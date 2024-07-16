@@ -71,23 +71,23 @@ Words and phrases in language often represent invariant concepts that remain sta
 Example: The Concept of "Dog"
 The word "dog" serves as an illustrative example of invariant representation in language:
 
-Morphological Diversity: Encompasses all dog breeds, from Chihuahuas to St. Bernards.
+- Morphological Diversity: Encompasses all dog breeds, from Chihuahuas to St. Bernards.
 
-Behavioral Characteristics: Includes common behaviors like barking, tail-wagging, and fetching.
+- Behavioral Characteristics: Includes common behaviors like barking, tail-wagging, and fetching.
 
-Physiological Features: Represents general attributes such as quadrupedal locomotion, presence of fur, and possession of a tail.
+- Physiological Features: Represents general attributes such as quadrupedal locomotion, presence of fur, and possession of a tail.
 
-Sensory Properties: Implies characteristics like a wet nose, keen sense of smell, and ability to hear high-frequency sounds.
+- Sensory Properties: Implies characteristics like a wet nose, keen sense of smell, and ability to hear high-frequency sounds.
 
-Cultural Associations: Carries connotations of loyalty, companionship, and domestication.
+- Cultural Associations: Carries connotations of loyalty, companionship, and domestication.
 
-Functional Roles: Encompasses various roles dogs play in human society, such as pets, working animals, or service animals.
+- Functional Roles: Encompasses various roles dogs play in human society, such as pets, working animals, or service animals.
 
-Evolutionary History: Implicitly references the species' evolution from wolf ancestors.
+- Evolutionary History: Implicitly references the species' evolution from wolf ancestors.
 
-Biological Classification: Places the animal within the taxonomic framework of mammals and canines.
+- Biological Classification: Places the animal within the taxonomic framework of mammals and canines.
 
-When the word "dog" is communicated, this entire complex of information is potentially transferred, with the receiver's brain "decompressing" the relevant aspects based on context and prior knowledge.
+- When the word "dog" is communicated, this entire complex of information is potentially transferred, with the receiver's brain "decompressing" the relevant aspects based on context and prior knowledge.
 
 ## Objectives
 
