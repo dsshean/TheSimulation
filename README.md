@@ -13,8 +13,6 @@ The project aims to use LLMs to generate and analyze diverse simulated scenarios
 - Fictional world simulations
 - Future scenario projections
 
-By examining the structures and patterns within these language-based simulations, the experiment can provide insights into both the nature of simulated realities and the capabilities of language models.
-
 ## Practical Applications
 
 This research has numerous practical applications across various fields:
@@ -58,7 +56,7 @@ This research has numerous practical applications across various fields:
 ## Framework
 Language as Compressed Reality
 
-The foundational concept of The Simulation is that language functions as a compressed representation of reality. This compression is not arbitrary but rather a consensus-based routine developed through evolution and cultural processes. The efficiency of language in conveying complex information suggests a potential optimization similar to that found in computational systems.
+The concept of The Simulation is that language functions as a compressed representation of reality. This is not arbitrary but rather a consensus-based routine developed through evolution and cultural processes. The efficiency of language in conveying complex information suggests similarities to that found in computational systems.
 
 ## Consensus-Based Compression
 
