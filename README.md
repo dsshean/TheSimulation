@@ -1,6 +1,6 @@
 # TheSimulation
 
-## Exploring Simulation Theory through Large Language Models
+Exploring Simulation Theory through Large Language Models
 
 ## Project Overview
 
@@ -55,16 +55,16 @@ This research has numerous practical applications across various fields:
     - Creating complex moral dilemmas for analysis
     - Simulating outcomes of ethical frameworks in various contexts
 
-# Framework
+## Framework
 Language as Compressed Reality
 
 The foundational concept of The Simulation is that language functions as a compressed representation of reality. This compression is not arbitrary but rather a consensus-based routine developed through evolution and cultural processes. The efficiency of language in conveying complex information suggests a potential optimization similar to that found in computational systems.
 
-# Consensus-Based Compression
+## Consensus-Based Compression
 
 Language evolves through collective agreement on meanings and representations. This process mirrors data compression algorithms that identify common patterns to reduce information redundancy. The consensus aspect ensures that the compression remains functional across a wide range of users and contexts.
 
-# Invariant Representations
+## Invariant Representations
 
 Words and phrases in language often represent invariant concepts that remain stable across multiple instances or examples. This property allows for efficient communication of complex ideas through simple linguistic tokens.
 
