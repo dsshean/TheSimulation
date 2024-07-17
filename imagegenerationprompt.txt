@@ -1,2 +1,0 @@
- <lora:pixelbuildings128-v2:1> top-down view of a building, hospital, simple, flat colors, stardew valley style
- low quality, blurry, deformed, watermark, text, signature, depth of field, photoreal
