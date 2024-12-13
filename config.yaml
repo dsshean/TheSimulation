@@ -1,0 +1,8 @@
+instrument_type: Stock # or 'Stock'
+trade_symbol: NVDA # Replace with your desired symbol
+contracts: 1 # For futures
+shares: 100 # For stocks
+profit_target: 20 # dollars profit
+daily_profit_target: 1000
+local: anthropic
+clientid: 10
