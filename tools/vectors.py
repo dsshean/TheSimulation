@@ -19,18 +19,18 @@ import json
 class DocumentProcessor:
     def __init__(
         self,
-        openai_api_key: str,
+        api_key: str,
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
         collection_name: str = "documents",
         persist_dir: str = "./storage",
-        model_name: str = "gpt-3.5-turbo",
+        model_name: str = "claude-3-5-sonnet-latest",
     ):
         """
         Initialize the document processor with LlamaIndex and Qdrant.
         
         Args:
-            openai_api_key: OpenAI API key
+            api_key: OpenAI API key
             qdrant_host: Qdrant server host
             qdrant_port: Qdrant server port
             collection_name: Name of the Qdrant collection
@@ -46,8 +46,8 @@ class DocumentProcessor:
         self.persist_dir.mkdir(parents=True, exist_ok=True)
         
         # Set up OpenAI
-        self.llm = OpenAI(temperature=0, model=model_name, api_key=openai_api_key)
-        self.embed_model = OpenAIEmbedding(api_key=openai_api_key)
+        self.llm = OpenAI(temperature=0, model=model_name, api_key=api_key)
+        self.embed_model = OpenAIEmbedding(api_key=api_key)
         
         # Initialize Qdrant client
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
@@ -276,51 +276,3 @@ class DocumentProcessor:
             }
             for hit in results
         ]
-
-# # Example usage
-# def main():
-#     # Initialize processor
-#     processor = DocumentProcessor(
-#         openai_api_key="your_openai_api_key",
-#         qdrant_host="localhost",
-#         qdrant_port=6333
-#     )
-    
-#     # Load and process documents
-#     documents = processor.load_documents("./documents")
-#     processor.process_documents(documents)
-    
-#     # Example vector query
-#     vector_results = processor.query_vector_store(
-#         "What are the main features discussed?",
-#         top_k=3
-#     )
-#     print("\nVector Search Results:")
-#     for result in vector_results:
-#         print(f"Score: {result['score']:.4f}")
-#         print(f"Text: {result['text'][:200]}...")
-#         print(f"Metadata: {result['metadata']}\n")
-    
-#     # Example knowledge graph query
-#     kg_results = processor.query_knowledge_graph(
-#         "What are the relationships between documents and features?"
-#     )
-#     print("\nKnowledge Graph Results:")
-#     for result in kg_results:
-#         print(f"Subject: {result['subject']}")
-#         print(f"Predicate: {result['predicate']}")
-#         print(f"Object: {result['object']}\n")
-    
-#     # Example metadata search
-#     metadata_results = processor.search_by_metadata({
-#         "category": "technical",
-#         "status": "active"
-#     })
-#     print("\nMetadata Search Results:")
-#     for result in metadata_results:
-#         print(f"Score: {result['score']:.4f}")
-#         print(f"Text: {result['text'][:200]}...")
-#         print(f"Metadata: {result['metadata']}\n")
-
-# if __name__ == "__main__":
-#     main()
