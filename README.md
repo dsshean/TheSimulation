@@ -4,7 +4,9 @@ Exploring Simulation Theory through Large Language Models
 
 ## Project Overview
 
-TheSimulation is an experiment to explore simulation theory utilizing Large Language Models (LLMs). This project investigates how LLMs can be used to create various types of simulations through language, serving as a proxy for different scenarios and environments. 
+CURRENTLY NON FUNCTIONAL - STILL UNDER DEVELOPMENT
+
+TheSimulation is an experiment to explore simulation theory utilizing Large Language Models (LLMs). This project investigates how LLMs can be used to create various types of simulations through language, serving as a proxy for different scenarios and environments.
 
 The project aims to use LLMs to generate and analyze diverse simulated scenarios, including:
 
@@ -18,42 +20,51 @@ The project aims to use LLMs to generate and analyze diverse simulated scenarios
 This research has numerous practical applications across various fields:
 
 1. Consumer Research and Product Development
+
    - Simulating consumer behavior in hypothetical scenarios
    - Testing product concepts in virtual environments
 
 2. Political Science
+
    - Modeling political systems and outcomes
    - Simulating policy impacts across different societal structures
 
 3. Environmental Studies
+
    - Projecting climate change scenarios
    - Modeling ecosystem responses to various interventions
 
 4. Urban Planning
+
    - Simulating city development under different conditions
    - Modeling traffic patterns and infrastructure needs
 
 5. Educational Tools
+
    - Developing immersive historical simulations
    - Creating interactive learning environments
 
 6. Psychological Research
+
    - Simulating social interactions and group dynamics
    - Exploring cognitive processes in controlled environments
 
 7. Crisis Management
+
    - Simulating disaster scenarios for preparedness training
    - Modeling response strategies to various crises
 
 8. Entertainment Industry
+
    - Developing rich, consistent fictional worlds for games and media
    - Simulating audience reactions to content
 
 9. Ethical Decision Making
-    - Creating complex moral dilemmas for analysis
-    - Simulating outcomes of ethical frameworks in various contexts
+   - Creating complex moral dilemmas for analysis
+   - Simulating outcomes of ethical frameworks in various contexts
 
 ## Framework
+
 Language as Compressed Reality
 
 The concept of The Simulation is that language functions as a compressed representation of reality. This is not arbitrary but rather a consensus-based routine developed through evolution and cultural processes. The efficiency of language in conveying complex information suggests similarities to that found in computational systems.
