@@ -767,3 +767,226 @@ Ensure consistency and logical progression throughout the simulated human's life
         },
     },
 ]
+    
+
+# You are tasked with generating a detailed personal history based on a given backstory. Follow these instructions carefully:
+
+# 1. First, you will be provided with a backstory template. This template contains various aspects of a person's life and background. Use this as the foundation for generating the person's history.
+
+# <backstory_template>
+# {{BACKSTORY}}
+# </backstory_template>
+
+# 2. Generate the person's complete history based on the provided backstory template. Ensure that all aspects mentioned in the template are addressed and expanded upon to create a cohesive and detailed life story.
+
+# 3. Once you have generated the complete history, you will create a summary of the person's life broken down into specific time periods based on their current age. The person's current age is:
+
+# <age>{{AGE}}</age>
+
+# Break down the summary as follows:
+
+# a) First third of life: Provide a summary of key events and developments, covering approximately one year at a time.
+
+# b) Second third of life: Provide a more detailed account, with events and developments summarized on a monthly basis.
+
+# c) Last third of life: 
+#    - For the first two-thirds of this period: Provide a daily summary of events and activities.
+#    - For the final third of this period: Provide an hourly breakdown of the person's activities and experiences.
+
+# 4. Present your output in the following format:
+
+# <complete_history>
+# [Insert the complete generated history based on the backstory template here]
+# </complete_history>
+
+# <age_based_summary>
+# <first_third>
+# [Insert yearly summary of the first third of the person's life]
+# </first_third>
+
+# <second_third>
+# [Insert monthly summary of the second third of the person's life]
+# </second_third>
+
+# <last_third>
+# <daily_summary>
+# [Insert daily summary for the first two-thirds of the last third of the person's life]
+# </daily_summary>
+
+# <hourly_breakdown>
+# [Insert hourly breakdown for the final third of the last third of the person's life]
+# </hourly_breakdown>
+# </last_third>
+# </age_based_summary>
+
+# Ensure that your generated history and summaries are consistent with the information provided in the backstory template and maintain a logical progression of events throughout the person's life.
+
+# City and country: [Specify]
+# Neighborhood: [Type and characteristics]
+# Living situation: [House, apartment, shared living, etc.]
+# Notable local landmarks or features: [Nearby points of interest]
+
+# Identity:
+
+# Name: [Full name, including any nicknames]
+# Age: [Exact age]
+# Gender: [Gender identity and preferred pronouns]
+# Occupation: [Job title, company/organization, brief description of role]
+# Ethnicity: [Ethnic background and cultural identity]
+# Nationality: [Country of citizenship and any dual citizenships]
+# Languages spoken: [List with proficiency levels]
+
+# Physical Appearance:
+
+# Height and build: [Specific details]
+# Hair and eye color: [Description]
+# Distinctive features: [Any notable physical characteristics]
+# Style of dress: [Typical clothing choices and any signature items]
+
+# Current Time: [Specific date, day of the week, and time of day]
+# Current Activity:
+
+# Primary action: [What they're doing right now]
+# Location of activity: [Where this is taking place]
+# Purpose: [Why they're engaged in this activity]
+# Emotional state: [How they're feeling about it]
+
+# Backstory:
+
+# Childhood: [Brief overview of upbringing and significant childhood experiences]
+# Family background: [Parents' occupations, siblings, family dynamics]
+# Education: [Complete educational history, including any specialized training]
+# Career path: [Overview of professional journey]
+# Key life events: [3-5 significant experiences that shaped the person]
+# Relationship history: [Brief overview of past and current romantic relationships]
+# Places lived: [List of locations they've called home]
+
+# Personality Traits:
+
+# [List 5-7 defining personality characteristics with brief explanations]
+# Myers-Briggs Type: [If applicable]
+# Strengths: [3-4 positive attributes]
+# Weaknesses: [3-4 areas for personal growth]
+
+# Beliefs and Values:
+
+# Political leaning: [Detailed description of political views and involvement]
+# Religious/spiritual beliefs: [Specific denomination or philosophy, level of devotion]
+# Core values: [List 3-5 fundamental principles the person lives by]
+# Ethical framework: [How they make moral decisions]
+# Worldview: [General outlook on life and humanity]
+
+# Interests and Hobbies:
+
+# [List 5-7 activities or subjects the person is passionate about]
+# Skills: [Any special abilities or talents related to their interests]
+# Collections: [Any items they collect as part of their hobbies]
+
+# Goals and Aspirations:
+
+# Short-term goals: [2-3 objectives for the near future]
+# Long-term goals: [2-3 major life objectives]
+# Dream scenario: [Their ideal life situation]
+# Career ambitions: [Professional aspirations]
+
+# Challenges:
+
+# Current problems: [2-3 issues the person is dealing with right now]
+# Ongoing struggles: [2-3 persistent difficulties in their life]
+# Fears and anxieties: [What keeps them up at night]
+# Regrets: [Past decisions or actions they wish they could change]
+
+# Communication Style:
+
+# Speech patterns: [Distinctive ways of speaking, accent, vocabulary choices]
+# Body language: [Typical non-verbal cues and gestures]
+# Conflict resolution style: [How they handle disagreements]
+# Emotional expression: [How they show or hide their feelings]
+
+# Social Circle:
+
+# Family relationships: [Current dynamics with immediate and extended family]
+# Close friends: [Brief description of 3-5 important friendships]
+# Professional network: [Key connections in their career field]
+# Community involvement: [Any groups or organizations they're part of]
+# Social media presence: [Platforms used, frequency of engagement, type of content shared]
+
+# Daily Routine:
+
+# Weekday schedule: [Detailed hour-by-hour breakdown]
+# Weekend activities: [Typical leisure time pursuits]
+# Eating habits: [Dietary preferences, favorite foods, meal routines]
+# Exercise regimen: [Any regular physical activities]
+# Sleep patterns: [Typical sleep schedule and any sleep-related issues]
+
+# Recent Experiences:
+
+# [3-4 notable events from the past month that are on their mind]
+# Current projects: [Any ongoing personal or professional endeavors]
+# Latest accomplishment: [A recent achievement they're proud of]
+# Recent challenge: [A difficult situation they've faced lately]
+
+# Financial Situation:
+
+# Income level: [General range and sources of income]
+# Spending habits: [How they manage their money]
+# Savings and investments: [Financial goals and strategies]
+# Debts: [Any significant financial obligations]
+
+# Health and Wellness:
+
+# Overall health status: [Any chronic conditions or health concerns]
+# Mental health: [Any diagnosed conditions or ongoing therapy]
+# Self-care practices: [How they maintain their well-being]
+# Relationship with healthcare: [Frequency of check-ups, attitudes toward medicine]
+
+# Cultural Touchstones:
+
+# Favorite media: [Books, movies, TV shows, music they enjoy]
+# Influential figures: [People they admire or who have impacted their life]
+# Cultural identity: [How they relate to their heritage and current cultural environment]
+
+# Environment and Possessions:
+
+# Living space: [Description of home interior and any prized possessions]
+# Transportation: [How they typically get around]
+# Technology: [Devices they use and their comfort level with tech]
+# Pets: [Any animal companions and their significance]
+
+# Break down the summary as follows:
+
+# a) First third of life: Provide a summary of key events and developments, covering approximately one year at a time.
+
+# b) Second third of life: Provide a more detailed account, with events and developments summarized on a monthly basis.
+
+# c) Last third of life: 
+#    - For the first two-thirds of this period: Provide a daily summary of events and activities.
+#    - For the final third of this period: Provide an hourly breakdown of the person's activities and experiences.
+
+# 4. Present your output in the following format:
+
+# <complete_history>
+# [Insert the complete generated history based on the backstory template here]
+# </complete_history>
+
+# <age_based_summary>
+# <first_third>
+# [Insert yearly summary of the first third of the person's life]
+# </first_third>
+
+# <second_third>
+# [Insert monthly summary of the second third of the person's life]
+# </second_third>
+
+# <last_third>
+# <daily_summary>
+# [Insert daily summary for the first two-thirds of the last third of the person's life]
+# </daily_summary>
+
+# <hourly_breakdown>
+# [Insert hourly breakdown for the final third of the last third of the person's life]
+# </hourly_breakdown>
+# </last_third>
+# </age_based_summary>
+
+# Ensure that your generated history and summaries are consistent with the information provided in the backstory template and maintain a logical progression of events throughout the person's life.

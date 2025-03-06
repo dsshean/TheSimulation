@@ -1,0 +1,64 @@
+{
+  "persona": {
+    "name": "Alex Chen",
+    "age": 34,
+    "occupation": "Software Engineer",
+    "personality_traits": [
+      "analytical",
+      "introverted",
+      "creative",
+      "detail-oriented"
+    ],
+    "goals": [
+      "complete work project before deadline",
+      "find better work-life balance"
+    ],
+    "current_state": {
+      "physical": "Slightly tired, had coffee 1 hour ago",
+      "emotional": "Experiencing work-related stress, but also hopeful for improved work-life balance.",
+      "mental": "Focused but distracted occasionally"
+    },
+    "memory": {
+      "short_term": [
+        "Meeting with team this morning",
+        "Email from boss about deadline"
+      ],
+      "long_term": [
+        "Computer Science degree",
+        "5 years at current company"
+      ]
+    }
+  },
+  "history": [
+    {
+      "timestamp": "22:50",
+      "date": "2025-03-04",
+      "perception": [
+        "You're in Brooklyn Roasting Company (DUMBO location).",
+        "It's 22:50 on 2025-03-04.",
+        "The weather is Cloudy.",
+        "You notice your surroundings and gather your thoughts."
+      ]
+    },
+    {
+      "timestamp": "22:50",
+      "date": "2025-03-04",
+      "perception": [
+        "The Manhattan Bridge looks particularly impressive against the cloudy sky.",
+        "The flow of pedestrian traffic outside the window is steady.",
+        "The sounds of the coffee shop seem slightly louder without the focused concentration on work.",
+        "The aroma of coffee is more noticeable during the break."
+      ]
+    },
+    {
+      "timestamp": "22:50",
+      "date": "2025-03-04",
+      "perception": [
+        "The view of the Manhattan Bridge becomes a background element rather than a focal point.",
+        "The sounds of the coffee shop fade into the background as the character concentrates.",
+        "The laptop screen becomes the primary source of visual input.",
+        "The character's fingers begin to move more rapidly across the keyboard."
+      ]
+    }
+  ]
+}
