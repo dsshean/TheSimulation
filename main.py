@@ -1,2459 +1,1936 @@
-import json
-import logging
-import re
-import yaml
-import os
 import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Union
-from rich.console import Console
-from rich.prompt import IntPrompt
+import datetime
+import json
+# At the top of your file, update the logging configuration
+import logging
+import os
+import re
+import time
+from datetime import datetime
+from logging.handlers import RotatingFileHandler
+from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
+
+import requests
+import yaml
+# Google Generative AI API
+from google import genai
+from google.genai import types
 from langchain_community.tools import DuckDuckGoSearchRun
-import argparse
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("simulation.log"), logging.StreamHandler()]
+from pydantic import BaseModel, Field, model_validator
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+# Create logs directory if it doesn't exist
+os.makedirs("logs", exist_ok=True)
+
+# Configure file logging
+file_handler = RotatingFileHandler(
+    "logs/simulation.log",
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=5
 )
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+# Configure root logger to use file handler
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.addHandler(file_handler)
+
+# Set Google Generative AI logger to log to file only
+genai_logger = logging.getLogger('google_genai')
+genai_logger.setLevel(logging.INFO)
+genai_logger.propagate = False  # Don't propagate to root logger
+genai_logger.addHandler(file_handler)
+
+# Set our application logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-class LLMService:
-    """Service for interacting with the LLM."""
-    
-    async def generate_content(self, prompt: str, system_instruction: str = "", temperature: float = 0.7) -> Any:
-        """Generate content using the LLM."""
-        try:
-            # This is a placeholder for the actual LLM call
-            # In a real implementation, this would call an API or local model
-            
-            # For demonstration purposes, we'll return a mock response
-            # In a real implementation, replace this with actual LLM API calls
-            
-            if "weather" in prompt.lower():
-                return json.dumps({
-                    "weather_condition": "Partly Cloudy",
-                    "temperature": "72°F (22°C)",
-                    "precipitation": "None",
-                    "data_source": "Mock Weather Data"
-                })
-            elif "news" in prompt.lower():
-                return json.dumps([
-                    {
-                        "headline": "Local Festival Announced for Next Weekend",
-                        "summary": "The annual city festival will take place next weekend with music, food, and activities.",
-                        "data_source": "Mock News Data"
-                    },
-                    {
-                        "headline": "New Restaurant Opens Downtown",
-                        "summary": "A new Italian restaurant has opened in the downtown area, featuring authentic cuisine.",
-                        "data_source": "Mock News Data"
-                    }
-                ])
-            elif "local events" in prompt.lower():
-                return json.dumps([
-                    {
-                        "name": "Farmers Market",
-                        "description": "Weekly farmers market with local produce and crafts",
-                        "date": "Every Saturday",
-                        "location": "City Square",
-                        "data_source": "Mock Events Data"
-                    },
-                    {
-                        "name": "Art Exhibition",
-                        "description": "Local artists showcase their work",
-                        "date": "This weekend",
-                        "location": "Community Gallery",
-                        "data_source": "Mock Events Data"
-                    }
-                ])
-            elif "create a persona" in prompt.lower():
-                return json.dumps({
-                    "name": "Alex Johnson",
-                    "age": 32,
-                    "occupation": "Graphic Designer",
-                    "personality_traits": ["creative", "curious", "outgoing"],
-                    "background": "Born and raised in the city, studied art in college, now works at a design agency.",
-                    "goals": ["Advance in career", "Find new inspiration", "Expand social circle"],
-                    "current_emotion": "curious",
-                    "current_goal": "Explore new parts of the city"
-                })
-            elif "immediate environment" in prompt.lower():
-                return json.dumps({
-                    "current_location_name": "Central Park",
-                    "location_type": "Park",
-                    "indoor_outdoor": "Outdoor",
-                    "description": "A vast urban park with walking paths, lakes, and open spaces.",
-                    "features": ["Trees", "Benches", "Walking paths", "Lake"],
-                    "present_people": ["Joggers", "Dog walkers", "Tourists", "Families"],
-                    "crowd_density": "Moderate",
-                    "social_atmosphere": "Relaxed and recreational",
-                    "ongoing_activities": ["Jogging", "Picnicking", "Photography", "Dog walking"],
-                    "data_source": "Mock Environment Data"
-                })
-            elif "search" in prompt.lower() and "results" in prompt.lower():
-                return json.dumps({
-                    "consequences": ["You learned about the opening hours of the museum", "You discovered there's a special exhibition today"],
-                    "observations": ["The search results were detailed and helpful", "Several reviews mentioned the impressive architecture"]
-                })
-            elif "decide" in prompt.lower() and "action" in prompt.lower():
-                return "I decide to walk over to the lake and sit on a bench to enjoy the view for a few minutes."
-            elif "updated narrative" in prompt.lower():
-                return "I stroll through the park, enjoying the dappled sunlight filtering through the trees. The weather is pleasant, and I can hear birds chirping nearby. I decide to find a quiet spot to sit and observe the people around me."
-            elif "location details" in prompt.lower():
-                return json.dumps({
-                    "full_name": "Central Park",
-                    "location_type": "Park",
-                    "description": "A vast urban park with walking paths, lakes, and open spaces.",
-                    "features": ["Trees", "Benches", "Walking paths", "Lake", "Zoo", "Playgrounds"],
-                    "opening_hours": "6:00 AM - 1:00 AM daily",
-                    "address": "Central Park, New York, NY",
-                    "popular_for": "Walking, jogging, picnics, boating",
-                    "price_level": "Free",
-                    "busy_times": "Weekends and holidays",
-                    "rating": "4.8/5",
-                    "data_source": "Mock Location Data"
-                })
-            elif "nearby locations" in prompt.lower():
-                return json.dumps([
-                    {
-                        "name": "Metropolitan Museum of Art",
-                        "type": "Museum",
-                        "distance": "Adjacent to Central Park"
-                    },
-                    {
-                        "name": "Bethesda Terrace",
-                        "type": "Landmark",
-                        "distance": "Within Central Park"
-                    },
-                    {
-                        "name": "Loeb Boathouse",
-                        "type": "Restaurant",
-                        "distance": "Within Central Park"
-                    }
-                ])
-            elif "opening hours" in prompt.lower():
-                return json.dumps({
-                    "is_open": True,
-                    "hours": "6:00 AM - 1:00 AM daily",
-                    "data_source": "Mock Hours Data"
-                })
-            elif "travel time" in prompt.lower():
-                return "15"
-            elif "transition" in prompt.lower():
-                return "I walk from Central Park to the Metropolitan Museum of Art, enjoying the pleasant weather. As I approach the grand entrance of the museum, I notice the impressive architecture and the steady stream of visitors entering and exiting. The change from the natural setting of the park to this cultural institution is striking."
-            else:
-                # Generic response for other prompts
-                return json.dumps({
-                    "consequences": ["Your action was successful", "People around you noticed what you did"],
-                    "observations": ["The environment responded naturally to your action", "You feel satisfied with the outcome"]
-                })
-                
-        except Exception as e:
-            logger.error(f"Error generating content: {e}")
-            return "Error generating content. Please try again."
+# Configure API keys
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") # still using openai key name for legacy reasons
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable not set. Please set it with your OpenAI API key.")
 
-class Simulacra:
-    """A simulated character with a persona."""
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY environment variable not set. Please set it with your Google API key.")
+
+# Type variable for Pydantic models
+T = TypeVar('T', bound=BaseModel)
+
+class WorldReactionProfile(BaseModel):
+    """Defines how the world reacts to the character's actions."""
     
-    def __init__(self):
-        """Initialize the simulacra."""
-        self.persona = {}
-        self.llm_service = LLMService()
+    consequence_severity: Literal["mild", "moderate", "severe"] = "moderate"
+    social_responsiveness: Literal["hostile", "neutral", "friendly", "indifferent"] = "neutral"
+    environmental_stability: Literal["stable", "dynamic", "chaotic"] = "dynamic"
+    coincidence_frequency: Literal["rare", "occasional", "frequent"] = "occasional"
+    challenge_level: Literal["easy", "normal", "difficult"] = "normal"
+    narrative_tone: Literal["comedic", "dramatic", "mundane", "suspenseful"] = "mundane"
+    opportunity_frequency: Literal["scarce", "normal", "abundant"] = "normal"
+    serendipity: Literal["low", "medium", "high"] = "medium"
+    world_awareness: Literal["invisible", "normal", "spotlight"] = "normal"
+    karmic_response: Literal["strong", "moderate", "none"] = "moderate"
     
-    async def decide_action(self, perception) -> str:
-        """Decide on an action based on the current perception."""
-        # Generate prompt for deciding action
-        prompt = PromptManager.decide_action_prompt(perception)
-        
-        # Get response from LLM
-        action_response = await self.llm_service.generate_content(
-            prompt=prompt,
-            system_instruction="You are a decision-making system for a simulated character. Respond with a specific, realistic action in first person present tense.",
-            temperature=0.7
-        )
-        
-        # Process the response
-        if isinstance(action_response, list) and len(action_response) > 0:
-            action = action_response[0]
-        elif isinstance(action_response, dict) and "text" in action_response:
-            action = action_response["text"]
-        elif isinstance(action_response, str):
-            action = action_response
-        else:
-            logger.warning(f"Unexpected action response format: {type(action_response)}")
-            action = "I decide to wait and observe my surroundings for a moment."
-        
-        # Clean up the action text
-        action = action.strip().strip('"')
-        
-        # Update the simulacra's state based on the action
-        self._update_state_based_on_action(action)
-        
-        return action
-    
-    def _update_state_based_on_action(self, action: str) -> None:
-        """Update the simulacra's state based on the action they've decided to take."""
-        # Extract emotion from action if possible
-        emotion_keywords = {
-            "happy": ["smile", "laugh", "joy", "happy", "excited", "pleased", "delighted"],
-            "sad": ["sigh", "cry", "sad", "upset", "disappointed", "unhappy", "tearful"],
-            "angry": ["frown", "angry", "annoyed", "irritated", "frustrated", "mad"],
-            "anxious": ["nervous", "anxious", "worried", "concerned", "uneasy", "apprehensive"],
-            "curious": ["curious", "interested", "intrigued", "wonder", "explore", "investigate"],
-            "tired": ["tired", "exhausted", "yawn", "weary", "fatigued", "sleepy"],
-            "relaxed": ["relax", "calm", "peaceful", "comfortable", "content", "at ease"]
+    @classmethod
+    def create_profile(cls, profile_name: str = "balanced") -> "WorldReactionProfile":
+        """Create a predefined world reaction profile."""
+        profiles = {
+            "balanced": {}, # Default values
+            "protagonist": {
+                "social_responsiveness": "friendly",
+                "coincidence_frequency": "frequent",
+                "opportunity_frequency": "abundant",
+                "serendipity": "high",
+                "world_awareness": "spotlight",
+                "karmic_response": "strong"
+            },
+            "antagonist": {
+                "social_responsiveness": "hostile",
+                "challenge_level": "difficult",
+                "narrative_tone": "dramatic",
+                "opportunity_frequency": "scarce",
+                "world_awareness": "spotlight"
+            },
+            "comedic": {
+                "consequence_severity": "mild",
+                "coincidence_frequency": "frequent",
+                "narrative_tone": "comedic",
+                "serendipity": "high"
+            },
+            "dramatic": {
+                "consequence_severity": "severe",
+                "environmental_stability": "chaotic",
+                "narrative_tone": "dramatic",
+                "challenge_level": "difficult"
+            },
+            "realistic": {
+                "coincidence_frequency": "rare",
+                "karmic_response": "none",
+                "world_awareness": "invisible",
+                "serendipity": "low"
+            },
+            "serendipitous": {
+                "coincidence_frequency": "frequent",
+                "opportunity_frequency": "abundant",
+                "serendipity": "high"
+            },
+            "challenging": {
+                "consequence_severity": "severe",
+                "challenge_level": "difficult",
+                "opportunity_frequency": "scarce"
+            }
         }
         
-        action_lower = action.lower()
-        detected_emotion = None
+        if profile_name in profiles:
+            return cls(**profiles[profile_name])
+        else:
+            logger.warning(f"Unknown profile '{profile_name}'. Using 'balanced' profile.")
+            return cls()
+    
+    def get_description(self) -> str:
+        """Get a human-readable description of the profile."""
+        descriptions = {
+            "consequence_severity": {
+                "mild": "Actions have minimal consequences",
+                "moderate": "Actions have normal, expected consequences",
+                "severe": "Actions have amplified consequences"
+            },
+            "social_responsiveness": {
+                "hostile": "People tend to be unfriendly or antagonistic",
+                "neutral": "People react normally based on circumstances",
+                "friendly": "People tend to be helpful and accommodating",
+                "indifferent": "People largely ignore the character"
+            },
+            "environmental_stability": {
+                "stable": "Environment changes little, predictable",
+                "dynamic": "Environment changes at a normal, realistic pace",
+                "chaotic": "Environment frequently changes in unexpected ways"
+            },
+            "coincidence_frequency": {
+                "rare": "Few coincidences, highly realistic cause-and-effect",
+                "occasional": "Normal level of coincidences",
+                "frequent": "Many coincidences (meeting just the right person, etc.)"
+            },
+            "challenge_level": {
+                "easy": "Obstacles are simpler than expected",
+                "normal": "Obstacles require appropriate effort",
+                "difficult": "Obstacles require exceptional effort"
+            },
+            "narrative_tone": {
+                "comedic": "Humorous situations tend to arise",
+                "dramatic": "Emotionally significant events occur",
+                "mundane": "Everyday, ordinary events predominate",
+                "suspenseful": "Tense, uncertain situations develop"
+            },
+            "opportunity_frequency": {
+                "scarce": "Few new opportunities present themselves",
+                "normal": "Realistic number of opportunities",
+                "abundant": "Many opportunities appear"
+            },
+            "serendipity": {
+                "low": "Rarely stumble upon helpful things",
+                "medium": "Occasionally find useful things by chance",
+                "high": "Frequently make fortunate discoveries"
+            },
+            "world_awareness": {
+                "invisible": "Character's actions go largely unnoticed",
+                "normal": "Appropriate recognition of actions",
+                "spotlight": "Character's actions receive unusual attention"
+            },
+            "karmic_response": {
+                "strong": "Good/bad actions quickly lead to rewards/consequences",
+                "moderate": "Some connection between moral choices and outcomes",
+                "none": "No special connection between moral choices and outcomes"
+            }
+        }
         
-        for emotion, keywords in emotion_keywords.items():
-            if any(keyword in action_lower for keyword in keywords):
-                detected_emotion = emotion
-                break
+        result = []
+        for key, value in self.model_dump().items():
+            if key in descriptions and value in descriptions[key]:
+                result.append(f"{key.replace('_', ' ').title()}: {descriptions[key][value]}")
         
-        if detected_emotion:
-            self.persona["current_emotion"] = detected_emotion
-        
-        # Update recent memory with the action
-        if "recent_actions" not in self.persona:
-            self.persona["recent_actions"] = []
-        
-        # Add the action to recent actions, keeping only the last 5
-        self.persona["recent_actions"].append(action)
-        if len(self.persona["recent_actions"]) > 5:
-            self.persona["recent_actions"] = self.persona["recent_actions"][-5:]
-        
-        # Update recent memory
-        self.persona["recent_memory"] = f"I recently {action.lower().replace('I ', '')}"
+        return "\n".join(result)
+
+class ImmediateEnvironment(BaseModel):
+    # Physical location
+    current_location_name: str  # Specific place (café, park, office)
+    location_type: str  # Category of location
+    indoor_outdoor: str  # Whether inside or outside
+    
+    # Immediate physical conditions
+    noise_level: str  # How loud/quiet it is
+    lighting: str  # Brightness, natural/artificial
+    temperature_feeling: str  # How it feels (may differ from weather)
+    air_quality: str  # Fresh, stuffy, smoky, etc.
+    
+    # Social environment
+    present_people: List[str]  # Types of people around
+    crowd_density: str  # How crowded it is
+    social_atmosphere: str  # Mood of people around
+    ongoing_activities: List[str]  # What others are doing
+    
+    # Available options
+    nearby_objects: List[str]  # Things that can be interacted with
+    available_services: List[str]  # Services that can be used
+    exit_options: List[str]  # Ways to leave current location
+    interaction_opportunities: List[str]  # People to talk to, activities to join
+    
+    # Sensory information
+    visible_features: List[str]  # Notable things that can be seen
+    audible_sounds: List[str]  # What can be heard
+    noticeable_smells: List[str]  # Olfactory information
+    
+    # Practical considerations
+    seating_availability: str  # Places to sit
+    food_drink_options: List[str]  # Available refreshments
+    restroom_access: str  # Bathroom availability
+    
+    # Dynamic elements
+    recent_changes: List[str]  # What just changed in the environment
+    ongoing_conversations: List[str]  # Topics being discussed nearby
+    attention_drawing_elements: List[str]  # Things that stand out
+
+class WorldState(BaseModel):
+    # Time and date
+    current_time: str
+    current_date: str
+    
+    # Location context
+    city_name: str
+    country_name: str
+    region_name: str
+    
+    # Weather
+    weather_condition: str
+    temperature: str
+    forecast: str
+    
+    # Social and economic conditions
+    social_climate: str  # General social mood, tensions, celebrations
+    economic_condition: str  # Economic health, job market, etc.
+    
+    # Current events
+    major_events: List[str]  # Significant happenings in the area
+    local_news: List[str]  # Recent news items
+    
+    # Infrastructure status
+    transportation_status: str  # Public transit, traffic conditions
+    utility_status: str  # Power, water, internet
+    
+    # Public information
+    public_announcements: List[str]  # Official communications
+    trending_topics: List[str]  # What people are talking about
+    
+    # Cultural context
+    current_cultural_events: List[str]  # Festivals, performances, exhibitions
+    sports_events: List[str]  # Games, matches, tournaments
+    
+    # Health and safety
+    public_health_status: str  # Disease outbreaks, health advisories
+    public_safety_status: str  # Crime levels, safety concerns
+
+class WorldStateResponse(BaseModel):
+    updated_world_state: WorldState
+
+class ImmediateEnvironmentResponse(BaseModel):
+    updated_environment: ImmediateEnvironment
+
+class WorldUpdateResponse(BaseModel):
+    time: str
+    location: str
+    weather: str
+    environment: str
+    events: str
+    social: str
+    economic: str
+    consequences: str
+    observations: str
+
+class EmotionAnalysisResponse(BaseModel):
+    primary_emotion: str
+    intensity: Literal['Low', 'Medium', 'High']
+    secondary_emotion: str
+    emotional_update: str
+
+class ActionDetails(BaseModel):
+    manner: Optional[str] = None
+    duration: Optional[str] = None
+
+class ActionDecisionResponse(BaseModel):
+    thought_process: str
+    action: str
+    action_details: ActionDetails
+
+class DayResponse(BaseModel):
+    reflect: str
 
 class PromptManager:
-    """Manages prompts for the simulation."""
+    """Manages all prompts used in the simulation."""
     
     @staticmethod
-    def process_update_prompt(world_state: Dict, immediate_environment: Dict, simulacra: Dict, action: str, reaction_profile: str = "balanced") -> str:
-        """Generate a prompt for processing an update to the world state based on an action."""
-        # Extract relevant information from world_state
-        city = world_state.get("city", "Unknown")
-        country = world_state.get("country", "Unknown")
-        current_time = world_state.get("current_time", "Unknown")
-        current_date = world_state.get("current_date", "Unknown")
-        day_of_week = world_state.get("day_of_week", "Unknown")
-        
-        # Extract weather information
-        weather = world_state.get("weather", {})
-        weather_condition = weather.get("weather_condition", "Unknown")
-        temperature = weather.get("temperature", "Unknown")
-        
-        # Extract location information
-        current_location = immediate_environment.get("current_location_name", "Unknown")
-        location_type = immediate_environment.get("location_type", "Unknown")
-        indoor_outdoor = immediate_environment.get("indoor_outdoor", "Unknown")
-        location_description = immediate_environment.get("description", "No description available")
-        
-        # Extract social context
-        present_people = immediate_environment.get("present_people", ["Unknown"])
-        crowd_density = immediate_environment.get("crowd_density", "Unknown")
-        social_atmosphere = immediate_environment.get("social_atmosphere", "Unknown")
-        ongoing_activities = immediate_environment.get("ongoing_activities", ["Unknown"])
-        
-        # Extract persona information
-        persona_name = simulacra.get("name", "Unknown")
-        persona_age = simulacra.get("age", "Unknown")
-        persona_occupation = simulacra.get("occupation", "Unknown")
-        persona_traits = simulacra.get("personality_traits", ["Unknown"])
-        persona_goal = simulacra.get("current_goal", "Unknown")
-        persona_emotion = simulacra.get("current_emotion", "neutral")
-        
-        # Get news and events if available
-        news = world_state.get("news", [])
-        local_events = world_state.get("local_events", [])
-        
-        # Format news and events for the prompt
-        news_text = ""
-        if news:
-            news_text = "Recent News:\n"
-            for i, item in enumerate(news[:2], 1):  # Include up to 2 news items
-                news_text += f"- {item.get('headline', 'Unknown')}: {item.get('summary', 'No details')}\n"
-        
-        events_text = ""
-        if local_events:
-            events_text = "Local Events:\n"
-            for i, event in enumerate(local_events[:2], 1):  # Include up to 2 events
-                events_text += f"- {event.get('name', 'Unknown')}: {event.get('description', 'No details')} at {event.get('location', 'Unknown')}\n"
-        
-        # Determine reaction guidance based on profile
-        reaction_guidance = ""
-        if reaction_profile == "balanced":
-            reaction_guidance = "Provide balanced, realistic consequences that match the scale of the action."
-        elif reaction_profile == "realistic":
-            reaction_guidance = "Provide highly realistic, detailed consequences that would occur in the real world."
-        elif reaction_profile == "dramatic":
-            reaction_guidance = "Provide somewhat dramatic consequences that make the simulation more interesting."
-        elif reaction_profile == "optimistic":
-            reaction_guidance = "Provide generally positive consequences, focusing on what goes well."
-        elif reaction_profile == "pessimistic":
-            reaction_guidance = "Provide generally challenging consequences, focusing on complications that arise."
-        
-        # Construct the prompt
-        prompt = f"""
-        You are simulating realistic world reactions to a character's action in {city}, {country}.
-        
-        REAL-WORLD CONTEXT:
-        - Location: {city}, {country}
-        - Date: {current_date} ({day_of_week})
-        - Time: {current_time}
-        - Weather: {weather_condition}, {temperature}
-        {news_text}
-        {events_text}
-        
-        CURRENT LOCATION: {current_location} ({location_type}, {indoor_outdoor})
-        {location_description}
-        
-        Notable features:
-        - {', '.join(immediate_environment.get('features', ['None']))}
-        
-        Present people: {', '.join(present_people)}
-        Crowd density: {crowd_density}
-        Social atmosphere: {social_atmosphere}
-        Ongoing activities: {', '.join(ongoing_activities)}
-        
-        CHARACTER:
-        - Name: {persona_name}
-        - Age: {persona_age}
-        - Occupation: {persona_occupation}
-        - Personality: {', '.join(persona_traits)}
-        - Current goal: {persona_goal}
-        - Current emotion: {persona_emotion}
-        
-        ACTION:
-        {action}
-        
-        Based on this action and context, determine:
-        1. The realistic consequences of this action (what happens as a result)
-        2. What the character observes during and after taking this action
-        
-        GUIDANCE:
-        {reaction_guidance}
-        - Consider the physical environment, social context, and time of day
-        - Consider how other people present would realistically react
-        - Consider any limitations or opportunities presented by the location
-        - Keep consequences proportional to the action
-        
-        Format your response as a JSON object with the following structure:
-        {{
-            "consequences": ["List of 1-3 consequences of the action"],
-            "observations": ["List of 1-3 observations the character makes"],
-            "environment_updates": {{
-                "optional fields to update in the environment": "new values"
-            }}
-        }}
+    def analyze_information_prompt(information: str, context: Optional[Dict] = None) -> str:
+        context_str = json.dumps(context, indent=2) if context else "No context provided."
+        return f"""
+        Information to analyze:
+        {information}
+
+        Context (previous world state or other relevant info):
+        {context_str}
+
+        Based on this, update the world state. Focus on making realistic and plausible changes to the world.
+        Return the updated world state as a JSON object.
         """
-        
-        return prompt
     
     @staticmethod
-    def decide_action_prompt(perception) -> str:
-        """Generate a prompt for deciding an action based on perception."""
-        # Extract relevant information from perception
-        time_context = perception.get("time_context", {})
-        location_context = perception.get("location_context", {})
-        environmental_context = perception.get("environmental_context", {})
-        social_context = perception.get("social_context", {})
-        self_context = perception.get("self_context", {})
-        narrative_context = perception.get("narrative_context", "")
+    def initialize_world_state_prompt(news_results: str, config: Dict) -> str:
+        return f"""
+        News results:
+        {news_results}
+
+        World configuration:
+        {json.dumps(config, indent=2)}
+
+        Based on this information, create a comprehensive world state with the following elements:
+        - current_time: The current time in 24-hour format
+        - current_date: The current date in YYYY-MM-DD format
+        - city_name: The name of the city
+        - country_name: The name of the country
+        - region_name: The name of the region or state
+        - weather_condition: Current weather (sunny, cloudy, rainy, etc.)
+        - temperature: Current temperature with units
+        - forecast: Brief weather forecast for next 24 hours
+        - social_climate: General social mood and atmosphere
+        - economic_condition: Current economic situation
+        - major_events: List of significant events happening in the area
+        - local_news: List of recent local news items
+        - transportation_status: Status of public transit and traffic
+        - utility_status: Status of power, water, internet services
+        - public_announcements: List of official announcements
+        - trending_topics: List of topics people are discussing
+        - current_cultural_events: List of ongoing cultural events
+        - sports_events: List of sports events
+        - public_health_status: Current public health situation
+        - public_safety_status: Current safety and security situation
+
+        Create a realistic and detailed world state based on the news and configuration.
+        """
+    
+    @staticmethod
+    def initialize_immediate_environment_prompt(world_state: Dict, location: str) -> str:
+        return f"""
+        World State:
+        {json.dumps(world_state, indent=2)}
+
+        Current Location: {location}
+
+        Based on this information, create a detailed immediate environment for this location with the following elements:
+        - current_location_name: Specific name of the current location
+        - location_type: Type of location (restaurant, park, office, etc.)
+        - indoor_outdoor: Whether the location is indoor or outdoor
+        - noise_level: How loud or quiet it is
+        - lighting: Lighting conditions
+        - temperature_feeling: How the temperature feels
+        - air_quality: Quality of the air
+        - present_people: Types of people present
+        - crowd_density: How crowded the location is
+        - social_atmosphere: Social mood of the location
+        - ongoing_activities: Activities happening around
+        - nearby_objects: Objects that can be interacted with
+        - available_services: Services available at this location
+        - exit_options: Ways to leave this location
+        - interaction_opportunities: Opportunities for interaction
+        - visible_features: Notable visible features
+        - audible_sounds: Sounds that can be heard
+        - noticeable_smells: Smells that can be detected
+        - seating_availability: Availability of seating
+        - food_drink_options: Available food and drinks
+        - restroom_access: Access to restrooms
+        - recent_changes: Recent changes to the environment
+        - ongoing_conversations: Topics being discussed nearby
+        - attention_drawing_elements: Things that draw attention
+
+        Create a realistic and detailed immediate environment that would be consistent with the world state and location.
+        """
+    
+    @staticmethod
+    def process_update_prompt(world_state: Dict, immediate_environment: Dict, 
+                            simulacra_action: Dict, reaction_profile: WorldReactionProfile) -> str:
+        """Create a prompt for processing an update based on the simulacra's action."""
         
-        # Format the prompt
-        prompt = f"""
-        You are deciding the next action for a character in a realistic simulation based on their perception of the world.
+        # Create guidance based on the reaction profile
+        profile_guidance = f"""
+        WORLD REACTION PROFILE:
         
-        Current Situation:
-        - Time: {time_context.get('current_time', 'Unknown')} on {time_context.get('current_date', 'Unknown')} ({time_context.get('day_of_week', 'Unknown')})
-        - Location: {location_context.get('current_location', 'Unknown')} in {location_context.get('city', 'Unknown')}, {location_context.get('country', 'Unknown')}
-        - Location Type: {location_context.get('location_type', 'Unknown')}
+        1. Consequence Severity: {reaction_profile.consequence_severity.upper()}
+        - {"Actions have minimal consequences" if reaction_profile.consequence_severity == "mild" else
+        "Actions have normal, expected consequences" if reaction_profile.consequence_severity == "moderate" else
+        "Actions have amplified consequences"}
+        
+        2. Social Responsiveness: {reaction_profile.social_responsiveness.upper()}
+        - {"People tend to be unfriendly or antagonistic" if reaction_profile.social_responsiveness == "hostile" else
+        "People react normally based on circumstances" if reaction_profile.social_responsiveness == "neutral" else
+        "People tend to be helpful and accommodating" if reaction_profile.social_responsiveness == "friendly" else
+        "People largely ignore the character"}
+        
+        3. Environmental Stability: {reaction_profile.environmental_stability.upper()}
+        - {"Environment changes little, predictable" if reaction_profile.environmental_stability == "stable" else
+        "Environment changes at a normal, realistic pace" if reaction_profile.environmental_stability == "dynamic" else
+        "Environment frequently changes in unexpected ways"}
+        
+        4. Coincidence Frequency: {reaction_profile.coincidence_frequency.upper()}
+        - {"Few coincidences, highly realistic cause-and-effect" if reaction_profile.coincidence_frequency == "rare" else
+        "Normal level of coincidences" if reaction_profile.coincidence_frequency == "occasional" else
+        "Many coincidences (meeting just the right person, etc.)"}
+        
+        5. Challenge Level: {reaction_profile.challenge_level.upper()}
+        - {"Obstacles are simpler than expected" if reaction_profile.challenge_level == "easy" else
+        "Obstacles require appropriate effort" if reaction_profile.challenge_level == "normal" else
+        "Obstacles require exceptional effort"}
+        
+        6. Narrative Tone: {reaction_profile.narrative_tone.upper()}
+        - {"Humorous situations tend to arise" if reaction_profile.narrative_tone == "comedic" else
+        "Emotionally significant events occur" if reaction_profile.narrative_tone == "dramatic" else
+        "Everyday, ordinary events predominate" if reaction_profile.narrative_tone == "mundane" else
+        "Tense, uncertain situations develop"}
+        
+        7. Opportunity Frequency: {reaction_profile.opportunity_frequency.upper()}
+        - {"Few new opportunities present themselves" if reaction_profile.opportunity_frequency == "scarce" else
+        "Realistic number of opportunities" if reaction_profile.opportunity_frequency == "normal" else
+        "Many opportunities appear"}
+        
+        8. Serendipity: {reaction_profile.serendipity.upper()}
+        - {"Rarely stumble upon helpful things" if reaction_profile.serendipity == "low" else
+        "Occasionally find useful things by chance" if reaction_profile.serendipity == "medium" else
+        "Frequently make fortunate discoveries"}
+        
+        9. World Awareness: {reaction_profile.world_awareness.upper()}
+        - {"Character's actions go largely unnoticed" if reaction_profile.world_awareness == "invisible" else
+        "Appropriate recognition of actions" if reaction_profile.world_awareness == "normal" else
+        "Character's actions receive unusual attention"}
+        
+        10. Karmic Response: {reaction_profile.karmic_response.upper()}
+        - {"Good/bad actions quickly lead to rewards/consequences" if reaction_profile.karmic_response == "strong" else
+        "Some connection between moral choices and outcomes" if reaction_profile.karmic_response == "moderate" else
+        "No special connection between moral choices and outcomes"}
+        """
+
+        agent_input = f"""
+        Current World State:
+        {json.dumps(world_state, indent=2)}
+
+        Current Immediate Environment:
+        {json.dumps(immediate_environment, indent=2)}
+
+        Simulacra action:
+        {json.dumps(simulacra_action, indent=2)}
+
+        {profile_guidance}
+
+        Analyze how the immediate environment should react to this action, considering:
+        1. Physical laws and plausibility
+        2. Environmental responses
+        3. Social responses from people present
+        4. Any changes to the surroundings
+        5. New opportunities or limitations created by the action
+
+        Focus primarily on updating the immediate environment, as this is what's directly affected by the simulacra's action.
+        Only update the world state if the action would realistically have broader implications.
+        
+        For consequences and observations, provide a LIST of specific, detailed statements.
+        Each consequence or observation should be a complete sentence describing one specific effect or thing noticed.
         """
         
-        # Add weather if available
-        if "weather" in environmental_context:
-            weather = environmental_context.get("weather", {})
-            prompt += f"""
-        - Weather: {weather.get('condition', 'Unknown')}, {weather.get('temperature', 'Unknown')}
+        prompt_json_output = "\nRespond in the following JSON format: " + json.dumps(
+            {
+                "updated_environment": "The updated immediate environment after the action",
+                "world_state_changes": "Any changes to the world state (if applicable)",
+                "consequences": ["List of specific consequences of the action, each as a complete sentence"],
+                "observations": ["List of specific things the simulacra would observe, each as a complete sentence"]
+            }
+        )
+        return agent_input + prompt_json_output
+    
+    @staticmethod
+    def reflect_on_situation_prompt(observations: str, persona_state: Dict) -> str:
+        reflection_prompt = f"""
+        {observations}
+
+        Consider your personality as {persona_state['name']}, a {persona_state['age']}-year-old {persona_state['occupation']} who is {', '.join(persona_state['personality_traits'])},
+        your current physical state ({persona_state['current_state']['physical']}),
+        emotional state ({persona_state['current_state']['emotional']}),
+        and mental state ({persona_state['current_state']['mental']}).
+
+        Think about your goals: {', '.join(persona_state['goals'])}
+
+        Consider your short-term memories of {', '.join(persona_state['memory']['short_term'])} and long-term experiences of {', '.join(persona_state['memory']['long_term'])}.
         """
         
-        # Add location description if available
-        if "description" in location_context:
-            prompt += f"""
-        - Description: {location_context.get('description', 'No description available')}
+        prompt_json_output = "\nRespond in the following JSON format: " + json.dumps(
+            {
+                "reflect": "A string reflecting on the situation (string)"
+            }
+        )
+        return reflection_prompt + prompt_json_output
+    
+    @staticmethod
+    def analyze_emotions_prompt(situation: str, current_emotional_state: str) -> str:
+        prompt_template = f"""
+Situation:
+{situation}
+
+Current emotional state:
+{current_emotional_state}
         """
         
-        # Add social context if available
-        if social_context:
-            prompt += f"""
-        - People Present: {', '.join(social_context.get('present_people', ['Unknown']))}
-        - Crowd Density: {social_context.get('crowd_density', 'Unknown')}
-        - Social Atmosphere: {social_context.get('social_atmosphere', 'Unknown')}
-        - Ongoing Activities: {', '.join(social_context.get('ongoing_activities', ['Unknown']))}
+        prompt_json_day = "\nRespond in the following JSON format: " + json.dumps(
+            {
+                "primary_emotion": "The most dominant emotion (string)",
+                "intensity": "Intensity of the primary emotion, choose from 'Low', 'Medium', or 'High' (string)",
+                "secondary_emotion": "The secondary emotion (string)",
+                "emotional_update": "A concise summary of the overall emotional state change (string)"
+            }
+        )
+        return prompt_template + prompt_json_day
+    
+    @staticmethod
+    def decide_action_prompt(reflection: str, emotional_analysis: Dict, goals: List[str], immediate_environment: Dict) -> str:
+        prompt_template = f"""
+        Reflection:
+        {reflection}
+
+        Emotional Analysis:
+        {json.dumps(emotional_analysis, indent=2)}
+
+        Considering your goals:
+        {json.dumps(goals, indent=2)}
+
+        Your immediate environment:
+        {json.dumps(immediate_environment, indent=2)}
+
+        What action will you take? Consider your personality traits, current state, available options in your environment, and what would be most consistent with who you are.
         """
         
-        # Add nearby locations if available
-        if "nearby_locations" in location_context:
-            nearby = location_context.get("nearby_locations", [])
-            if nearby:
-                prompt += "\n    - Nearby Places:\n"
-                for i, place in enumerate(nearby[:3], 1):
-                    prompt += f"      {i}. {place.get('name', 'Unknown')} ({place.get('type', 'place')})\n"
-        
-        # Add character's current state
-        prompt += f"""
-        Character's Current State:
-        - Name: {self_context.get('name', 'Unknown')}
-        - Age: {self_context.get('age', 'Unknown')}
-        - Occupation: {self_context.get('occupation', 'Unknown')}
-        - Current Emotion: {self_context.get('current_emotion', 'Unknown')}
-        - Current Goal: {self_context.get('current_goal', 'Unknown')}
-        - Recent Memory: {self_context.get('recent_memory', 'None')}
-        """
-        
-        # Add narrative context if available
-        if narrative_context:
-            prompt += f"""
-        Narrative Context:
-        {narrative_context}
-        """
-        
-        # Add action guidance
-        prompt += """
-        Based on the character's current situation and state, decide on a realistic and specific action for them to take next.
-        
-        The action should:
-        1. Be realistic and appropriate for the current situation
-        2. Consider the character's goals, emotions, and personality
-        3. Be specific and detailed (e.g., "Order a cappuccino and sit by the window" rather than just "Get coffee")
-        4. Consider the time of day, location, and social context
-        
-        Available action types:
-        - Physical actions (e.g., "Walk to the counter", "Sit down at a table")
-        - Social interactions (e.g., "Ask the barista about their coffee recommendations")
-        - Movement to new locations (e.g., "Leave the cafe and walk to the nearby park")
-        - Information seeking (e.g., "Search online for local events happening today")
-        - Internal actions (e.g., "Reflect on the recent conversation")
-        
-        Return ONLY the action as a single paragraph, written in first person present tense (e.g., "I walk to the counter and order a cappuccino").
-        """
-        
-        return prompt
+        prompt_json_output = "\nRespond in the following JSON format: " + json.dumps(
+            {
+                "thought_process": "Your internal reasoning for the action (string)",
+                "action": "The action you decide to take (string)",
+                "action_details": "Specific details about how you'll perform the action (object, optional)"
+            }
+        )
+        return prompt_template + prompt_json_output
+
+class LLMService:
+    """Centralized service for LLM interactions."""
+    
+    def __init__(self, api_key: str = None):
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        self.client = genai.Client(api_key=self.api_key)
+    
+    async def generate_content(self, 
+                              prompt: str, 
+                              model_name: str = "gemini-2.0-flash",
+                              system_instruction: str = "",
+                              response_model: Type[T] = None,
+                              temperature: float = 0.0) -> Dict:
+        """Generate content using the Gemini API with proper error handling."""
+        response_text = "No response"
+        try:
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=temperature,
+                    response_mime_type='application/json',
+                    response_schema=response_model
+                )
+            )
+            
+            response_text = response.text
+            
+            # Validate and parse JSON response using Pydantic model if provided
+            if response_model:
+                validated_response = response_model.model_validate_json(response_text)
+                return validated_response.model_dump()
+            
+            # If no model provided, try to parse as JSON
+            return json.loads(response_text)
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"JSONDecodeError from Gemini response: {e}, response text: {response_text}")
+            return {"error": f"Could not decode JSON: {str(e)}", "raw_response": response_text}
+        except Exception as e:
+            logger.error(f"Error in LLM service: {e}")
+            return {"error": str(e)}
 
 class WorldEngine:
-    """Engine for simulating the world and its interactions with the simulacra."""
-    
-    def __init__(self, config: Dict, reaction_profile: str = "balanced"):
-        """Initialize the world engine."""
-        self.config = config
-        self.reaction_profile = reaction_profile
-        self.world_state = {}
-        self.immediate_environment = {}
-        self.simulacra = Simulacra()
-        self.narrative_context = ""
+    """Manages the environment and physical laws of the simulated world."""
+
+    def __init__(self, world_config_path: str = "world_config.yaml", load_state: bool = True, 
+                console: Console = None, reaction_profile: Union[str, Dict, WorldReactionProfile] = "balanced"):
+        """
+        Initialize the WorldEngine.
+        
+        Args:
+            world_config_path: Path to the world configuration file
+            load_state: Whether to load existing state
+            console: Rich console for output
+            reaction_profile: How the world reacts to the character's actions
+                            Can be a profile name, a dict of settings, or a WorldReactionProfile
+        """
+        # Initialize console
+        self.console = console or Console()
+        self.world_config_path = world_config_path
+        self.state_path = "world_state.json"
+        self.history = []
+        self.world_state = None
+        self.immediate_environment = None
         self.llm_service = LLMService()
-        self.console = Console()
-    
-    async def initialize_new_world(self, persona_file: str) -> None:
-        """Initialize a new world state with a persona."""
-        try:
-            # Get city and country from config
-            city = self.config.get("city", "New York")
-            country = self.config.get("country", "United States")
-            
-            # Load or create persona
-            try:
-                with open(persona_file, "r") as f:
-                    self.simulacra.persona = json.load(f)
-                    self.console.print(f"[green]Loaded persona: {self.simulacra.persona.get('name', 'Unknown')}[/green]")
-            except FileNotFoundError:
-                # Create a new persona
-                self.simulacra.persona = await create_persona(city, country)
-            
-            # Determine a plausible location name
-            location_name = self.config.get("starting_location", "")
-            if not location_name:
-                location_name = await self._determine_plausible_location(city, country, self.simulacra.persona)
-            
-            # Initialize world state with real-time data
-            self.world_state = {
-                "city": city,
-                "country": country,
-                "current_location": location_name
-            }
-            
-            # Update with real-time data
-            await self._update_real_time_data()
-            
-            # Create immediate environment
-            self.immediate_environment = await self._create_default_immediate_environment(location_name)
-            
-            # Generate initial narrative context
-            self.narrative_context = await self._generate_initial_narrative()
-            
-            # Save the initial state
-            await self.save_state()
-            
-            self.console.print(f"[green]Successfully initialized new world in {city}, {country} at {location_name}[/green]")
-            
-        except Exception as e:
-            logger.error(f"Error initializing new world: {e}")
-            self.console.print(f"[red]Error initializing new world: {e}[/red]")
-            
-            # Create a minimal fallback world state
-            self.world_state = {
-                "city": self.config.get("city", "New York"),
-                "country": self.config.get("country", "United States"),
-                "current_time": datetime.now().strftime("%H:%M"),
-                "current_date": datetime.now().strftime("%Y-%m-%d"),
-                "day_of_week": datetime.now().strftime("%A"),
-                "weather": {
-                    "weather_condition": "Clear",
-                    "temperature": "72°F (22°C)",
-                    "data_source": "Fallback - No data retrieved"
-                }
-            }
-            
-            # Create a minimal immediate environment
-            location_name = self.config.get("starting_location", "Coffee Shop")
-            self.immediate_environment = {
-                "current_location_name": location_name,
-                "location_type": "Coffee Shop",
-                "indoor_outdoor": "Indoor",
-                "description": "A cozy coffee shop with a warm atmosphere.",
-                "features": ["Tables", "Chairs", "Counter", "Coffee machines"],
-                "present_people": ["Baristas", "Customers"],
-                "crowd_density": "Moderate",
-                "social_atmosphere": "Casual and relaxed",
-                "ongoing_activities": ["People drinking coffee", "Conversations", "People working on laptops"],
-                "data_source": "Fallback - No data retrieved"
-            }
-            
-            # Generate a simple narrative context
-            self.narrative_context = f"I find myself at a {location_name} in {self.world_state['city']}, {self.world_state['country']}. It's {self.world_state['current_time']} on {self.world_state['day_of_week']}."
-    
-    async def _determine_plausible_location(self, city: str, country: str, persona: Dict) -> str:
-        """Determine a plausible location for the simulacra based on their persona."""
-        try:
-            # Extract relevant information from persona
-            occupation = persona.get("occupation", "")
-            current_goal = persona.get("current_goal", "")
-            
-            # Get current time
-            current_time = datetime.now().strftime("%H:%M")
-            current_hour = int(current_time.split(":")[0])
-            
-            # Determine day of week
-            day_of_week = datetime.now().strftime("%A")
-            is_weekend = day_of_week in ["Saturday", "Sunday"]
-            
-            # Create a prompt for determining a plausible location
-            prompt = f"""
-            Determine a plausible current location for a person with the following characteristics:
-            
-            - Occupation: {occupation}
-            - Current goal: {current_goal}
-            - Current time: {current_time}
-            - Day of week: {day_of_week}
-            - City: {city}, {country}
-            
-            Consider:
-            1. What would be a realistic place for this person to be at this time and day?
-            2. Consider their occupation and goals
-            3. Consider the time of day (morning, afternoon, evening)
-            4. Consider whether it's a weekday or weekend
-            
-            Return ONLY the name of a specific, realistic location (e.g., "Central Park", "Starbucks on 5th Avenue", "Public Library").
-            """
-            
-            # Get response from LLM
-            location_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Determine a realistic location for a person based on their characteristics and the current time and day.",
-                temperature=0.7
-            )
-            
-            # Process the response
-            if isinstance(location_response, list) and len(location_response) > 0:
-                location = location_response[0]
-            elif isinstance(location_response, dict) and "text" in location_response:
-                location = location_response["text"]
-            elif isinstance(location_response, str):
-                location = location_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(location_response)}")
-            
-            # Clean up the location name
-            location = location.strip().strip('"\'.,;:')
-            
-            return location
-            
-        except Exception as e:
-            logger.error(f"Error determining plausible location: {e}")
-            
-            # Fallback to time-based location
-            current_hour = datetime.now().hour
-            day_of_week = datetime.now().strftime("%A")
-            is_weekend = day_of_week in ["Saturday", "Sunday"]
-            
-            if is_weekend:
-                if 8 <= current_hour < 12:
-                    return "Local Cafe"
-                elif 12 <= current_hour < 18:
-                    return "City Park"
-                else:
-                    return "Home"
-            else:  # Weekday
-                if 8 <= current_hour < 9:
-                    return "Coffee Shop"
-                elif 9 <= current_hour < 17:
-                    return "Office"
-                elif 17 <= current_hour < 20:
-                    return "Restaurant"
-                else:
-                    return "Home"
-    
-    async def _update_real_time_data(self) -> None:
-        """Update the world state with real-time data."""
-        try:
-            # Get city and country
-            city = self.world_state.get("city", "New York")
-            country = self.world_state.get("country", "United States")
-            
-            # Update current date and time
-            current_datetime = datetime.now()
-            self.world_state["current_time"] = current_datetime.strftime("%H:%M")
-            self.world_state["current_date"] = current_datetime.strftime("%Y-%m-%d")
-            self.world_state["day_of_week"] = current_datetime.strftime("%A")
-            
-            # Check if we need to update weather data
-            update_weather = False
-            if "weather" not in self.world_state:
-                update_weather = True
-            elif "last_weather_update" in self.world_state:
-                last_update = datetime.strptime(self.world_state["last_weather_update"], "%Y-%m-%d")
-                if (current_datetime.date() - last_update.date()).days >= 1:
-                    update_weather = True
-            else:
-                update_weather = True
-            
-            if update_weather and self.config.get("use_real_data", True):
-                weather_data = await self._get_real_weather_data(city, country)
-                self.world_state["weather"] = weather_data
-                self.world_state["last_weather_update"] = current_datetime.strftime("%Y-%m-%d")
-                self.console.print(f"[green]Updated weather data for {city}, {country}[/green]")
-            
-            # Check if we need to update news data
-            update_news = False
-            if "news" not in self.world_state:
-                update_news = True
-            elif "last_news_update" in self.world_state:
-                last_update = datetime.strptime(self.world_state["last_news_update"], "%Y-%m-%d")
-                if (current_datetime.date() - last_update.date()).days >= 3:  # Update news every 3 days
-                    update_news = True
-            else:
-                update_news = True
-            
-            if update_news and self.config.get("use_real_data", True):
-                news_data = await self._get_real_news_data(city, country)
-                self.world_state["news"] = news_data
-                self.world_state["last_news_update"] = current_datetime.strftime("%Y-%m-%d")
-                self.console.print(f"[green]Updated news data for {city}, {country}[/green]")
-            
-            # Check if we need to update local events
-            update_events = False
-            if "local_events" not in self.world_state:
-                update_events = True
-            elif "last_events_update" in self.world_state:
-                last_update = datetime.strptime(self.world_state["last_events_update"], "%Y-%m-%d")
-                # Update events weekly or if it's Monday
-                if (current_datetime.date() - last_update.date()).days >= 7 or current_datetime.strftime("%A") == "Monday":
-                    update_events = True
-            else:
-                update_events = True
-            
-            if update_events and self.config.get("use_real_data", True):
-                events_data = await self._get_local_events(city, country)
-                self.world_state["local_events"] = events_data
-                self.world_state["last_events_update"] = current_datetime.strftime("%Y-%m-%d")
-                self.console.print(f"[green]Updated local events for {city}, {country}[/green]")
-            
-        except Exception as e:
-            logger.error(f"Error updating real-time data: {e}")
-            self.console.print(f"[red]Error updating real-time data: {e}[/red]")
-    
-    async def _get_real_weather_data(self, city: str, country: str) -> Dict:
-        """Get real weather data for the specified city and country."""
-        try:
-            # Construct a search query for weather
-            query = f"current weather in {city}, {country}"
-            
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to extract weather information from search results
-            prompt = f"""
-            Extract the current weather information for {city}, {country} from these search results:
-            
-            {search_results}
-            
-            Extract the following information:
-            1. Current weather condition (e.g., sunny, cloudy, rainy)
-            2. Current temperature (in both Fahrenheit and Celsius if available)
-            3. Precipitation (if any)
-            
-            Format your response as a JSON object with these fields. If information is not available, use "Unknown" as the value.
-            """
-            
-            weather_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Extract weather information from search results as a JSON object.",
-                temperature=0.3
-            )
-            
-            # Process the response
-            if isinstance(weather_response, list) and len(weather_response) > 0:
-                weather_text = weather_response[0]
-            elif isinstance(weather_response, dict) and "text" in weather_response:
-                weather_text = weather_response["text"]
-            elif isinstance(weather_response, str):
-                weather_text = weather_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(weather_response)}")
-            
-            # Parse the JSON
-            weather_data = json.loads(weather_text)
-            
-            # Add data source
-            weather_data["data_source"] = "DuckDuckGo Search Results"
-            
-            return weather_data
-            
-        except Exception as e:
-            logger.error(f"Error getting real weather data: {e}")
-            
-            # Return fallback weather data
-            return {
-                "weather_condition": "Clear",
-                "temperature": "72°F (22°C)",
-                "precipitation": "None",
-                "data_source": "Fallback - Error retrieving weather"
-            }
-    
-    async def _get_real_news_data(self, city: str, country: str) -> List[Dict]:
-        """Get real news data for the specified city and country."""
-        try:
-            # Construct a search query for news
-            query = f"latest news in {city}, {country}"
-            
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to extract news information from search results
-            prompt = f"""
-            Extract the latest news for {city}, {country} from these search results:
-            
-            {search_results}
-            
-            Extract 3-5 recent news items, each with:
-            1. Headline
-            2. Brief summary (1-2 sentences)
-            
-            Format your response as a JSON array of objects, each with "headline" and "summary" fields.
-            Only include real news that is explicitly mentioned in the search results.
-            """
-            
-            news_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Extract news information from search results as a JSON array.",
-                temperature=0.3
-            )
-            
-            # Process the response
-            if isinstance(news_response, list) and len(news_response) > 0:
-                news_text = news_response[0]
-            elif isinstance(news_response, dict) and "text" in news_response:
-                news_text = news_response["text"]
-            elif isinstance(news_response, str):
-                news_text = news_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(news_response)}")
-            
-            # Parse the JSON
-            news_data = json.loads(news_text)
-            
-            # Add data source to each news item
-            for item in news_data:
-                item["data_source"] = "DuckDuckGo Search Results"
-            
-            return news_data
-            
-        except Exception as e:
-            logger.error(f"Error getting real news data: {e}")
-            
-            # Return fallback news data
-            return [
-                {
-                    "headline": "Local Government Announces Infrastructure Project",
-                    "summary": "The city has announced plans for road improvements and public transportation upgrades.",
-                    "data_source": "Fallback - Error retrieving news"
-                },
-                {
-                    "headline": "Community Festival Planned for Next Month",
-                    "summary": "Local organizers are preparing for the annual community festival with music, food, and activities.",
-                    "data_source": "Fallback - Error retrieving news"
-                }
-            ]
-    
-    async def _get_local_events(self, city: str, country: str) -> List[Dict]:
-        """Get local events for the specified city and country."""
-        try:
-            # Get current date
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            
-            # Construct a search query for events
-            query = f"upcoming events in {city}, {country} this week"
-            
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to extract event information from search results
-            prompt = f"""
-            Extract upcoming events in {city}, {country} from these search results:
-            
-            {search_results}
-            
-            Extract 3-5 upcoming events, each with:
-            1. Event name
-            2. Brief description
-            3. Date/time (if available)
-            4. Location (if available)
-            
-            Format your response as a JSON array of objects, each with "name", "description", "date", and "location" fields.
-            Only include real events that are explicitly mentioned in the search results.
-            """
-            
-            events_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Extract event information from search results as a JSON array.",
-                temperature=0.3
-            )
-            
-            # Process the response
-            if isinstance(events_response, list) and len(events_response) > 0:
-                events_text = events_response[0]
-            elif isinstance(events_response, dict) and "text" in events_response:
-                events_text = events_response["text"]
-            elif isinstance(events_response, str):
-                events_text = events_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(events_response)}")
-            
-            # Parse the JSON
-            events_data = json.loads(events_text)
-            
-            # Add data source to each event
-            for event in events_data:
-                event["data_source"] = "DuckDuckGo Search Results"
-            
-            return events_data
-            
-        except Exception as e:
-            logger.error(f"Error getting local events: {e}")
-            
-            # Return fallback events data
-            return [
-                {
-                    "name": "Farmers Market",
-                    "description": "Weekly farmers market with local produce and crafts",
-                    "date": "Every Saturday",
-                    "location": "City Square",
-                    "data_source": "Fallback - Error retrieving events"
-                },
-                {
-                    "name": "Art Exhibition",
-                    "description": "Local artists showcase their work",
-                    "date": "This weekend",
-                    "location": "Community Gallery",
-                    "data_source": "Fallback - Error retrieving events"
-                }
-            ]
-    
-    async def _create_default_immediate_environment(self, location_name: str) -> Dict:
-        """Create a detailed immediate environment using real-world data about the location."""
-        try:
-            # Get city and country from world state
-            city = self.world_state.get("city", "New York")
-            country = self.world_state.get("country", "United States")
-            
-            # Get detailed information about the location
-            location_details = await self._get_location_details(location_name, city, country)
-            
-            # Get nearby locations
-            nearby_locations = await self._get_nearby_locations(location_name)
-            
-            # Determine if it's indoor or outdoor based on location type
-            location_type = location_details.get("location_type", "").lower()
-            indoor_types = ["restaurant", "cafe", "museum", "library", "store", "shop", "mall", "cinema", "theater", "hotel"]
-            outdoor_types = ["park", "garden", "plaza", "square", "beach", "trail", "market"]
-            
-            is_indoor = any(t in location_type for t in indoor_types)
-            is_outdoor = any(t in location_type for t in outdoor_types)
-            
-            if is_indoor and not is_outdoor:
-                indoor_outdoor = "Indoor"
-            elif is_outdoor and not is_indoor:
-                indoor_outdoor = "Outdoor"
-            else:
-                indoor_outdoor = "Mixed indoor and outdoor"
-            
-            # Create environment based on real data
-            environment = {
-                "current_location_name": location_details.get("full_name", location_name),
-                "location_type": location_details.get("location_type", "Unknown"),
-                "indoor_outdoor": indoor_outdoor,
-                "description": location_details.get("description", "No description available"),
-                "features": location_details.get("features", []),
-                "opening_hours": location_details.get("opening_hours", "Not available"),
-                "popular_for": location_details.get("popular_for", "Not specified"),
-                "price_level": location_details.get("price_level", "Not available"),
-                "busy_times": location_details.get("busy_times", "Not available"),
-                "rating": location_details.get("rating", "Not available"),
-                "address": location_details.get("address", "Not available"),
-                "data_source": "DuckDuckGo Search Results"
-            }
-            
-            # Add nearby locations if available
-            if nearby_locations:
-                environment["nearby_locations"] = nearby_locations
-            
-            # Add weather-related information if outdoor
-            if is_outdoor:
-                weather = self.world_state.get("weather", {})
-                environment.update({
-                    "weather_condition": weather.get("weather_condition", "Not available"),
-                    "temperature": weather.get("temperature", "Not available"),
-                    "precipitation": weather.get("precipitation", "None")
-                })
-            
-            # Add standard fields based on location type
-            if is_indoor:
-                environment.update({
-                    "noise_level": "Typical for a " + location_details.get("location_type", "place"),
-                    "lighting": "Standard indoor lighting",
-                    "temperature_feeling": "Climate controlled",
-                    "air_quality": "Indoor air"
-                })
-            else:
-                environment.update({
-                    "noise_level": "Typical outdoor sounds",
-                    "lighting": "Natural light",
-                    "temperature_feeling": "Outdoor temperature",
-                    "air_quality": "Outdoor air"
-                })
-            
-            # Add people and activities based on location type and time
-            current_time = self.world_state.get("current_time", "12:00")
-            day_of_week = self.world_state.get("day_of_week", "Unknown")
-            
-            # Determine crowd density based on time and day
-            try:
-                hour = int(current_time.split(":")[0])
-                is_weekend = day_of_week in ["Saturday", "Sunday"]
-                
-                # Busy times for different location types
-                if "restaurant" in location_type or "cafe" in location_type:
-                    if (11 <= hour <= 14) or (17 <= hour <= 21):  # Lunch or dinner time
-                        crowd_density = "Busy" if is_weekend else "Moderately busy"
-                    elif 7 <= hour <= 10:  # Breakfast time
-                        crowd_density = "Moderately busy" if is_weekend else "Somewhat quiet"
-                    elif 14 < hour < 17:  # Afternoon lull
-                        crowd_density = "Somewhat quiet"
-                    else:  # Late night
-                        crowd_density = "Quiet" if hour >= 22 else "Somewhat quiet"
-                elif "park" in location_type or "garden" in location_type:
-                    if 10 <= hour <= 18 and is_weekend:  # Weekend daytime
-                        crowd_density = "Busy"
-                    elif 10 <= hour <= 18:  # Weekday daytime
-                        crowd_density = "Moderately busy"
-                    else:  # Early morning or evening
-                        crowd_density = "Quiet" if hour >= 20 or hour < 7 else "Somewhat quiet"
-                elif "mall" in location_type or "shop" in location_type or "store" in location_type:
-                    if 12 <= hour <= 18 and is_weekend:  # Weekend shopping hours
-                        crowd_density = "Busy"
-                    elif 12 <= hour <= 18:  # Weekday shopping hours
-                        crowd_density = "Moderately busy"
-                    else:  # Early or late hours
-                        crowd_density = "Quiet" if hour >= 20 or hour < 9 else "Somewhat quiet"
-                else:
-                    # Default crowd density
-                    if 9 <= hour <= 17:  # Business hours
-                        crowd_density = "Moderately busy"
-                    else:
-                        crowd_density = "Somewhat quiet"
-            except:
-                # Default if time parsing fails
-                crowd_density = "Moderately busy"
-            
-            # Add crowd information
-            environment["crowd_density"] = crowd_density
-            
-            # Add people and activities based on location type
-            if "restaurant" in location_type or "cafe" in location_type:
-                environment["present_people"] = ["Customers", "Wait staff", "Baristas/Cooks"]
-                environment["social_atmosphere"] = "Casual dining atmosphere"
-                environment["ongoing_activities"] = ["People eating", "Conversations", "Staff serving customers"]
-            elif "park" in location_type or "garden" in location_type:
-                environment["present_people"] = ["Visitors", "Joggers", "People walking dogs", "Families"]
-                environment["social_atmosphere"] = "Relaxed outdoor leisure"
-                environment["ongoing_activities"] = ["Walking", "Jogging", "Picnicking", "People enjoying nature"]
-            elif "museum" in location_type or "gallery" in location_type:
-                environment["present_people"] = ["Visitors", "Tour guides", "Staff"]
-                environment["social_atmosphere"] = "Quiet appreciation"
-                environment["ongoing_activities"] = ["People viewing exhibits", "Guided tours", "Photography"]
-            elif "mall" in location_type or "shop" in location_type or "store" in location_type:
-                environment["present_people"] = ["Shoppers", "Store employees", "Security personnel"]
-                environment["social_atmosphere"] = "Retail environment"
-                environment["ongoing_activities"] = ["Shopping", "Browsing", "Staff assisting customers"]
-            else:
-                environment["present_people"] = ["Various people appropriate for this location"]
-                environment["social_atmosphere"] = "Typical for this type of location"
-                environment["ongoing_activities"] = ["Activities appropriate for this location"]
-            
-            self.console.print(f"[green]Successfully created detailed environment for {location_name}[/green]")
-            return environment
-            
-        except Exception as e:
-            logger.error(f"Error creating detailed environment: {e}")
-            self.console.print(f"[red]Error creating detailed environment: {e}. Using basic environment.[/red]")
-            
-            # Fall back to a simpler method
-            return {
-                "current_location_name": location_name,
-                "location_type": "Unknown location type",
-                "indoor_outdoor": "Unknown",
-                "description": "No information available about this location",
-                "features": ["Unknown features"],
-                "present_people": ["Various people"],
-                "crowd_density": "Moderate",
-                "social_atmosphere": "Neutral",
-                "ongoing_activities": ["Various activities"],
-                "data_source": "Fallback - No data retrieved",
-                "note": "Location information could not be retrieved. Using placeholder values."
-            }
-    
-    async def _get_location_details(self, location_name: str, city: str, country: str) -> Dict:
-        """Get detailed information about a location using web search."""
-        try:
-            # Construct a search query
-            query = f"{location_name} in {city}, {country} details information"
-            
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to extract location details from search results
-            prompt = f"""
-            Extract detailed information about "{location_name}" in {city}, {country} from these search results:
-            
-            {search_results}
-            
-            Extract the following information if available:
-            1. Full name of the location
-            2. Location type (e.g., restaurant, park, museum, cafe, etc.)
-            3. Description (a brief description of the place)
-            4. Features (notable features of the place)
-            5. Opening hours
-            6. Address
-            7. Popular for (what the place is known for)
-            8. Price level (if applicable)
-            9. Busy times (if mentioned)
-            10. Rating (if mentioned)
-            
-            Format your response as a JSON object with these fields. If information is not available, use "Not available" or an empty list for features.
-            
-            IMPORTANT: Only include information that is explicitly mentioned in the search results. Do not make up or infer details that aren't present.
-            """
-            
-            details_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Extract location details from search results as a JSON object. Only include information explicitly mentioned in the results.",
-                temperature=0.3
-            )
-            
-            # Process the response
-            if isinstance(details_response, list) and len(details_response) > 0:
-                details_text = details_response[0]
-            elif isinstance(details_response, dict) and "text" in details_response:
-                details_text = details_response["text"]
-            elif isinstance(details_response, str):
-                details_text = details_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(details_response)}")
-            
-            # Parse the JSON
-            details = json.loads(details_text)
-            
-            # Add data source
-            details["data_source"] = "DuckDuckGo Search Results"
-            
-            # Ensure all expected fields are present
-            expected_fields = [
-                "full_name", "location_type", "description", "features", 
-                "opening_hours", "address", "popular_for", "price_level", 
-                "busy_times", "rating"
-            ]
-            
-            for field in expected_fields:
-                if field not in details:
-                    if field == "features":
-                        details[field] = []
-                    else:
-                        details[field] = "Not available"
-            
-            return details
-            
-        except Exception as e:
-            logger.error(f"Error getting location details: {e}")
-            
-            # Create fallback location details
-            return {
-                "full_name": location_name,
-                "location_type": self._guess_location_type(location_name),
-                "description": f"A place called {location_name} in {city}, {country}.",
-                "features": [],
-                "opening_hours": "Not available",
-                "address": f"Somewhere in {city}, {country}",
-                "popular_for": "Not available",
-                "price_level": "Not available",
-                "busy_times": "Not available",
-                "rating": "Not available",
-                "data_source": "Fallback - Error retrieving details"
-            }
-    
-    def _guess_location_type(self, location_name: str) -> str:
-        """Make an educated guess about the location type based on its name."""
-        location_name_lower = location_name.lower()
         
-        # Common location types and their keywords
-        location_types = {
-            "restaurant": ["restaurant", "bistro", "eatery", "grill", "diner", "steakhouse", "pizzeria"],
-            "cafe": ["cafe", "coffee", "bakery", "patisserie", "tea"],
-            "park": ["park", "garden", "gardens", "square", "commons", "green"],
-            "museum": ["museum", "gallery", "exhibition", "memorial"],
-            "library": ["library", "archives"],
-            "store": ["store", "shop", "market", "boutique", "mall", "outlet", "supermarket"],
-            "bar": ["bar", "pub", "tavern", "brewery", "lounge"],
-            "hotel": ["hotel", "inn", "motel", "hostel", "resort", "suites"],
-            "theater": ["theater", "theatre", "cinema", "movies"],
-            "gym": ["gym", "fitness", "wellness", "spa"],
-            "school": ["school", "university", "college", "academy", "institute"],
-            "hospital": ["hospital", "clinic", "medical", "health"],
-            "office": ["office", "headquarters", "building", "tower", "center", "centre"],
-            "station": ["station", "terminal", "airport", "port", "dock"]
-        }
+        # Set reaction profile
+        if isinstance(reaction_profile, str):
+            self.reaction_profile = WorldReactionProfile.create_profile(reaction_profile)
+        elif isinstance(reaction_profile, dict):
+            self.reaction_profile = WorldReactionProfile(**reaction_profile)
+        elif isinstance(reaction_profile, WorldReactionProfile):
+            self.reaction_profile = reaction_profile
+        else:
+            logger.warning(f"Invalid reaction profile type. Using 'balanced' profile.")
+            self.reaction_profile = WorldReactionProfile.create_profile("balanced")
         
-        # Check for matches
-        for location_type, keywords in location_types.items():
-            if any(keyword in location_name_lower for keyword in keywords):
-                return location_type
+        logger.info(f"World Engine initialized with reaction profile: {self.reaction_profile.model_dump()}")
+
+        # Check if this is a continuation or new simulation
+        if load_state and os.path.exists(self.state_path):
+            logger.info("Loading existing world state...")
+            self.load_state()
+
+    def _search_news(self, query: str) -> str:
+        """Search for news using DuckDuckGo directly."""
+        try:
+            search_url = "https://api.duckduckgo.com/"
+            params = {
+                "q": query,
+                "format": "json",
+                "pretty": 1,
+                "no_redirect": 1,
+                "t": "api" # for api calls
+            }
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0'} # need user agent
+            response = requests.get(search_url, params=params, headers=headers)
+            response.raise_for_status() # Raise an exception for HTTP errors
+
+            data = response.json()
+            if data and 'RelatedTopics' in data:
+                news_items = []
+                for topic in data['RelatedTopics']:
+                    if isinstance(topic, dict) and 'Text' in topic and 'FirstURL' in topic:
+                        news_items.append(f"- {topic['Text']} (Source: {topic['FirstURL']})")
+                return "\n".join(news_items)
+            return "No relevant news found."
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching news from DuckDuckGo: {e}")
+            return "Error fetching news."
+
+    async def _gather_comprehensive_news(self, location: Dict) -> str:
+        """Gather comprehensive news about a location from multiple queries."""
+        city = location.get("city", "Seattle")
+        country = location.get("country", "USA")
         
-        # If no match found, make a guess based on common naming patterns
-        if any(char.isdigit() for char in location_name):
-            return "address"
-        elif "street" in location_name_lower or "avenue" in location_name_lower or "road" in location_name_lower:
-            return "street"
-        elif "square" in location_name_lower or "plaza" in location_name_lower:
-            return "plaza"
-        
-        # Default
-        return "place"
-    
-    async def _get_nearby_locations(self, location_name: str = None) -> List[Dict]:
-        """Get nearby locations based on the current location."""
-        try:
-            # Get city and country from world state
-            city = self.world_state.get("city", "New York")
-            country = self.world_state.get("country", "United States")
-            
-            # Use provided location name or get from immediate environment
-            if location_name is None:
-                location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            
-            # Construct a search query
-            query = f"places near {location_name} in {city}, {country}"
-            
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to extract nearby locations from search results
-            prompt = f"""
-            Extract a list of real places near "{location_name}" in {city}, {country} from these search results:
-            
-            {search_results}
-            
-            Extract 3-7 nearby places, each with:
-            1. Name of the place
-            2. Type of place (e.g., restaurant, park, museum, etc.)
-            3. Distance from {location_name} (if mentioned)
-            
-            Format your response as a JSON array of objects, each with "name", "type", and "distance" fields.
-            
-            IMPORTANT: Only include places that are explicitly mentioned in the search results. Do not make up or infer places that aren't present.
-            """
-            
-            nearby_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Extract nearby locations from search results as a JSON array. Only include places explicitly mentioned in the results.",
-                temperature=0.3
-            )
-            
-            # Process the response
-            if isinstance(nearby_response, list) and len(nearby_response) > 0:
-                nearby_text = nearby_response[0]
-            elif isinstance(nearby_response, dict) and "text" in nearby_response:
-                nearby_text = nearby_response["text"]
-            elif isinstance(nearby_response, str):
-                nearby_text = nearby_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(nearby_response)}")
-            
-            # Parse the JSON
-            nearby_places = json.loads(nearby_text)
-            
-            # Add data source to each place
-            for place in nearby_places:
-                place["data_source"] = "DuckDuckGo Search Results"
-            
-            return nearby_places
-            
-        except Exception as e:
-            logger.error(f"Error getting nearby locations: {e}")
-            
-            # Return fallback nearby places
-            return [
-                {
-                    "name": "Local Cafe",
-                    "type": "Cafe",
-                    "distance": "Nearby",
-                    "data_source": "Fallback - Error retrieving nearby places"
-                },
-                {
-                    "name": "Convenience Store",
-                    "type": "Store",
-                    "distance": "Within walking distance",
-                    "data_source": "Fallback - Error retrieving nearby places"
-                },
-                {
-                    "name": "Public Park",
-                    "type": "Park",
-                    "distance": "A few blocks away",
-                    "data_source": "Fallback - Error retrieving nearby places"
-                }
-            ]
-    
-    async def _check_location_hours(self) -> Dict:
-        """Check if the current location is open based on real-time data."""
-        try:
-            # Get current time and day of week
-            current_time = self.world_state.get("current_time", "12:00")
-            day_of_week = self.world_state.get("day_of_week", "Unknown")
-            
-            # Get location details
-            location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            location_type = self.immediate_environment.get("location_type", "Unknown")
-            
-            # If opening hours are already available in the immediate environment, use those
-            if "opening_hours" in self.immediate_environment and self.immediate_environment["opening_hours"] != "Not available":
-                opening_hours = self.immediate_environment["opening_hours"]
-            else:
-                # Get city and country
-                city = self.world_state.get("city", "New York")
-                country = self.world_state.get("country", "United States")
-                
-                # Perform a web search to find opening hours
-                query = f"{location_name} {location_type} opening hours {city} {country}"
-                
-                search = DuckDuckGoSearchRun()
-                search_results = search.run(query)
-                
-                # Use the LLM to extract opening hours from search results
-                prompt = f"""
-                Extract the opening hours for "{location_name}" ({location_type}) in {city}, {country} from these search results:
-                
-                {search_results}
-                
-                Extract ONLY the opening hours information. If different hours are listed for different days, include that information.
-                
-                Return ONLY the opening hours text, nothing else. If no opening hours are found, return "Not available".
-                """
-                
-                hours_response = await self.llm_service.generate_content(
-                    prompt=prompt,
-                    system_instruction="Extract opening hours from search results. Return only the hours text.",
-                    temperature=0.3
-                )
-                
-                # Process the response
-                if isinstance(hours_response, list) and len(hours_response) > 0:
-                    opening_hours = hours_response[0]
-                elif isinstance(hours_response, dict) and "text" in hours_response:
-                    opening_hours = hours_response["text"]
-                elif isinstance(hours_response, str):
-                    opening_hours = hours_response
-                else:
-                    opening_hours = "Not available"
-                
-                # Clean up the hours text
-                opening_hours = opening_hours.strip().strip('"\'.,;:')
-                
-                # Update the immediate environment with the opening hours
-                self.immediate_environment["opening_hours"] = opening_hours
-            
-            # Check if the location is currently open
-            is_open = True  # Default to open
-            
-            # If we have valid opening hours, check if the location is open
-            if opening_hours != "Not available" and "24/7" not in opening_hours.lower() and "always open" not in opening_hours.lower():
-                # Parse the current time
-                try:
-                    current_hour = int(current_time.split(":")[0])
-                    current_minute = int(current_time.split(":")[1])
-                    
-                    # Simple heuristic for common opening hours patterns
-                    if "closed" in opening_hours.lower() and day_of_week.lower() in opening_hours.lower():
-                        is_open = False
-                    elif any(f"{day_of_week.lower()}: closed" in opening_hours.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
-                        is_open = False
-                    elif "9" in opening_hours and "5" in opening_hours and (current_hour < 9 or current_hour >= 17):
-                        is_open = False
-                    elif "10" in opening_hours and "6" in opening_hours and (current_hour < 10 or current_hour >= 18):
-                        is_open = False
-                    elif "8" in opening_hours and "8" in opening_hours and (current_hour < 8 or current_hour >= 20):
-                        is_open = False
-                    elif "closed" in opening_hours.lower() and "open" not in opening_hours.lower():
-                        is_open = False
-                except:
-                    # If parsing fails, assume it's open
-                    pass
-            
-            return {
-                "is_open": is_open,
-                "hours": opening_hours,
-                "data_source": "DuckDuckGo Search Results"
-            }
-            
-        except Exception as e:
-            logger.error(f"Error checking location hours: {e}")
-            
-            # Return fallback status
-            return {
-                "is_open": True,  # Default to open
-                "hours": "Not available",
-                "data_source": "Fallback - Error checking hours"
-            }
-    
-    async def _generate_initial_narrative(self) -> str:
-        """Generate the initial narrative context for the simulation."""
-        try:
-            # Extract relevant information
-            persona_name = self.simulacra.persona.get("name", "Unknown")
-            persona_occupation = self.simulacra.persona.get("occupation", "Unknown")
-            persona_goal = self.simulacra.persona.get("current_goal", "Unknown")
-            persona_emotion = self.simulacra.persona.get("current_emotion", "neutral")
-            
-            location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            location_type = self.immediate_environment.get("location_type", "Unknown")
-            location_description = self.immediate_environment.get("description", "No description available")
-            
-            city = self.world_state.get("city", "Unknown")
-            country = self.world_state.get("country", "Unknown")
-            current_time = self.world_state.get("current_time", "Unknown")
-            day_of_week = self.world_state.get("day_of_week", "Unknown")
-            
-            weather = self.world_state.get("weather", {})
-            weather_condition = weather.get("weather_condition", "Unknown")
-            temperature = weather.get("temperature", "Unknown")
-            
-            # Create a prompt for generating the narrative
-            prompt = f"""
-            Generate an initial narrative context for a simulation with the following details:
-            
-            Character:
-            - Name: {persona_name}
-            - Occupation: {persona_occupation}
-            - Current Goal: {persona_goal}
-            - Current Emotion: {persona_emotion}
-            
-            Location:
-            - Name: {location_name}
-            - Type: {location_type}
-            - Description: {location_description}
-            - City: {city}, {country}
-            
-            Time and Weather:
-            - Current Time: {current_time}
-            - Day of Week: {day_of_week}
-            - Weather: {weather_condition}, {temperature}
-            
-            Write a first-person narrative paragraph (3-5 sentences) that sets the scene for the character at this location.
-            Focus on sensory details, the character's current state of mind, and their immediate surroundings.
-            """
-            
-            # Generate the narrative
-            narrative_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Write an engaging, first-person narrative paragraph that sets the scene for a simulation.",
-                temperature=0.7
-            )
-            
-            # Process the response
-            if isinstance(narrative_response, list) and len(narrative_response) > 0:
-                narrative = narrative_response[0]
-            elif isinstance(narrative_response, dict) and "text" in narrative_response:
-                narrative = narrative_response["text"]
-            elif isinstance(narrative_response, str):
-                narrative = narrative_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(narrative_response)}")
-            
-            # Clean up the narrative
-            narrative = narrative.strip().strip('"')
-            
-            return narrative
-            
-        except Exception as e:
-            logger.error(f"Error generating initial narrative: {e}")
-            
-            # Create a simple fallback narrative
-            location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            city = self.world_state.get("city", "Unknown")
-            country = self.world_state.get("country", "Unknown")
-            current_time = self.world_state.get("current_time", "Unknown")
-            day_of_week = self.world_state.get("day_of_week", "Unknown")
-            
-            return f"I find myself at {location_name} in {city}, {country}. It's {current_time} on {day_of_week}. I take a moment to gather my thoughts and observe my surroundings."
-    
-    async def _generate_updated_narrative(self, action: str, consequences: List[str]) -> str:
-        """Generate an updated narrative context based on the character's action and consequences."""
-        try:
-            # Extract relevant information
-            persona_name = self.simulacra.persona.get("name", "Unknown")
-            
-            location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            
-            city = self.world_state.get("city", "Unknown")
-            current_time = self.world_state.get("current_time", "Unknown")
-            day_of_week = self.world_state.get("day_of_week", "Unknown")
-            
-            weather = self.world_state.get("weather", {})
-            weather_condition = weather.get("weather_condition", "Unknown")
-            
-            # Format the consequences for the prompt
-            consequences_text = "\n".join([f"- {consequence}" for consequence in consequences[:2]])  # Limit to 2 consequences for brevity
-            
-            # Create a prompt for generating the updated narrative
-            prompt = f"""
-            Update the narrative context based on the character's action and its consequences:
-            
-            Character: {persona_name}
-            Location: {location_name} in {city}
-            Time: {current_time} on {day_of_week}
-            Weather: {weather_condition}
-            
-            Previous narrative context:
-            {self.narrative_context}
-            
-            Action taken:
-            {action}
-            
-            Consequences:
-            {consequences_text}
-            
-            Write an updated first-person narrative paragraph (3-5 sentences) that continues the story.
-            Maintain continuity with the previous narrative while incorporating the action and its consequences.
-            Focus on the character's experience, sensory details, and current situation.
-            """
-            
-            # Generate the narrative
-            narrative_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Write an engaging, first-person narrative paragraph that updates the simulation context.",
-                temperature=0.7
-            )
-            
-            # Process the response
-            if isinstance(narrative_response, list) and len(narrative_response) > 0:
-                narrative = narrative_response[0]
-            elif isinstance(narrative_response, dict) and "text" in narrative_response:
-                narrative = narrative_response["text"]
-            elif isinstance(narrative_response, str):
-                narrative = narrative_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(narrative_response)}")
-            
-            # Clean up the narrative
-            narrative = narrative.strip().strip('"')
-            
-            return narrative
-            
-        except Exception as e:
-            logger.error(f"Error generating updated narrative: {e}")
-            
-            # Create a simple fallback narrative update
-            location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            
-            # Simplify the consequences for the fallback
-            consequences_summary = ". ".join(consequences[:1]) if consequences else "Nothing significant happened."
-            
-            return f"{self.narrative_context}\n\nI {action.lower().replace('I ', '')}. {consequences_summary} I continue to observe my surroundings at {location_name}."
-    
-    async def process_perception(self) -> Dict:
-        """Process perception for the simulacra."""
-        try:
-            # Get current time and date
-            current_time = self.world_state.get("current_time", "Unknown")
-            current_date = self.world_state.get("current_date", "Unknown")
-            day_of_week = self.world_state.get("day_of_week", "Unknown")
-            
-            # Get location information
-            city = self.world_state.get("city", "Unknown")
-            country = self.world_state.get("country", "Unknown")
-            current_location = self.immediate_environment.get("current_location_name", "Unknown")
-            location_type = self.immediate_environment.get("location_type", "Unknown")
-            location_description = self.immediate_environment.get("description", "No description available")
-            
-            # Get weather information
-            weather = self.world_state.get("weather", {})
-            weather_condition = weather.get("weather_condition", "Unknown")
-            temperature = weather.get("temperature", "Unknown")
-            
-            # Get social context
-            present_people = self.immediate_environment.get("present_people", ["Unknown"])
-            crowd_density = self.immediate_environment.get("crowd_density", "Unknown")
-            social_atmosphere = self.immediate_environment.get("social_atmosphere", "Unknown")
-            ongoing_activities = self.immediate_environment.get("ongoing_activities", ["Unknown"])
-            
-            # Get nearby locations
-            nearby_locations = self.immediate_environment.get("nearby_locations", [])
-            
-            # Get news and events
-            news = self.world_state.get("news", [])
-            local_events = self.world_state.get("local_events", [])
-            
-            # Construct the perception object
-            perception = {
-                "time_context": {
-                    "current_time": current_time,
-                    "current_date": current_date,
-                    "day_of_week": day_of_week
-                },
-                "location_context": {
-                    "city": city,
-                    "country": country,
-                    "current_location": current_location,
-                    "location_type": location_type,
-                    "description": location_description,
-                    "nearby_locations": nearby_locations
-                },
-                "environmental_context": {
-                    "weather": {
-                        "condition": weather_condition,
-                        "temperature": temperature
-                    },
-                    "indoor_outdoor": self.immediate_environment.get("indoor_outdoor", "Unknown")
-                },
-                "social_context": {
-                    "present_people": present_people,
-                    "crowd_density": crowd_density,
-                    "social_atmosphere": social_atmosphere,
-                    "ongoing_activities": ongoing_activities
-                },
-                "self_context": self.simulacra.persona,
-                "narrative_context": self.narrative_context,
-                "world_context": {
-                    "news": news[:3] if news else [],  # Include up to 3 news items
-                    "local_events": local_events[:3] if local_events else []  # Include up to 3 local events
-                }
-            }
-            
-            # Check if the last action was a search action
-            last_action = self.simulacra.persona.get("recent_actions", [""])[-1] if self.simulacra.persona.get("recent_actions") else ""
-            
-            if "search" in last_action.lower() or "look up" in last_action.lower() or "google" in last_action.lower():
-                # Extract the search query from the action
-                search_query = self._extract_search_query(last_action)
-                
-                if search_query:
-                    # Perform the search
-                    search_result = await self.perform_search(search_query)
-                    
-                    # Add the search result to the perception
-                    perception["search_result"] = search_result
-                    
-                    # Update the narrative context to include the search
-                    self.narrative_context += f"\n\nI searched for information about '{search_query}' and found: {search_result['summary']}"
-            
-            return perception
-            
-        except Exception as e:
-            logger.error(f"Error processing perception: {e}")
-            self.console.print(f"[red]Error processing perception: {e}[/red]")
-            
-            # Return a minimal perception object in case of error
-            return {
-                "time_context": {"current_time": "Unknown", "current_date": "Unknown", "day_of_week": "Unknown"},
-                "location_context": {"city": "Unknown", "country": "Unknown", "current_location": "Unknown"},
-                "environmental_context": {"weather": {"condition": "Unknown", "temperature": "Unknown"}},
-                "social_context": {"present_people": ["Unknown"], "social_atmosphere": "Unknown"},
-                "self_context": self.simulacra.persona,
-                "narrative_context": "There was an error processing your perception of the world."
-            }
-    
-    def _extract_search_query(self, action: str) -> str:
-        """Extract a search query from an action text."""
-        search_indicators = [
-            "search for", "search about", "look up", "google", "find information about",
-            "research", "check online for", "search the web for", "look for information on"
+        # Create multiple search queries for different aspects
+        queries = [
+            f"current news {city} {country}",
+            f"weather forecast {city} {country}",
+            f"events in {city} this week",
+            f"economic news {city}",
+            f"social issues {city}",
+            f"transportation {city} status",
+            f"cultural events {city}",
+            f"sports news {city}"
         ]
         
-        action_lower = action.lower()
+        # Gather news for each query
+        news_results = []
+        for query in queries:
+            category = query.split()[0].capitalize()
+            results = self._search_news(query)
+            if results and results != "No relevant news found." and results != "Error fetching news.":
+                news_results.append(f"--- {category} News ---\n{results}\n")
         
-        for indicator in search_indicators:
-            if indicator in action_lower:
-                # Find the position of the indicator
-                start_pos = action_lower.find(indicator) + len(indicator)
-                
-                # Extract everything after the indicator
-                query_text = action[start_pos:].strip()
-                
-                # Clean up the query
-                query_text = query_text.strip('".\',:;')
-                
-                # Handle cases where the query is part of a larger sentence
-                end_markers = ['.', '!', '?', 'and', 'then', 'while', 'before', 'after']
-                for marker in end_markers:
-                    if f" {marker} " in query_text:
-                        query_text = query_text.split(f" {marker} ")[0]
-                
-                return query_text
+        return "\n".join(news_results)
+
+    # Update the _determine_plausible_location method to use the LLM's knowledge
+    async def _determine_plausible_location(self, config: Dict) -> str:
+        """Use the LLM to determine a plausible location based on the world config and persona."""
+        city = config.get("location", {}).get("city", "Seattle")
+        country = config.get("location", {}).get("country", "USA")
         
-        # If no specific search indicator is found but the action mentions search
-        if "search" in action_lower:
-            # Try to extract what comes after "search"
-            parts = action_lower.split("search")
-            if len(parts) > 1:
-                query_text = parts[1].strip('".\',:; ')
-                return query_text
+        # Get persona information if available
+        persona_path = "simulacra_state.json"
+        persona = {}
         
-        return ""
-    
-    async def perform_search(self, query: str) -> Dict:
-        """Perform a web search based on a query from the simulacra."""
+        if os.path.exists(persona_path):
+            try:
+                with open(persona_path, 'r') as file:
+                    data = json.load(file)
+                    if "persona" in data:
+                        persona = data["persona"]
+                        self.console.print(f"[green]Loaded existing persona: {persona.get('name', 'Unknown')}[/green]")
+            except Exception as e:
+                logger.error(f"Error loading persona: {e}")
+        
+        # If no persona exists, generate one based on the location
+        if not persona:
+            self.console.print(f"[yellow]No existing persona found. Generating a persona based on {city}, {country}...[/yellow]")
+            persona = await self._generate_persona_for_location(city, country)
+            
+            # Save the generated persona
+            try:
+                with open(persona_path, 'w') as file:
+                    json.dump({"persona": persona, "history": []}, file, indent=2)
+                self.console.print(f"[green]Generated and saved new persona: {persona.get('name', 'Unknown')}[/green]")
+            except Exception as e:
+                logger.error(f"Error saving generated persona: {e}")
+        
+        # Create a prompt for the LLM to determine a plausible location
+        prompt = f"""
+        Based on the following information, determine a realistic and specific location where the character might be at the start of the simulation:
+        
+        City: {city}
+        Country: {country}
+        
+        Character information:
+        Name: {persona.get('name', 'Unknown')}
+        Age: {persona.get('age', 'Unknown')}
+        Occupation: {persona.get('occupation', 'Unknown')}
+        Personality traits: {', '.join(persona.get('personality_traits', ['Unknown']))}
+        Goals: {', '.join(persona.get('goals', ['Unknown']))}
+        Current state: {persona.get('current_state', {}).get('physical', 'Unknown')}
+        """
+        
+        prompt += """
+        Consider the character's occupation, age, and personality to determine where they might realistically be.
+        Choose a specific location (like a particular coffee shop, park, office, etc.) that would exist in this city.
+        The location should be realistic and specific, not generic.
+        
+        Return only the name of the location, nothing else.
+        """
+        
+        self.console.print(f"[yellow]Determining plausible location in {city}...[/yellow]")
+        
         try:
-            self.console.print(f"[yellow]Performing web search: {query}[/yellow]")
-            
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to summarize the search results
-            prompt = f"""
-            Summarize the following search results for the query: "{query}"
-            
-            {search_results}
-            
-            IMPORTANT:
-            1. ONLY include information that is explicitly mentioned in the search results
-            2. Organize the information in a clear, concise manner
-            3. If the search results don't contain relevant information, state that clearly
-            4. Include 3-5 key points from the search results
-            
-            Format your response as a search result summary that would be helpful to someone who asked this question.
-            """
-            
-            summary_response = await self.llm_service.generate_content(
+            # Use the LLM to determine a plausible location
+            response = await self.llm_service.generate_content(
                 prompt=prompt,
-                system_instruction="Summarize search results in a helpful, factual manner. Only include information from the search results.",
-                temperature=0.3
+                system_instruction="Determine a realistic and specific location for the character based on their profile and the city.",
+                temperature=0.7  # Slightly higher temperature for creativity
             )
             
-            # Process the response
-            if isinstance(summary_response, list) and len(summary_response) > 0:
-                summary = summary_response[0]
-            elif isinstance(summary_response, dict) and "text" in summary_response:
-                summary = summary_response["text"]
-            elif isinstance(summary_response, str):
-                summary = summary_response
-            else:
-                raise ValueError(f"Unexpected response format: {type(summary_response)}")
-            
-            # Clean up the summary
-            summary = summary.strip()
-            
-            self.console.print(f"[green]Search completed[/green]")
-            
-            return {
-                "query": query,
-                "summary": summary,
-                "data_source": "DuckDuckGo Search Results"
-            }
-            
-        except Exception as e:
-            logger.error(f"Error performing search: {e}")
-            self.console.print(f"[red]Error performing search: {e}[/red]")
-            
-            return {
-                "query": query,
-                "summary": f"The search for '{query}' failed due to a technical error.",
-                "data_source": "Error - Search Failed"
-            }
-    
-    async def process_update(self, action: str) -> Dict:
-        """Process an update to the world state based on an action."""
-        self.console.print(f"[cyan]Processing action: {action}[/cyan]")
-        
-        # Update real-time data
-        await self._update_real_time_data()
-        
-        # Check if the current location is open
-        location_status = await self._check_location_hours()
-        if location_status.get("is_open") is False:
-            self.console.print(f"[yellow]Note: {self.immediate_environment.get('current_location_name')} is currently closed. Opening hours: {location_status.get('hours', 'Unknown')}[/yellow]")
-        
-        # Get nearby locations
-        nearby_places = await self._get_nearby_locations()
-        if nearby_places:
-            self.immediate_environment["nearby_locations"] = nearby_places
-        
-        # Check if this is a search action
-        is_search_action = "search" in action.lower() or "look up" in action.lower() or "google" in action.lower()
-        
-        if is_search_action:
-            search_query = self._extract_search_query(action)
-            if search_query:
-                search_result = await self.perform_search(search_query)
-                
-                # Generate a response that incorporates the search result
-                prompt = f"""
-                The character has performed a search for: "{search_query}"
-                
-                Search results summary:
-                {search_result['summary']}
-                
-                Based on this search, describe:
-                1. What the character learns from this search
-                2. How this information might affect their current situation
-                3. Any observations about the search results
-                
-                Format your response as a JSON object with the following structure:
-                {{
-                    "consequences": ["List of 1-3 consequences of the search"],
-                    "observations": ["List of 1-3 observations about the search results"]
-                }}
-                """
-                
-                system_instruction = "You are simulating realistic world reactions to a character's search action. Provide consequences and observations in the requested JSON format."
-                
-                response = await self.llm_service.generate_content(
-                    prompt=prompt,
-                    system_instruction=system_instruction,
-                    temperature=0.5
-                )
-                
-                # Process the response
-                try:
-                    if isinstance(response, list) and len(response) > 0:
-                        response_text = response[0]
-                    elif isinstance(response, dict) and "text" in response:
-                        response_text = response["text"]
-                    elif isinstance(response, str):
-                        response_text = response
-                    else:
-                        raise ValueError(f"Unexpected response format: {type(response)}")
-                    
-                    # Extract JSON from the response
-                    response_json = json.loads(response_text)
-                    
-                    consequences = response_json.get("consequences", ["You found some information from your search."])
-                    observations = response_json.get("observations", ["The search results provided some insights."])
-                    
-                    # Update the narrative context
-                    updated_narrative = await self._generate_updated_narrative(action, consequences)
-                    self.narrative_context = updated_narrative
-                    
-                    # Return the results
-                    return {
-                        "consequences": consequences,
-                        "observations": observations,
-                        "search_result": search_result,
-                        "nearby_places": nearby_places[:3] if nearby_places else []
-                    }
-                    
-                except Exception as e:
-                    logger.error(f"Error processing search response: {e}")
-                    self.console.print(f"[red]Error processing search response: {e}[/red]")
-                    
-                    # Fallback response
-                    consequences = ["You found some information from your search."]
-                    observations = ["The search results provided some insights."]
-                    
-                    # Update the narrative context
-                    updated_narrative = await self._generate_updated_narrative(action, consequences)
-                    self.narrative_context = updated_narrative
-                    
-                    return {
-                        "consequences": consequences,
-                        "observations": observations,
-                        "search_result": search_result,
-                        "nearby_places": nearby_places[:3] if nearby_places else []
-                    }
-        
-        # For non-search actions, proceed with normal update
-        prompt = PromptManager.process_update_prompt(
-            world_state=self.world_state,
-            immediate_environment=self.immediate_environment,
-            simulacra=self.simulacra.persona,
-            action=action,
-            reaction_profile=self.reaction_profile
-        )
-        
-        system_instruction = "You are simulating realistic world reactions to a character's action. Provide consequences and observations in the requested JSON format."
-        
-        response = await self.llm_service.generate_content(
-            prompt=prompt,
-            system_instruction=system_instruction,
-            temperature=0.5
-        )
-        
-        # Process the response
-        try:
-            if isinstance(response, list) and len(response) > 0:
-                response_text = response[0]
-            elif isinstance(response, dict) and "text" in response:
-                response_text = response["text"]
+            # Extract the location from the response
+            if isinstance(response, dict) and "text" in response:
+                location = response["text"].strip()
             elif isinstance(response, str):
-                response_text = response
+                location = response.strip()
+            else:
+                location = str(response).strip()
+            
+            # Clean up the response
+            location = location.strip('"\'').strip()
+            
+            # If the response is too long or contains explanations, extract just the location name
+            if len(location.split()) > 10 or ":" in location or "." in location:
+                # Try to extract just the location name
+                lines = location.split('\n')
+                for line in lines:
+                    if line.strip() and len(line.split()) < 10 and ":" not in line and "." not in line:
+                        location = line.strip()
+                        break
+            
+            self.console.print(f"[green]Determined location:[/green] {location}")
+            return location
+        except Exception as e:
+            logger.error(f"Error determining plausible location: {e}")
+            # Fallback to a generic location
+            fallback_location = f"Coffee shop in {city}"
+            self.console.print(f"[red]Error determining location, using fallback:[/red] {fallback_location}")
+            return fallback_location
+
+    async def _generate_persona_for_location(self, city: str, country: str) -> Dict:
+        """Generate a persona that would plausibly be in the given location."""
+        
+        prompt = f"""
+        Create a realistic persona for a character in {city}, {country}.
+        
+        Consider the demographics, culture, and lifestyle of this location to create a believable character.
+        
+        Return the persona as a JSON object with the following structure:
+        {{
+            "name": "Character's name",
+            "age": age as number,
+            "occupation": "Character's job",
+            "personality_traits": ["trait1", "trait2", "trait3", "trait4"],
+            "goals": ["goal1", "goal2"],
+            "current_state": {{
+                "physical": "Description of physical state",
+                "emotional": "Description of emotional state",
+                "mental": "Description of mental state"
+            }},
+            "memory": {{
+                "short_term": ["recent memory 1", "recent memory 2"],
+                "long_term": ["long-term memory 1", "long-term memory 2"]
+            }}
+        }}
+        
+        Make the character interesting but realistic for this location. Consider local industries, cultural context, and daily life.
+        """
+        
+        system_instruction = f"Create a realistic persona for a character living in {city}, {country} as a structured JSON object."
+        
+        try:
+            response = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                temperature=0.7
+            )
+            
+            # If response is a list with one item (as shown in your example)
+            if isinstance(response, list) and len(response) > 0:
+                persona = response[0]
+            # If response is already a dictionary
+            elif isinstance(response, dict):
+                persona = response
             else:
                 raise ValueError(f"Unexpected response format: {type(response)}")
             
-            # Extract JSON from the response
-            response_json = json.loads(response_text)
-            
-            consequences = response_json.get("consequences", ["Your action had no noticeable consequences."])
-            observations = response_json.get("observations", ["You didn't observe anything significant."])
-            
-            # Update the immediate environment if provided
-            if "environment_updates" in response_json:
-                environment_updates = response_json["environment_updates"]
-                for key, value in environment_updates.items():
-                    if key in self.immediate_environment:
-                        self.immediate_environment[key] = value
-            
-            # Update the narrative context
-            updated_narrative = await self._generate_updated_narrative(action, consequences)
-            self.narrative_context = updated_narrative
-            
-            # Return the results
-            return {
-                "consequences": consequences,
-                "observations": observations,
-                "nearby_places": nearby_places[:3] if nearby_places else []
-            }
+            self.console.print(f"[green]Successfully generated persona for {persona['name']}[/green]")
+            return persona
             
         except Exception as e:
-            logger.error(f"Error processing update response: {e}")
-            self.console.print(f"[red]Error processing update response: {e}[/red]")
-            
-            # Fallback response
-            consequences = ["Your action had no noticeable consequences."]
-            observations = ["You didn't observe anything significant."]
-            
-            # Update the narrative context with a simple fallback
-            self.narrative_context += f"\n\nI {action.lower().replace('I ', '')}. Nothing significant happened."
-            
-            return {
-                "consequences": consequences,
-                "observations": observations,
-                "nearby_places": nearby_places[:3] if nearby_places else []
+            logger.error(f"Error generating persona: {e}")
+            # Return a default persona
+            default_persona = {
+                "name": f"Local Resident of {city}",
+                "age": 30,
+                "occupation": "Professional",
+                "personality_traits": ["adaptable", "observant", "practical", "curious"],
+                "goals": ["navigate daily life", "pursue personal interests"],
+                "current_state": {
+                    "physical": "Well-rested",
+                    "emotional": "Neutral",
+                    "mental": "Alert and aware"
+                },
+                "memory": {
+                    "short_term": [f"Recent activities in {city}"],
+                    "long_term": [f"Life experiences in {country}"]
+                }
             }
-    
-    async def change_location(self, new_location_name: str) -> Dict:
-        """Change the character's location to a new place."""
+            self.console.print(f"[red]Using default persona due to error: {e}[/red]")
+            return default_persona
+        
+    def get_current_datetime(self):
+        """Get the current date and time."""
+        now = datetime.datetime.now()
+        return {
+            "time": now.strftime("%H:%M"),
+            "date": now.strftime("%Y-%m-%d"),
+            "day_of_week": now.strftime("%A")
+        }
+
+    async def initialize_new_world(self):
+        """Initialize a new world state with both macro and micro levels using real data."""
+        logger.info("Initializing new world...")
+        config = {}
         try:
-            self.console.print(f"[cyan]Changing location to: {new_location_name}[/cyan]")
+            with open(self.world_config_path, 'r') as file:
+                config = yaml.safe_load(file)
+        except FileNotFoundError:
+            logger.warning(f"World config file not found at {self.world_config_path}. Using default settings.")
+            config = {}
+
+        try:
+            location = config.get("location", {"city": "NYC", "country": "USA"})
+            logger.info(f"Initializing world in {location.get('city', 'unknown location')}")
             
-            # Get current city and country
-            city = self.world_state.get("city", "New York")
-            country = self.world_state.get("country", "United States")
+            # Get current date and time
+            current_datetime = self.get_current_datetime()
             
-            # Get current location for reference
-            current_location = self.immediate_environment.get("current_location_name", "Unknown")
+            # Gather comprehensive news - real current events
+            self.console.print(f"[yellow]Gathering news for {location.get('city')}...[/yellow]")
+            news_results = await self._gather_comprehensive_news(location)
             
-            # Calculate travel time based on distance (simplified)
-            travel_time = await self._calculate_travel_time(current_location, new_location_name, city, country)
+            # Initialize world state (macro level) with real data
+            prompt = PromptManager.initialize_world_state_prompt(news_results, config)
             
-            # Advance time based on travel
-            if travel_time > 0:
-                self.advance_time(travel_time)
-                self.console.print(f"[yellow]Traveled for {travel_time} minutes to reach {new_location_name}[/yellow]")
+            # Add current date and time to the prompt
+            prompt += f"\n\nCurrent date: {current_datetime['date']}\nCurrent time: {current_datetime['time']}\nDay of week: {current_datetime['day_of_week']}"
             
-            # Create a new immediate environment for the new location
-            new_environment = await self._create_default_immediate_environment(new_location_name)
-            
-            # Update the immediate environment
-            self.immediate_environment = new_environment
-            
-            # Update the world state with the new location
-            self.world_state["current_location"] = new_location_name
-            
-            # Generate a transition narrative
-            transition_prompt = f"""
-            The character has moved from {current_location} to {new_location_name} in {city}, {country}.
-            
-            Current time: {self.world_state.get("current_time", "Unknown")}
-            Weather: {self.world_state.get("weather", {}).get("weather_condition", "Unknown")}, {self.world_state.get("weather", {}).get("temperature", "Unknown")}
-            
-            New location description: {new_environment.get("description", "No description available")}
-            
-            Write a brief, engaging paragraph describing the transition and arrival at the new location.
-            Focus on sensory details and the character's first impressions of the new environment.
-            """
-            
-            transition_response = await self.llm_service.generate_content(
-                prompt=transition_prompt,
-                system_instruction="Write a brief, engaging narrative transition for a character moving to a new location.",
-                temperature=0.6
+            self.console.print("[yellow]Generating world state based on current events...[/yellow]")
+            world_state_response = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction='Create a comprehensive world state based on the provided information, current news, and real-world data.',
+                response_model=WorldStateResponse
             )
             
-            # Process the response
-            if isinstance(transition_response, list) and len(transition_response) > 0:
-                transition_narrative = transition_response[0]
-            elif isinstance(transition_response, dict) and "text" in transition_response:
-                transition_narrative = transition_response["text"]
-            elif isinstance(transition_response, str):
-                transition_narrative = transition_response
+            if "updated_world_state" in world_state_response:
+                self.world_state = world_state_response["updated_world_state"]
+                # Ensure the time and date are current
+                self.world_state["current_time"] = current_datetime["time"]
+                self.world_state["current_date"] = current_datetime["date"]
             else:
-                transition_narrative = f"I arrived at {new_location_name} after leaving {current_location}."
+                # Fallback if LLM fails
+                self.world_state = self._create_default_world_state(config)
             
-            # Update the narrative context
-            self.narrative_context = transition_narrative
+            # Determine a plausible location based on persona using the LLM
+            starting_location = await self._determine_plausible_location(config)
             
+            # Initialize immediate environment (micro level)
+            self.console.print(f"[yellow]Creating environment for {starting_location}...[/yellow]")
+            prompt = PromptManager.initialize_immediate_environment_prompt(self.world_state, starting_location)
+            environment_response = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction='Create a detailed immediate environment based on the world state and location.',
+                response_model=ImmediateEnvironmentResponse
+            )
+            
+            if "updated_environment" in environment_response:
+                self.immediate_environment = environment_response["updated_environment"]
+            else:
+                # Fallback if LLM fails - now uses LLM for fallback too
+                self.immediate_environment = await self._create_default_immediate_environment(starting_location)
+            
+            # Get persona information if available
+            persona = {}
+            persona_path = "simulacra_state.json"
+            if os.path.exists(persona_path):
+                try:
+                    with open(persona_path, 'r') as file:
+                        data = json.load(file)
+                        if "persona" in data:
+                            persona = data["persona"]
+                except Exception as e:
+                    logger.error(f"Error loading persona: {e}")
+            
+            # Generate narrative context
+            narrative_context = await self._generate_narrative_context(
+                persona, 
+                self.world_state, 
+                self.immediate_environment.get('current_location_name', starting_location)
+            )
+
+            # Save the initial state
+            self.save_state()
+
+            logger.info("New world state and immediate environment initialized")
             return {
-                "new_location": new_location_name,
-                "travel_time": travel_time,
-                "transition_narrative": transition_narrative,
-                "environment": new_environment
+                "world_state": self.world_state,
+                "immediate_environment": self.immediate_environment,
+                "narrative_context": narrative_context,
+                "observations": [
+                    f"You're in {self.immediate_environment.get('current_location_name', starting_location)}.",
+                    f"It's {self.world_state.get('current_time', current_datetime['time'])} on {self.world_state.get('current_date', current_datetime['date'])}.",
+                    f"The weather is {self.world_state.get('weather_condition', 'normal')}.",
+                    "You notice your surroundings and gather your thoughts."
+                ]
             }
-            
         except Exception as e:
-            logger.error(f"Error changing location: {e}")
-            self.console.print(f"[red]Error changing location: {e}[/red]")
-            
-            # Fallback - create a simple environment for the new location
-            fallback_environment = {
-                "current_location_name": new_location_name,
-                "location_type": "Unknown",
-                "indoor_outdoor": "Unknown",
-                "description": f"A location called {new_location_name}",
-                "features": ["Basic features"],
-                "present_people": ["Various people"],
-                "crowd_density": "Moderate",
-                "social_atmosphere": "Neutral",
-                "ongoing_activities": ["Various activities"],
-                "data_source": "Fallback - Error during location change"
-            }
-            
-            # Update the immediate environment with the fallback
-            self.immediate_environment = fallback_environment
-            
-            # Update the world state with the new location
-            self.world_state["current_location"] = new_location_name
-            
-            # Simple fallback narrative
-            fallback_narrative = f"I arrived at {new_location_name} after leaving my previous location."
-            self.narrative_context = fallback_narrative
-            
+            logger.error(f"Error initializing new world: {e}")
+            # Create basic defaults if everything fails
+            self.world_state = self._create_default_world_state(config)
+            self.immediate_environment = self._create_default_immediate_environment("Coffee shop")
+            self.save_state()
             return {
-                "new_location": new_location_name,
-                "travel_time": 15,  # Default travel time
-                "transition_narrative": fallback_narrative,
-                "environment": fallback_environment
+                "world_state": self.world_state,
+                "immediate_environment": self.immediate_environment,
+                "narrative_context": "You arrived at a coffee shop after a busy morning. You have several things on your mind and are trying to figure out your next steps.",
+                "observations": [
+                    f"You're in a coffee shop.",
+                    f"It's {self.world_state.get('current_time', 'daytime')} on {self.world_state.get('current_date', 'today')}.",
+                    f"The weather is {self.world_state.get('weather_condition', 'normal')}.",
+                    "You notice your surroundings and gather your thoughts."
+                ]
             }
-    
-    async def _calculate_travel_time(self, origin: str, destination: str, city: str, country: str) -> int:
-        """Calculate approximate travel time between two locations in minutes."""
+
+    def _create_default_world_state(self, config: Dict) -> Dict:
+        """Create a default world state if LLM initialization fails."""
+        now = datetime.datetime.now()
+        location = config.get("location", {"city": "NYC", "country": "USA"})
+        
+        return {
+            "current_time": now.strftime("%H:%M"),
+            "current_date": now.strftime("%Y-%m-%d"),
+            "city_name": location.get("city", "NYC"),
+            "country_name": location.get("country", "USA"),
+            "region_name": location.get("region", "Northeast"),
+            "weather_condition": "Partly cloudy",
+            "temperature": "68°F (20°C)",
+            "forecast": "Similar conditions expected for the next 24 hours",
+            "social_climate": "Generally calm with typical urban activity",
+            "economic_condition": "Stable with normal business activity",
+            "major_events": ["No major events currently"],
+            "local_news": ["Standard local news coverage"],
+            "transportation_status": "Normal operation of public transit and typical traffic patterns",
+            "utility_status": "All utilities functioning normally",
+            "public_announcements": ["No significant public announcements"],
+            "trending_topics": ["Local sports", "Weather", "Weekend activities"],
+            "current_cultural_events": ["Regular museum exhibitions", "Some local music performances"],
+            "sports_events": ["Regular season games for local teams"],
+            "public_health_status": "No significant health concerns or advisories",
+            "public_safety_status": "Normal safety conditions with typical police presence"
+        }
+
+    async def _create_default_immediate_environment(self, location_name: str) -> Dict:
+        """Create a default immediate environment using the LLM if the standard initialization fails."""
         try:
-            # If the locations are the same, no travel time
-            if origin.lower() == destination.lower():
-                return 0
+            self.console.print(f"[yellow]Creating fallback environment for {location_name} using LLM...[/yellow]")
             
-            # Construct a search query for travel time
-            query = f"travel time from {origin} to {destination} in {city}, {country}"
+            # Determine a basic location type first
+            location_type_prompt = f"""
+            What type of location is "{location_name}"? 
+            Examples: Coffee shop, Restaurant, Park, Office building, Library, Museum, etc.
             
-            search = DuckDuckGoSearchRun()
-            search_results = search.run(query)
-            
-            # Use the LLM to extract travel time from search results
-            prompt = f"""
-            Extract the approximate travel time between {origin} and {destination} in {city}, {country} from these search results:
-            
-            {search_results}
-            
-            If you can find a specific travel time (e.g., "15 minutes by car", "30 minutes walking"), extract that value in minutes.
-            If multiple travel methods are mentioned (walking, driving, public transit), prioritize the most common or reasonable method.
-            If no specific time is mentioned, estimate based on:
-            - Walking: 5 minutes for very close locations, 15 minutes for nearby locations, 30+ minutes for distant locations
-            - Driving: 5-10 minutes for locations in the same area, 15-30 minutes for cross-town trips
-            
-            Return ONLY the number of minutes as an integer. If you cannot determine a time, return 15 as a default.
+            Return only the location type, nothing else.
             """
             
-            time_response = await self.llm_service.generate_content(
-                prompt=prompt,
-                system_instruction="Extract or estimate travel time in minutes from search results. Return only an integer.",
+            location_type_response = await self.llm_service.generate_content(
+                prompt=location_type_prompt,
+                system_instruction="Determine the type of location based on its name.",
                 temperature=0.3
             )
             
-            # Process the response
-            if isinstance(time_response, list) and len(time_response) > 0:
-                time_text = time_response[0]
-            elif isinstance(time_response, dict) and "text" in time_response:
-                time_text = time_response["text"]
-            elif isinstance(time_response, str):
-                time_text = time_response
+            # Extract location type
+            if isinstance(location_type_response, list) and len(location_type_response) > 0:
+                location_type = location_type_response[0]
+            elif isinstance(location_type_response, dict) and "text" in location_type_response:
+                location_type = location_type_response["text"].strip()
+            elif isinstance(location_type_response, str):
+                location_type = location_type_response.strip()
             else:
-                return 15  # Default if response format is unexpected
+                location_type = "Public space"
             
-            # Extract the number from the response
-            time_text = time_text.strip()
-            try:
-                travel_time = int(re.search(r'\d+', time_text).group())
-                return min(travel_time, 120)  # Cap at 120 minutes to prevent unreasonable values
-            except:
-                return 15  # Default if parsing fails
-                
-        except Exception as e:
-            logger.error(f"Error calculating travel time: {e}")
-            return 15  # Default travel time in minutes
-    
-    def advance_time(self, minutes: int) -> None:
-        """Advance the simulation time by the specified number of minutes."""
-        try:
-            # Get current time
-            current_time = self.world_state.get("current_time", "12:00")
+            # Clean up location type
+            location_type = location_type.strip('"\'').strip()
             
-            # Parse the time
-            try:
-                # Try 24-hour format first
-                hour, minute = map(int, current_time.split(":"))
-            except:
-                try:
-                    # Try 12-hour format
-                    time_parts = current_time.split()
-                    hour, minute = map(int, time_parts[0].split(":"))
-                    if time_parts[1].lower() == "pm" and hour < 12:
-                        hour += 12
-                    elif time_parts[1].lower() == "am" and hour == 12:
-                        hour = 0
-                except:
-                    # Default to noon if parsing fails
-                    hour, minute = 12, 0
+            # Now generate a complete environment based on the location name and type
+            environment_prompt = f"""
+            Create a detailed immediate environment for a location named "{location_name}" which is a {location_type}.
             
-            # Advance time
-            minute += minutes
-            hour += minute // 60
-            minute %= 60
+            Return the environment as a JSON object with the following structure:
+            {{
+                "current_location_name": "{location_name}",
+                "location_type": "{location_type}",
+                "indoor_outdoor": "Indoor or Outdoor",
+                "noise_level": "Description of noise level",
+                "lighting": "Description of lighting",
+                "temperature_feeling": "How the temperature feels",
+                "air_quality": "Description of air quality",
+                "present_people": ["Types of people present"],
+                "crowd_density": "Description of crowd density",
+                "social_atmosphere": "Description of social atmosphere",
+                "ongoing_activities": ["Activities happening around"],
+                "nearby_objects": ["Objects that can be interacted with"],
+                "available_services": ["Services available at this location"],
+                "exit_options": ["Ways to leave this location"],
+                "interaction_opportunities": ["Opportunities for interaction"],
+                "visible_features": ["Notable visible features"],
+                "audible_sounds": ["Sounds that can be heard"],
+                "noticeable_smells": ["Smells that can be detected"],
+                "seating_availability": "Availability of seating",
+                "food_drink_options": ["Available food and drinks"],
+                "restroom_access": "Access to restrooms",
+                "recent_changes": ["Recent changes to the environment"],
+                "ongoing_conversations": ["Topics being discussed nearby"],
+                "attention_drawing_elements": ["Things that draw attention"]
+            }}
             
-            # Handle day change
-            new_day = False
-            if hour >= 24:
-                hour %= 24
-                new_day = True
+            Make the environment realistic and detailed for this type of location.
+            """
             
-            # Format the new time
-            new_time = f"{hour:02d}:{minute:02d}"
-            self.world_state["current_time"] = new_time
-            
-            # If a new day has started, update the date and day of week
-            if new_day:
-                try:
-                    current_date = datetime.strptime(self.world_state.get("current_date", datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d")
-                    new_date = current_date + timedelta(days=1)
-                    self.world_state["current_date"] = new_date.strftime("%Y-%m-%d")
-                    self.world_state["day_of_week"] = new_date.strftime("%A")
-                    
-                    # Get new weather and news for the new day
-                    self.console.print(f"[yellow]A new day has begun: {new_date.strftime('%A, %Y-%m-%d')}[/yellow]")
-                    
-                    # Update weather and news asynchronously
-                    asyncio.create_task(self._update_real_time_data())
-                except:
-                    # If date parsing fails, just note the day change
-                    self.console.print("[yellow]A new day has begun.[/yellow]")
-            
-            # Check if the location status might have changed
-            location_name = self.immediate_environment.get("current_location_name", "Unknown")
-            opening_hours = self.immediate_environment.get("opening_hours", "Not available")
-            
-            if opening_hours != "Not available" and "24/7" not in opening_hours.lower() and "always open" not in opening_hours.lower():
-                self.console.print(f"[dim]Time is now {new_time}. You may want to check if {location_name} is still open.[/dim]")
-            else:
-                self.console.print(f"[dim]Time is now {new_time}.[/dim]")
-                
-        except Exception as e:
-            logger.error(f"Error advancing time: {e}")
-            self.console.print(f"[red]Error advancing time: {e}[/red]")
-            
-            # Fallback - just set a reasonable time
-            self.world_state["current_time"] = "12:00"
-    
-    async def save_state(self) -> bool:
-        """Save the current state to a file."""
-        try:
-            state = {
-                "world_state": self.world_state,
-                "immediate_environment": self.immediate_environment,
-                "persona": self.simulacra.persona,
-                "narrative_context": self.narrative_context,
-                "reaction_profile": self.reaction_profile
-            }
-            
-            with open("simulation_state.json", "w") as f:
-                json.dump(state, f, indent=2)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error saving state: {e}")
-            self.console.print(f"[red]Error saving state: {e}[/red]")
-            return False
-    
-    async def load_state(self) -> bool:
-        """Load the state from a file."""
-        try:
-            with open("simulation_state.json", "r") as f:
-                state = json.load(f)
-            
-            self.world_state = state.get("world_state", {})
-            self.immediate_environment = state.get("immediate_environment", {})
-            self.simulacra.persona = state.get("persona", {})
-            self.narrative_context = state.get("narrative_context", "")
-            self.reaction_profile = state.get("reaction_profile", "balanced")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error loading state: {e}")
-            self.console.print(f"[red]Error loading state: {e}[/red]")
-            return False
-
-async def create_persona(city: str, country: str) -> Dict:
-    """Create a new persona based on the specified city and country."""
-    try:
-        console = Console()
-        console.print("[yellow]No persona file found. Creating a new persona...[/yellow]")
-        
-        # Initialize LLM service
-        llm_service = LLMService()
-        
-        # Generate a prompt for creating a persona
-        prompt = f"""
-        Create a realistic persona for someone living in {city}, {country}.
-        
-        The persona should include:
-        1. Name (appropriate for the location)
-        2. Age (between 18 and 65)
-        3. Occupation (realistic for the location)
-        4. Personality traits (3-5 traits)
-        5. Background (brief life history)
-        6. Goals (1-3 current goals)
-        7. Current emotional state
-        
-        Make the persona realistic, nuanced, and appropriate for the location.
-        """
-        
-        system_instruction = """
-        You are creating a realistic persona for a simulation. 
-        Return the persona as a JSON object with the following structure:
-        {
-            "name": "Full Name",
-            "age": age_as_integer,
-            "occupation": "Occupation",
-            "personality_traits": ["trait1", "trait2", "trait3"],
-            "background": "Brief background story",
-            "goals": ["goal1", "goal2"],
-            "current_emotion": "emotion",
-            "current_goal": "Most immediate goal"
-        }
-        """
-        
-        # Generate the persona
-        persona_response = await llm_service.generate_content(
-            prompt=prompt,
-            system_instruction=system_instruction,
-            temperature=0.7
-        )
-        
-        # Process the response
-        if isinstance(persona_response, list) and len(persona_response) > 0:
-            persona_text = persona_response[0]
-        elif isinstance(persona_response, dict) and "text" in persona_response:
-            persona_text = persona_response["text"]
-        elif isinstance(persona_response, str):
-            persona_text = persona_response
-        else:
-            raise ValueError(f"Unexpected response format: {type(persona_response)}")
-        
-        # Parse the JSON
-        persona = json.loads(persona_text)
-        
-        # Add additional fields needed for simulation
-        persona["recent_memory"] = f"I woke up this morning in {city}, {country}."
-        persona["recent_actions"] = []
-        
-        # Save the persona to a file
-        with open("persona.json", "w") as f:
-            json.dump(persona, f, indent=2)
-        
-        console.print(f"[green]Created new persona: {persona['name']}, a {persona['age']}-year-old {persona['occupation']}[/green]")
-        
-        return persona
-        
-    except Exception as e:
-        logger.error(f"Error creating persona: {e}")
-        console.print(f"[red]Error creating persona: {e}[/red]")
-        
-        # Create a default persona
-        default_persona = {
-            "name": f"Alex Smith",
-            "age": 30,
-            "occupation": "Office Worker",
-            "personality_traits": ["adaptable", "curious", "friendly"],
-            "background": f"Born and raised in {city}, {country}. Has lived there all their life.",
-            "goals": ["Find a better job", "Make new friends", "Explore the city"],
-            "current_emotion": "neutral",
-            "current_goal": "Get through the day",
-            "recent_memory": f"I woke up this morning in {city}, {country}.",
-            "recent_actions": []
-        }
-        
-        # Save the default persona
-        with open("persona.json", "w") as f:
-            json.dump(default_persona, f, indent=2)
-        
-        console.print("[yellow]Created default persona due to error.[/yellow]")
-        
-        return default_persona
-
-async def run_simulation(
-    persona_file: str,
-    world_config: Dict,
-    reaction_profile: str = "balanced",
-    max_steps: int = 10,
-    new_simulation: bool = False,
-    time_increment: int = 15
-) -> None:
-    """Run the simulation with the specified parameters."""
-    # Initialize console for output
-    console = Console()
-    
-    # Determine profile name for display
-    profile_display = {
-        "balanced": "Balanced",
-        "optimistic": "Optimistic",
-        "pessimistic": "Pessimistic",
-        "creative": "Creative",
-        "analytical": "Analytical"
-    }.get(reaction_profile, "Custom")
-    
-    # Initialize the world engine
-    world_engine = WorldEngine(
-        persona_file=persona_file,
-        world_config=world_config,
-        reaction_profile=reaction_profile
-    )
-    
-    # Initialize or load the world state
-    if new_simulation:
-        console.print("[yellow]Initializing new world with real-time data...[/yellow]")
-        await world_engine.initialize_world()
-    else:
-        console.print("[yellow]Attempting to load existing state...[/yellow]")
-        state_loaded = await world_engine.load_state()
-        if not state_loaded:
-            console.print("[yellow]No existing state found or error loading. Initializing new world...[/yellow]")
-            await world_engine.initialize_world()
-    
-    # Print world state information
-    console.print("\n[bold cyan]===== WORLD STATE =====[/bold cyan]")
-    console.print(f"[cyan]Location:[/cyan] {world_engine.world_state.get('city', 'Unknown')}, {world_engine.world_state.get('country', 'Unknown')}")
-    console.print(f"[cyan]Date/Time:[/cyan] {world_engine.world_state.get('current_date', 'Unknown')} ({world_engine.world_state.get('day_of_week', 'Unknown')}), {world_engine.world_state.get('current_time', 'Unknown')}")
-    
-    # Print current weather
-    weather = world_engine.world_state.get('weather', {})
-    if weather:
-        console.print(f"[cyan]Current Weather:[/cyan] {weather.get('weather_condition', 'Unknown')}, {weather.get('temperature', 'Unknown')}")
-        if 'data_source' in weather:
-            console.print(f"[dim](Weather data source: {weather.get('data_source', 'Unknown')})[/dim]")
-    
-    # Print current news
-    news = world_engine.world_state.get('news', [])
-    if news:
-        console.print("\n[bold cyan]CURRENT NEWS[/bold cyan]")
-        for i, item in enumerate(news[:3], 1):  # Show top 3 news items
-            console.print(f"[cyan]{i}.[/cyan] {item}")
-        if 'news_data_source' in world_engine.world_state:
-            console.print(f"[dim](News data source: {world_engine.world_state.get('news_data_source', 'Unknown')})[/dim]")
-    
-    # Print local events
-    events = world_engine.world_state.get('local_events', [])
-    if events:
-        console.print("\n[bold cyan]LOCAL EVENTS[/bold cyan]")
-        for i, event in enumerate(events[:3], 1):  # Show top 3 events
-            console.print(f"[cyan]{i}.[/cyan] {event}")
-        if 'events_data_source' in world_engine.world_state:
-            console.print(f"[dim](Events data source: {world_engine.world_state.get('events_data_source', 'Unknown')})[/dim]")
-    
-    # Print reaction profile
-    console.print(f"\n[bold magenta]Reaction Profile:[/bold magenta] {profile_display}")
-    
-    # Print character information
-    persona = world_engine.simulacra.persona
-    console.print("\n[bold green]===== CHARACTER =====[/bold green]")
-    console.print(f"[green]Name:[/green] {persona.get('name', 'Unknown')}")
-    console.print(f"[green]Age:[/green] {persona.get('age', 'Unknown')}")
-    console.print(f"[green]Occupation:[/green] {persona.get('occupation', 'Unknown')}")
-    console.print(f"[green]Current Goal:[/green] {persona.get('current_goal', 'Unknown')}")
-    console.print(f"[green]Current Emotion:[/green] {persona.get('current_emotion', 'Unknown')}")
-    
-    # Print current location information
-    console.print("\n[bold blue]===== CURRENT LOCATION =====[/bold blue]")
-    location = world_engine.immediate_environment
-    console.print(f"[blue]Name:[/blue] {location.get('current_location_name', 'Unknown')}")
-    console.print(f"[blue]Type:[/blue] {location.get('location_type', 'Unknown')} ({location.get('indoor_outdoor', 'Unknown')})")
-    console.print(f"[blue]Description:[/blue] {location.get('description', 'No description available')}")
-    
-    if 'address' in location:
-        console.print(f"[blue]Address:[/blue] {location.get('address', 'Unknown')}")
-    
-    if 'opening_hours' in location:
-        console.print(f"[blue]Opening Hours:[/blue] {location.get('opening_hours', 'Unknown')}")
-    
-    # Print initial narrative context
-    console.print("\n[bold yellow]===== NARRATIVE =====[/bold yellow]")
-    console.print(f"{world_engine.narrative_context}")
-    
-    # Main simulation loop
-    step = 1
-    while step <= max_steps:
-        console.print(f"\n[bold]===== SIMULATION STEP {step}/{max_steps} =====[/bold]")
-        
-        # Perception phase
-        console.print("\n[bold cyan]PERCEPTION[/bold cyan]")
-        perception = await world_engine.process_perception()
-        
-        # Action phase
-        console.print("\n[bold green]ACTION[/bold green]")
-        action = await world_engine.simulacra.decide_action(perception)
-        
-        # World update phase
-        console.print("\n[bold blue]WORLD UPDATE[/bold blue]")
-        update_result = await world_engine.process_update(action)
-        
-        # Advance time
-        console.print(f"\n[bold yellow]Time passes... ({time_increment} minutes)[/bold yellow]")
-        world_engine.advance_time(time_increment)
-        
-        # Save state
-        await world_engine.save_state()
-        
-        # Prompt user to continue
-        if step < max_steps:
-            choice = Prompt.ask(
-                "\n[bold]Continue simulation?[/bold]",
-                choices=["y", "n", "t", "q"],
-                default="y"
+            environment_response = await self.llm_service.generate_content(
+                prompt=environment_prompt,
+                system_instruction=f"Create a detailed environment for a {location_type} named {location_name}.",
+                temperature=0.7
             )
             
-            if choice.lower() == "n":
-                break
-            elif choice.lower() == "t":
-                new_increment = IntPrompt.ask(
-                    "Enter new time increment (minutes)",
-                    default=time_increment
-                )
-                time_increment = max(1, min(new_increment, 1440))  # Between 1 minute and 24 hours
-            elif choice.lower() == "q":
-                console.print("[yellow]Quitting simulation...[/yellow]")
-                break
-        
-        step += 1
-    
-    console.print("\n[bold]===== SIMULATION COMPLETE =====[/bold]")
-    console.print(f"Completed {step-1} steps of simulation.")
+            # Extract the environment
+            if isinstance(environment_response, list) and len(environment_response) > 0:
+                environment = environment_response[0]
+            elif isinstance(environment_response, dict):
+                if "updated_environment" in environment_response:
+                    environment = environment_response["updated_environment"]
+                else:
+                    environment = environment_response
+            else:
+                raise ValueError(f"Unexpected response format: {type(environment_response)}")
+            
+            self.console.print(f"[green]Successfully generated environment for {location_name} ({location_type})[/green]")
+            return environment
+            
+        except Exception as e:
+            logger.error(f"Error creating environment with LLM: {e}")
+            self.console.print(f"[red]Error creating environment with LLM: {e}. Using hardcoded fallback.[/red]")
+            
+            # Ultimate fallback - hardcoded environment
+            return {
+                "current_location_name": location_name,
+                "location_type": "Public space",
+                "indoor_outdoor": "Indoor",
+                "noise_level": "Moderate with conversation",
+                "lighting": "Adequate lighting",
+                "temperature_feeling": "Comfortable",
+                "air_quality": "Fresh",
+                "present_people": ["Various people"],
+                "crowd_density": "Moderately busy",
+                "social_atmosphere": "Neutral",
+                "ongoing_activities": ["People going about their business"],
+                "nearby_objects": ["Furniture", "Fixtures"],
+                "available_services": ["Basic amenities"],
+                "exit_options": ["Main entrance/exit"],
+                "interaction_opportunities": ["People nearby"],
+                "visible_features": ["Standard features for this type of location"],
+                "audible_sounds": ["Ambient noise", "Conversations"],
+                "noticeable_smells": ["Neutral smells"],
+                "seating_availability": "Some seating available",
+                "food_drink_options": ["Basic options if applicable"],
+                "restroom_access": "Standard access",
+                "recent_changes": ["Nothing notable has changed recently"],
+                "ongoing_conversations": ["General conversations"],
+                "attention_drawing_elements": ["Nothing particularly notable"]
+            }
 
-def create_default_world_config():
-    """Create a default world configuration file if it doesn't exist."""
-    if not os.path.exists("world_config.yaml"):
-        default_config = {
-            "city": "New York",
-            "country": "United States",
-            "starting_location": "Central Park",
-            "use_real_data": True
+    async def process_update(self, simulacra_action: Dict[str, Any], simulacra_persona: Dict = None) -> Dict[str, Any]:
+        """Process an action from the simulacra and update both world state and immediate environment."""
+
+        # Save the action to history
+        self.history.append({
+            "timestamp": self.world_state.get("current_time", datetime.now().strftime("%H:%M")),
+            "date": self.world_state.get("current_date", datetime.now().strftime("%Y-%m-%d")),
+            "action": simulacra_action
+        })
+
+        self.console.print(f"\n[bold yellow]Processing action:[/bold yellow] {simulacra_action.get('action', 'Unknown action')}")
+        
+        # Include reaction profile in the prompt
+        prompt = PromptManager.process_update_prompt(
+            self.world_state, 
+            self.immediate_environment, 
+            simulacra_action,
+            self.reaction_profile
+        )
+        
+        system_instruction = 'Update the environment based on an action taken by a simulated character, following the specified world reaction profile.'
+        
+        try:
+            self.console.print("[bold]Generating world response...[/bold]")
+            update_response = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_model=None  # Using a custom response format
+            )
+
+            # Update immediate environment
+            if "updated_environment" in update_response:
+                self.immediate_environment = update_response["updated_environment"]
+                self.console.print("[green]Environment updated successfully[/green]")
+            
+            # Update world state if there are broader changes
+            if "world_state_changes" in update_response and update_response["world_state_changes"]:
+                # Apply only the changes to the world state
+                world_changes = update_response["world_state_changes"]
+                for key, value in world_changes.items():
+                    if key in self.world_state:
+                        self.world_state[key] = value
+                self.console.print("[blue]World state updated with broader changes[/blue]")
+            
+            # Ensure consequences and observations are properly formatted as lists
+            consequences = update_response.get("consequences", "No notable consequences.")
+            observations = update_response.get("observations", "Nothing notable observed.")
+            
+            # Convert to list if they're strings
+            if isinstance(consequences, str):
+                consequences = [consequences]
+                self.console.print("[yellow]Converted consequences from string to list[/yellow]")
+            elif not isinstance(consequences, list):
+                consequences = ["Unexpected response format for consequences."]
+                self.console.print("[red]Unexpected format for consequences[/red]")
+                
+            if isinstance(observations, str):
+                observations = [observations]
+                self.console.print("[yellow]Converted observations from string to list[/yellow]")
+            elif not isinstance(observations, list):
+                observations = ["Unexpected response format for observations."]
+                self.console.print("[red]Unexpected format for observations[/red]")
+            
+            # Generate an updated narrative context if persona is provided
+            narrative_update = ""
+            if simulacra_persona:
+                narrative_update = await self._generate_updated_narrative(
+                    simulacra_persona,
+                    [action["action"] for action in self.history[-5:] if "action" in action],  # Last 5 actions
+                    self.world_state,
+                    self.immediate_environment,
+                    consequences,
+                    observations
+                )
+            
+            # Save the updated state
+            self.save_state()
+            self.console.print("[green]World state saved successfully[/green]")
+
+            return {
+                "world_state": self.world_state,
+                "immediate_environment": self.immediate_environment,
+                "consequences": consequences,
+                "observations": observations,
+                "narrative_update": narrative_update
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing update: {e}")
+            self.console.print(f"[bold red]Error processing update:[/bold red] {str(e)}")
+            return {
+                "error": str(e),
+                "world_state": self.world_state,
+                "immediate_environment": self.immediate_environment,
+                "consequences": ["No changes due to error"],
+                "observations": ["The environment continues as before"],
+                "narrative_update": "The story continues without significant developments."
+            }
+
+    def save_state(self):
+        """Save current world state and immediate environment to a file."""
+        try:
+            with open(self.state_path, 'w') as file:
+                json.dump({
+                    "world_state": self.world_state,
+                    "immediate_environment": self.immediate_environment,
+                    "history": self.history,
+                    "reaction_profile": self.reaction_profile.model_dump()
+                }, file, indent=2)
+            logger.info(f"World state and immediate environment saved to {self.state_path}")
+        except Exception as e:
+            logger.error(f"Error saving world state: {e}")
+
+    def load_state(self):
+        """Load world state and immediate environment from a file."""
+        try:
+            with open(self.state_path, 'r') as file:
+                state_data = json.load(file)
+                
+                # Validate loaded data against models
+                if "world_state" in state_data:
+                    WorldState.model_validate(state_data["world_state"])
+                    self.world_state = state_data["world_state"]
+                
+                if "immediate_environment" in state_data:
+                    ImmediateEnvironment.model_validate(state_data["immediate_environment"])
+                    self.immediate_environment = state_data["immediate_environment"]
+                
+                if "history" in state_data:
+                    self.history = state_data["history"]
+                    
+                if "reaction_profile" in state_data:
+                    try:
+                        self.reaction_profile = WorldReactionProfile(**state_data["reaction_profile"])
+                        logger.info(f"Loaded reaction profile: {self.reaction_profile.model_dump()}")
+                    except Exception as e:
+                        logger.error(f"Error loading reaction profile: {e}. Using default profile.")
+                        self.reaction_profile = WorldReactionProfile.create_profile("balanced")
+                else:
+                    logger.info("No reaction profile found in state file. Using default profile.")
+                    self.reaction_profile = WorldReactionProfile.create_profile("balanced")
+                        
+            logger.info(f"World state and immediate environment loaded from {self.state_path}")
+        except FileNotFoundError:
+            logger.warning(f"No world state file found at {self.state_path}. Starting with a new world.")
+        except json.JSONDecodeError:
+            logger.error(f"Corrupted world state file at {self.state_path}. Starting with a new world.")
+        except Exception as e:
+            logger.error(f"Error loading world state from {self.state_path}: {e}. Starting with a new world.")
+
+    def get_world_summary(self) -> str:
+        """Generate a concise summary of the current world state, highlighting key events."""
+        if not self.world_state:
+            return "[bold red]World state not initialized.[/bold red]"
+        
+        # Extract key information
+        time_date = f"[bold cyan]{self.world_state.get('current_time', 'unknown time')} on {self.world_state.get('current_date', 'unknown date')}[/bold cyan]"
+        location = f"[bold green]{self.world_state.get('city_name', 'unknown city')}, {self.world_state.get('region_name', 'unknown region')}[/bold green]"
+        weather = f"[bold yellow]{self.world_state.get('weather_condition', 'unknown weather')}, {self.world_state.get('temperature', '')}[/bold yellow]"
+        
+        # Check for major events
+        major_events = self.world_state.get('major_events', [])
+        if not major_events or major_events == ["No major events currently"]:
+            event_str = "[italic]No significant events.[/italic]"
+        else:
+            event_str = f"[bold magenta]Events:[/bold magenta] {', '.join(major_events[:2])}"
+        
+        # Check for any unusual conditions
+        conditions = []
+        if "unstable" in self.world_state.get('economic_condition', '').lower() or "recession" in self.world_state.get('economic_condition', '').lower():
+            conditions.append("[bold red]Economic instability[/bold red]")
+        if "tension" in self.world_state.get('social_climate', '').lower() or "unrest" in self.world_state.get('social_climate', '').lower():
+            conditions.append("[bold red]Social tensions[/bold red]")
+        if "storm" in self.world_state.get('weather_condition', '').lower() or "severe" in self.world_state.get('weather_condition', '').lower():
+            conditions.append("[bold red]Severe weather[/bold red]")
+        if "outage" in self.world_state.get('utility_status', '').lower() or "disruption" in self.world_state.get('utility_status', '').lower():
+            conditions.append("[bold red]Utility disruptions[/bold red]")
+        if "delay" in self.world_state.get('transportation_status', '').lower() or "closure" in self.world_state.get('transportation_status', '').lower():
+            conditions.append("[bold red]Transportation issues[/bold red]")
+        if "warning" in self.world_state.get('public_health_status', '').lower() or "outbreak" in self.world_state.get('public_health_status', '').lower():
+            conditions.append("[bold red]Health concerns[/bold red]")
+        
+        if conditions:
+            condition_str = f"[bold orange3]Notable conditions:[/bold orange3] {', '.join(conditions)}"
+        else:
+            condition_str = "[green]Normal conditions overall.[/green]"
+        
+        # Combine into summary
+        summary = f"[bold blue]World Summary:[/bold blue] {time_date} in {location}. {weather}. {event_str} {condition_str}"
+        return summary
+
+    def get_environment_summary(self) -> str:
+        """Generate a concise summary of the immediate environment, highlighting key elements."""
+        if not self.immediate_environment:
+            return "[bold red]Immediate environment not initialized.[/bold red]"
+        
+        # Extract key information
+        location = f"[bold cyan]{self.immediate_environment.get('current_location_name', 'unknown location')} ({self.immediate_environment.get('location_type', 'unknown type')})[/bold cyan]"
+        setting = f"[bold green]{self.immediate_environment.get('indoor_outdoor', 'unknown setting')}[/bold green]"
+        atmosphere = f"[bold yellow]{self.immediate_environment.get('social_atmosphere', 'unknown atmosphere')}[/bold yellow]"
+        
+        # People and activities
+        people = self.immediate_environment.get('present_people', [])
+        if people:
+            people_str = f"[bold magenta]People:[/bold magenta] {', '.join(people[:2])}"
+        else:
+            people_str = "[italic]No people around.[/italic]"
+        
+        activities = self.immediate_environment.get('ongoing_activities', [])
+        if activities:
+            activities_str = f"[bold blue]Activities:[/bold blue] {', '.join(activities[:2])}"
+        else:
+            activities_str = "[italic]No notable activities.[/italic]"
+        
+        # Attention-grabbing elements
+        attention = self.immediate_environment.get('attention_drawing_elements', [])
+        if attention:
+            attention_str = f"[bold orange3]Notable:[/bold orange3] {', '.join(attention[:2])}"
+        else:
+            attention_str = "[italic]Nothing particularly notable.[/italic]"
+        
+        # Recent changes
+        changes = self.immediate_environment.get('recent_changes', [])
+        if changes and changes != ["Nothing notable has changed recently"]:
+            changes_str = f"[bold red]Recent changes:[/bold red] {', '.join(changes[:2])}"
+        else:
+            changes_str = ""
+        
+        # Combine into summary
+        summary = f"[bold purple]Environment Summary:[/bold purple] {location}, {setting}. {atmosphere} atmosphere. {people_str} {activities_str} {attention_str} {changes_str}".strip()
+        return summary
+    
+    async def _generate_narrative_context(self, persona: Dict, world_state: Dict, location: str) -> str:
+        """Generate a narrative context explaining how the character arrived at their current situation."""
+        
+        # Create a prompt for the LLM to generate a narrative context
+        prompt = f"""
+        Based on the following information, create a brief narrative context (2-3 paragraphs) explaining how the character arrived at their current situation:
+        
+        Character information:
+        Name: {persona.get('name', 'Unknown')}
+        Age: {persona.get('age', 'Unknown')}
+        Occupation: {persona.get('occupation', 'Unknown')}
+        Personality traits: {', '.join(persona.get('personality_traits', ['Unknown']))}
+        Goals: {', '.join(persona.get('goals', ['Unknown']))}
+        Current physical state: {persona.get('current_state', {}).get('physical', 'Unknown')}
+        Current emotional state: {persona.get('current_state', {}).get('emotional', 'Unknown')}
+        Current mental state: {persona.get('current_state', {}).get('mental', 'Unknown')}
+        Short-term memories: {', '.join(persona.get('memory', {}).get('short_term', ['Unknown']))}
+        Long-term memories: {', '.join(persona.get('memory', {}).get('long_term', ['Unknown']))}
+        
+        World information:
+        Current time: {world_state.get('current_time', 'Unknown')}
+        Current date: {world_state.get('current_date', 'Unknown')}
+        City: {world_state.get('city_name', 'Unknown')}
+        Weather: {world_state.get('weather_condition', 'Unknown')}
+        Social climate: {world_state.get('social_climate', 'Unknown')}
+        Major events: {', '.join(world_state.get('major_events', ['None']))}
+        
+        Current location: {location}
+        
+        The narrative should explain:
+        1. Why the character is at this specific location
+        2. What they were doing earlier today
+        3. What their immediate concerns or thoughts are
+        4. How their current emotional and physical state came to be
+        
+        The narrative should be realistic, specific to this character, and connect to their goals and personality.
+        """
+        
+        self.console.print(f"[yellow]Generating narrative context...[/yellow]")
+        
+        try:
+            # Use the LLM to generate a narrative context
+            response = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction="Create a realistic narrative context for the character's current situation.",
+                temperature=0.7  # Slightly higher temperature for creativity
+            )
+            
+            # Extract the narrative from the response
+            if isinstance(response, dict) and "text" in response:
+                narrative = response["text"].strip()
+            elif isinstance(response, str):
+                narrative = response.strip()
+            else:
+                narrative = str(response).strip()
+            
+            self.console.print(f"[green]Narrative context generated successfully[/green]")
+            return narrative
+        except Exception as e:
+            logger.error(f"Error generating narrative context: {e}")
+            # Fallback to a generic narrative
+            fallback_narrative = f"{persona.get('name', 'The character')} arrived at {location} after a busy morning. They have several things on their mind, particularly {', '.join(persona.get('goals', ['their goals']))}. They're feeling {persona.get('current_state', {}).get('emotional', 'mixed emotions')} as they navigate their day."
+            self.console.print(f"[red]Error generating narrative context, using fallback[/red]")
+            return fallback_narrative
+        
+    async def _generate_updated_narrative(self, persona: Dict, previous_actions: List[Dict], 
+                                        world_state: Dict, immediate_environment: Dict, 
+                                        consequences: List[str], observations: List[str]) -> str:
+        """Generate an updated narrative context based on recent actions and events."""
+        
+        # Extract the most recent actions (up to 3)
+        recent_actions = previous_actions[-3:] if previous_actions else []
+        actions_text = ""
+        for action in recent_actions:
+            actions_text += f"- {action.get('action', 'Unknown action')}\n"
+            if 'action_details' in action and action['action_details']:
+                actions_text += f"  Details: {json.dumps(action['action_details'])}\n"
+        
+        if not actions_text:
+            actions_text = "No recent actions recorded."
+        
+        # Create a prompt for the LLM to generate an updated narrative
+        prompt = f"""
+        Based on the following information, create a brief narrative update (1-2 paragraphs) that continues the character's story:
+        
+        Character information:
+        Name: {persona.get('name', 'Unknown')}
+        Current physical state: {persona.get('current_state', {}).get('physical', 'Unknown')}
+        Current emotional state: {persona.get('current_state', {}).get('emotional', 'Unknown')}
+        Current mental state: {persona.get('current_state', {}).get('mental', 'Unknown')}
+        Goals: {', '.join(persona.get('goals', ['Unknown']))}
+        
+        Current location: {immediate_environment.get('current_location_name', 'Unknown location')}
+        Current time: {world_state.get('current_time', 'Unknown time')}
+        
+        Recent actions taken by the character:
+        {actions_text}
+        
+        Recent consequences of these actions:
+        {', '.join(consequences) if consequences else 'No notable consequences.'}
+        
+        Recent observations by the character:
+        {', '.join(observations) if observations else 'Nothing notable observed.'}
+        
+        The narrative update should:
+        1. Reflect the character's progress toward their goals
+        2. Acknowledge any changes in their emotional or physical state
+        3. Incorporate the consequences of their recent actions
+        4. Set up potential next steps or challenges
+        5. Maintain continuity with their overall story
+        
+        The narrative should be realistic, specific to this character, and feel like a continuation of their ongoing story.
+        """
+        
+        self.console.print(f"[yellow]Generating narrative update...[/yellow]")
+        
+        try:
+            # Use the LLM to generate a narrative update
+            response = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction="Create a realistic narrative update that continues the character's story.",
+                temperature=0.7  # Slightly higher temperature for creativity
+            )
+            
+            # Extract the narrative from the response
+            if isinstance(response, dict) and "text" in response:
+                narrative = response["text"].strip()
+            elif isinstance(response, str):
+                narrative = response.strip()
+            else:
+                narrative = str(response).strip()
+            
+            self.console.print(f"[green]Narrative update generated successfully[/green]")
+            return narrative
+        except Exception as e:
+            logger.error(f"Error generating narrative update: {e}")
+            # Fallback to a generic narrative update
+            fallback_narrative = f"{persona.get('name', 'The character')} continues their day at {immediate_environment.get('current_location_name', 'their location')}. They're still focused on {', '.join(persona.get('goals', ['their goals']))} as they navigate the next steps."
+            self.console.print(f"[red]Error generating narrative update, using fallback[/red]")
+            return fallback_narrative
+
+class Simulacra:
+    """Represents a simulated human with personality, goals, and behaviors."""
+
+    def __init__(self, persona_path: Optional[str] = None, console: Console = None):
+        # Initialize console
+        self.console = console or Console()
+        # Initialize persona
+        if persona_path and os.path.exists(persona_path):
+            with open(persona_path, 'r') as file:
+                self.persona = json.load(file)
+            logger.info(f"Loaded persona from {persona_path}")
+        else:
+            self.persona = {
+                "name": "Alex Chen",
+                "age": 34,
+                "occupation": "Software Engineer",
+                "personality_traits": ["analytical", "introverted", "creative", "detail-oriented"],
+                "goals": ["complete work project before deadline", "find better work-life balance"],
+                "current_state": {
+                    "physical": "Slightly tired, had coffee 1 hour ago",
+                    "emotional": "Mildly stressed about project deadline",
+                    "mental": "Focused but distracted occasionally"
+                },
+                "memory": {
+                    "short_term": ["Meeting with team this morning", "Email from boss about deadline"],
+                    "long_term": ["Computer Science degree", "5 years at current company"]
+                }
+            }
+
+        self.history = []
+        self.state_path = "simulacra_state.json"
+        self.llm_service = LLMService()
+
+    async def _reflect_on_situation(self, observations: str, immediate_environment: Dict, persona_state: Optional[Dict] = None) -> str:
+        """Reflect on the current situation based on observations using Gemini API."""
+        if persona_state is None:
+            persona_state = self.persona
+
+        # Include immediate environment in the reflection
+        enhanced_observations = f"""
+        Observations:
+        {observations}
+        
+        Your immediate environment:
+        {json.dumps(immediate_environment, indent=2)}
+        """
+
+        prompt = PromptManager.reflect_on_situation_prompt(enhanced_observations, persona_state)
+        system_instruction = 'Reflect on the current situation based on these observations and your environment:'
+        
+        try:
+            reflection_text_dict = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_model=DayResponse
+            )
+            return reflection_text_dict.get('reflect', "I'm trying to understand what's happening around me.")
+        except Exception as e:
+            logger.error(f"Error in reflection: {e}")
+            return "I'm trying to understand what's happening around me."
+
+    async def _analyze_emotions(self, situation: str, current_emotional_state: str) -> Dict:
+        """Analyze emotional response to a situation using Gemini API."""
+        prompt = PromptManager.analyze_emotions_prompt(situation, current_emotional_state)
+        system_instruction = "Analyze the emotional tone of the following situation and the character's current emotional state."
+        
+        try:
+            emotion_analysis_dict = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_model=EmotionAnalysisResponse
+            )
+            return emotion_analysis_dict
+        except Exception as e:
+            logger.error(f"Error analyzing emotions: {e}")
+            return {
+                "primary_emotion": "confused",
+                "intensity": "Medium",
+                "secondary_emotion": "uncertain",
+                "emotional_update": "I'm feeling a bit confused by what's happening."
+            }
+
+    async def _decide_action(self, reflection: str, emotional_analysis: Dict, goals: List[str], immediate_environment: Dict) -> Dict:
+        """Decide on an action based on reflection, emotional analysis, and immediate environment."""
+        prompt = PromptManager.decide_action_prompt(reflection, emotional_analysis, goals, immediate_environment)
+        system_instruction = 'Decide on an action to take based on your reflection, emotional analysis, and environment.'
+        
+        try:
+            action_decision_dict = await self.llm_service.generate_content(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_model=ActionDecisionResponse
+            )
+            return action_decision_dict
+        except Exception as e:
+            logger.error(f"Error deciding action: {e}")
+            return {
+                "thought_process": "I need to take a moment to think about my next steps.",
+                "action": "Pause and consider options",
+                "action_details": {"manner": "thoughtful", "duration": "brief"}
+            }
+
+    def save_state(self):
+        """Save current simulacra state to a file."""
+        try:
+            with open(self.state_path, 'w') as file:
+                json.dump({
+                    "persona": self.persona,
+                    "history": self.history
+                }, file, indent=2)
+            logger.info(f"Successfully saved simulacra state to {self.state_path}")
+        except Exception as e:
+            logger.error(f"Error saving simulacra state: {e}")
+
+    async def process_perception(self, world_update: Dict[str, Any]) -> Dict[str, Any]:
+        """Process perceptions from the world and decide on actions."""
+
+        # Extract the relevant parts from the world update
+        world_state = world_update.get("world_state", {})
+        immediate_environment = world_update.get("immediate_environment", {})
+        observations = world_update.get("observations", [])
+        
+        # Print simulacra's current state before processing
+        self.console.print(Panel(self.get_simulacra_summary(), 
+                            title="[bold cyan]SIMULACRA CURRENT STATE[/bold cyan]", 
+                            border_style="cyan"))
+        
+        # Save the perception to history
+        self.history.append({
+            "timestamp": world_state.get("current_time", "unknown"),
+            "date": world_state.get("current_date", "unknown"),
+            "perception": observations
+        })
+
+        observations_str = json.dumps(observations, indent=2)
+        self.console.print(f"\n[bold yellow]Processing observations:[/bold yellow]", observations_str)
+
+        # Use the immediate environment in reflection and decision making
+        self.console.print("\n[bold green]Reflecting on situation...[/bold green]")
+        reflection_text = await self._reflect_on_situation(observations_str, immediate_environment)
+        self.console.print(f"[italic green]Reflection:[/italic green] {reflection_text}\n")
+        
+        self.console.print("[bold blue]Analyzing emotions...[/bold blue]")
+        emotional_analysis = await self._analyze_emotions(reflection_text, self.persona["current_state"]["emotional"])
+        self.console.print(f"[italic blue]Emotional analysis:[/italic blue] {json.dumps(emotional_analysis, indent=2)}\n")
+        
+        self.console.print("[bold magenta]Deciding on action...[/bold magenta]")
+        action_decision = await self._decide_action(
+            reflection_text, 
+            emotional_analysis, 
+            self.persona["goals"],
+            immediate_environment
+        )
+        self.console.print(f"[italic magenta]Action decision:[/italic magenta] {json.dumps(action_decision, indent=2)}\n")
+
+        # Update the persona's emotional state based on the analysis
+        if "emotional_update" in emotional_analysis:
+            previous_emotional = self.persona["current_state"]["emotional"]
+            self.persona["current_state"]["emotional"] = emotional_analysis["emotional_update"]
+            self.console.print(f"[bold orange3]Emotional state updated:[/bold orange3] {previous_emotional} → {self.persona['current_state']['emotional']}")
+
+        simulacra_response = {
+            "thought_process": action_decision.get("thought_process", "Processing observations..."),
+            "emotional_update": emotional_analysis.get("emotional_update", "Maintaining emotional state."),
+            "action": action_decision.get("action", "Observe further."),
+            "action_details": action_decision.get("action_details", {}),
+            "updated_state": self.persona["current_state"]
+        }
+
+        # Print final response
+        response_panel = f"[bold]Thought process:[/bold] {simulacra_response['thought_process']}\n\n"
+        response_panel += f"[bold]Emotional update:[/bold] {simulacra_response['emotional_update']}\n\n"
+        response_panel += f"[bold]Action:[/bold] {simulacra_response['action']}"
+        
+        if simulacra_response.get("action_details"):
+            response_panel += f"\n\n[bold]Action details:[/bold] {json.dumps(simulacra_response['action_details'], indent=2)}"
+        
+        self.console.print(Panel(response_panel, 
+                            title="[bold red]SIMULACRA RESPONSE[/bold red]", 
+                            border_style="red"))
+
+        return simulacra_response
+
+    def get_simulacra_summary(self) -> str:
+        """Generate a concise summary of the simulacra's current state."""
+        name = self.persona.get("name", "Unknown")
+        age = self.persona.get("age", "Unknown")
+        occupation = self.persona.get("occupation", "Unknown")
+        
+        # Get current state information
+        physical = self.persona.get("current_state", {}).get("physical", "Unknown physical state")
+        emotional = self.persona.get("current_state", {}).get("emotional", "Unknown emotional state")
+        mental = self.persona.get("current_state", {}).get("mental", "Unknown mental state")
+        
+        # Get goals
+        goals = self.persona.get("goals", [])
+        goals_str = ", ".join(goals) if goals else "No specific goals"
+        
+        # Get recent memories
+        short_term = self.persona.get("memory", {}).get("short_term", [])
+        recent_memories = ", ".join(short_term[:2]) if short_term else "No recent memories"
+        
+        # Create summary with rich formatting
+        summary = f"[bold blue]Simulacra:[/bold blue] {name}, {age}, {occupation}\n"
+        summary += f"[bold green]Physical state:[/bold green] {physical}\n"
+        summary += f"[bold yellow]Emotional state:[/bold yellow] {emotional}\n"
+        summary += f"[bold magenta]Mental state:[/bold magenta] {mental}\n"
+        summary += f"[bold cyan]Current goals:[/bold cyan] {goals_str}\n"
+        summary += f"[bold orange3]Recent memories:[/bold orange3] {recent_memories}"
+        
+        return summary
+
+async def run_simulation(cycles: int = 3, world_config_path: str = "world_config.yaml",
+                       persona_path: Optional[str] = None, new_simulation: bool = False,
+                       console: Console = None, reaction_profile: Union[str, Dict, WorldReactionProfile] = "balanced"):
+    """
+    Run the simulation for a specified number of cycles.
+    
+    Args:
+        cycles: Number of simulation cycles to run
+        world_config_path: Path to the world configuration file
+        persona_path: Path to the persona file
+        new_simulation: Whether to start a new simulation
+        console: Rich console for output
+        reaction_profile: How the world reacts to the character's actions
+                         Can be a profile name, a dict of settings, or a WorldReactionProfile
+    """
+    
+    # If no console is provided, create a new one
+    if console is None:
+        console = Console()
+
+    # Initialize world and simulacra
+    world = WorldEngine(
+        world_config_path=world_config_path, 
+        load_state=not new_simulation, 
+        console=console,
+        reaction_profile=reaction_profile
+    )
+    simulacra = Simulacra(persona_path=persona_path, console=console)
+
+    # Display reaction profile
+    if isinstance(reaction_profile, str):
+        profile_name = reaction_profile.capitalize()
+    elif isinstance(reaction_profile, dict):
+        profile_name = "Custom"
+    elif isinstance(reaction_profile, WorldReactionProfile):
+        profile_name = "Custom"
+    else:
+        profile_name = "Balanced"
+    
+    profile_description = world.reaction_profile.get_description()
+    
+    console.print(Panel(
+        f"[bold]SIMULATION START[/bold]\n\n[bold cyan]World Reaction Profile:[/bold cyan] [bold]{profile_name}[/bold]\n\n{profile_description}", 
+        title="[bold green]SIMULACRA[/bold green]", 
+        border_style="green",
+        width=100
+    ))
+
+    # If it's a new simulation or world state is not loaded, initialize it
+    if new_simulation or world.world_state is None or world.immediate_environment is None:
+        console.print("[yellow]Initializing new world state and immediate environment...[/yellow]")
+        world_data = await world.initialize_new_world()
+        
+        # Display the initial narrative context
+        if "narrative_context" in world_data:
+            console.print(Panel(
+                Markdown(world_data["narrative_context"]),
+                title="[bold blue]NARRATIVE CONTEXT[/bold blue]",
+                border_style="blue",
+                width=100
+            ))
+        
+        # Print initial summaries
+        console.print("\n" + world.get_world_summary())
+        console.print("\n" + world.get_environment_summary())
+    else:
+        world_data = {
+            "world_state": world.world_state,
+            "immediate_environment": world.immediate_environment,
+            "observations": [
+                f"You're in {world.immediate_environment.get('current_location_name', 'a location')}.",
+                f"It's {world.world_state.get('current_time', 'daytime')} on {world.world_state.get('current_date', 'today')}.",
+                f"The weather is {world.world_state.get('weather_condition', 'normal')}.",
+                "You notice your surroundings and gather your thoughts."
+            ]
         }
         
-        with open("world_config.yaml", "w") as f:
-            yaml.dump(default_config, f, default_flow_style=False)
+        # Print initial summaries for existing world
+        console.print("\n" + world.get_world_summary())
+        console.print("\n" + world.get_environment_summary())
+
+    # Initial world perception
+    world_update = world_data
+    narrative_context = world_data.get("narrative_context", "")
+
+    for cycle in range(cycles):
+        console.rule(f"[bold cyan]CYCLE {cycle+1}[/bold cyan]")
+
+        # Simulacra perceives and acts
+        simulacra_response = await simulacra.process_perception(world_update)
+
+        # World processes the action
+        console.print(Panel("[bold]WORLD PROCESSING[/bold]", border_style="blue"))
+        world_update = await world.process_update(simulacra_response, simulacra.persona)
+
+        # Display the narrative update if available
+        if "narrative_update" in world_update and world_update["narrative_update"]:
+            console.print(Panel(
+                Markdown(world_update["narrative_update"]),
+                title=f"[bold blue]NARRATIVE UPDATE - CYCLE {cycle+1}[/bold blue]",
+                border_style="blue",
+                width=100
+            ))
+            # Update the overall narrative context
+            narrative_context = world_update["narrative_update"]
+
+        # Print summaries after update
+        console.print("\n" + world.get_world_summary())
+        console.print("\n" + world.get_environment_summary())
+
+        # Create a table for consequences and observations
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Consequences", style="green")
+        table.add_column("Observations", style="yellow")
         
-        print("Created default world configuration file: world_config.yaml")
-        return default_config
-    
-    with open("world_config.yaml", "r") as f:
-        return yaml.safe_load(f)
+        # Get consequences and observations
+        consequences = world_update.get("consequences", [])
+        observations = world_update.get("observations", [])
+        
+        # Determine the maximum number of rows needed
+        max_rows = max(len(consequences), len(observations), 1)
+        
+        # Add rows to the table
+        for i in range(min(max_rows, 3)):  # Show at most 3 rows
+            cons_text = consequences[i] if i < len(consequences) else ""
+            obs_text = observations[i] if i < len(observations) else ""
+            table.add_row(cons_text, obs_text)
+            
+        # If there are more than 3 consequences or observations, add a summary row
+        if len(consequences) > 3 or len(observations) > 3:
+            cons_more = f"... and {len(consequences) - 3} more" if len(consequences) > 3 else ""
+            obs_more = f"... and {len(observations) - 3} more" if len(observations) > 3 else ""
+            table.add_row(cons_more, obs_more)
+            
+        # If there are no consequences or observations, add a message
+        if not consequences and not observations:
+            table.add_row("No notable consequences.", "Nothing notable observed.")
+            
+        console.print(Panel(table, title="[bold purple]RESULTS[/bold purple]", border_style="purple"))
+
+        # Small delay for readability
+        time.sleep(1)
+
+    # Save final states
+    world.save_state()
+    simulacra.save_state()
+
+    # Display final narrative summary
+    if narrative_context:
+        console.print(Panel(
+            Markdown(f"**Final Narrative Summary:**\n\n{narrative_context}"),
+            title="[bold blue]STORY CONCLUSION[/bold blue]",
+            border_style="blue",
+            width=100
+        ))
+
+    console.print(Panel("[bold]SIMULATION END[/bold]", title="[bold green]SIMULACRA[/bold green]", border_style="green"))
 
 if __name__ == "__main__":
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description="Run a character simulation with real-world data integration")
-    parser.add_argument("--persona", type=str, default="persona.json", help="Path to persona file")
-    parser.add_argument("--config", type=str, default="world_config.yaml", help="Path to world configuration file")
-    parser.add_argument("--steps", type=int, default=10, help="Maximum number of simulation steps")
-    parser.add_argument("--new", action="store_true", help="Start a new simulation")
-    parser.add_argument("--city", type=str, help="Override city in configuration")
-    parser.add_argument("--country", type=str, help="Override country in configuration")
-    parser.add_argument("--no-real-data", action="store_true", help="Disable real-world data fetching")
-    parser.add_argument("--profile", type=str, default="balanced", 
-                        choices=["balanced", "optimistic", "pessimistic", "creative", "analytical"],
-                        help="Reaction profile for the simulation")
-    parser.add_argument("--time-increment", type=int, default=15, help="Time increment in minutes between steps")
-    
+    # Create a default world_config.yaml if it doesn't exist
+    if not os.path.exists("world_config.yaml"):
+        default_config = {
+            "location": {
+                "city": "NYC",
+                "country": "USA",
+                "region": "Northeast"
+            },
+            "environment": {
+                "setting": "Urban downtown",
+                "density": "High",
+                "noise_level": "Moderate"
+            },
+            "starting_location": "unknown",
+            "simulation_parameters": {
+                "initial_time": "auto",
+                "time_flow_rate": 1.0,
+                "detail_level": "high"
+            }
+        }
+        with open("world_config.yaml", 'w') as file:
+            yaml.dump(default_config, file, default_flow_style=False)
+        print("Created default world_config.yaml")
+
+    # Parse command line arguments
+    import argparse
+    parser = argparse.ArgumentParser(description='Run a simulacra simulation')
+    parser.add_argument('--cycles', type=int, default=3, help='Number of simulation cycles')
+    parser.add_argument('--new', action='store_true', help='Start a new simulation')
+    parser.add_argument('--config', type=str, default='world_config.yaml', help='Path to world config file')
+    parser.add_argument('--persona', type=str, default=None, help='Path to persona file')
+    parser.add_argument('--profile', type=str, default='balanced', 
+                        choices=['balanced', 'protagonist', 'antagonist', 'comedic', 'dramatic', 
+                                'realistic', 'serendipitous', 'challenging'],
+                        help='World reaction profile')
     args = parser.parse_args()
+
+    # Create a console
+    console = Console()
     
-    # Create default world config if it doesn't exist
-    world_config = create_default_world_config()
-    
-    # Override with command line arguments if provided
-    if args.city:
-        world_config["city"] = args.city
-    
-    if args.country:
-        world_config["country"] = args.country
-    
-    if args.no_real_data:
-        world_config["use_real_data"] = False
-    
-    # Check if persona file exists, create if it doesn't
-    if not os.path.exists(args.persona):
-        asyncio.run(create_persona(world_config['location']["city"], world_config['location']["country"]))
-    
-    # Run the simulation
+    # Run the simulation with the console
     asyncio.run(run_simulation(
-        persona_file=args.persona,
-        world_config=world_config,
-        reaction_profile=args.profile,
-        max_steps=args.steps,
-        new_simulation=args.new,
-        time_increment=args.time_increment
+        cycles=args.cycles, 
+        world_config_path=args.config, 
+        persona_path=args.persona, 
+        new_simulation=args.new, 
+        console=console,
+        reaction_profile=args.profile
     ))

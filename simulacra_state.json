@@ -15,7 +15,7 @@
     ],
     "current_state": {
       "physical": "Slightly tired, had coffee 1 hour ago",
-      "emotional": "Experiencing work-related stress, but also hopeful for improved work-life balance.",
+      "emotional": "I'm feeling a bit confused by what's happening.",
       "mental": "Focused but distracted occasionally"
     },
     "memory": {
@@ -44,20 +44,49 @@
       "timestamp": "22:50",
       "date": "2025-03-04",
       "perception": [
-        "The Manhattan Bridge looks particularly impressive against the cloudy sky.",
-        "The flow of pedestrian traffic outside the window is steady.",
-        "The sounds of the coffee shop seem slightly louder without the focused concentration on work.",
-        "The aroma of coffee is more noticeable during the break."
+        "The simulacra will observe the time passing.",
+        "The simulacra will observe the activity of other people in the coffee shop.",
+        "The simulacra will observe the view of the Manhattan Bridge.",
+        "The simulacra will observe the remaining battery life on their laptop.",
+        "The simulacra will observe the amount of coffee left in their cup.",
+        "The simulacra will observe the street outside as they prepare to leave.",
+        "The simulacra will observe the other customers in the coffee shop.",
+        "The simulacra will observe the barista.",
+        "The simulacra will observe the available seating as they prepare to leave.",
+        "The simulacra will observe the weather outside."
       ]
     },
     {
       "timestamp": "22:50",
       "date": "2025-03-04",
       "perception": [
-        "The view of the Manhattan Bridge becomes a background element rather than a focal point.",
-        "The sounds of the coffee shop fade into the background as the character concentrates.",
-        "The laptop screen becomes the primary source of visual input.",
-        "The character's fingers begin to move more rapidly across the keyboard."
+        "The simulacra observes that another person is already eyeing the newly vacated table.",
+        "The simulacra notices the cool air outside as they exit the coffee shop.",
+        "The simulacra observes the Manhattan Bridge as they walk towards home."
+      ]
+    },
+    {
+      "timestamp": "22:50",
+      "date": "2025-03-04",
+      "perception": [
+        "You find yourself in DUMBO Streets (en route home).",
+        "The time is 22:50 on 2025-03-04.",
+        "The weather is Cloudy.",
+        "You take a moment to gather your thoughts."
+      ]
+    },
+    {
+      "timestamp": "22:50",
+      "date": "2025-03-04",
+      "perception": [
+        "The environment remains unchanged due to an error."
+      ]
+    },
+    {
+      "timestamp": "22:50",
+      "date": "2025-03-04",
+      "perception": [
+        "The environment remains unchanged due to an error."
       ]
     }
   ]
