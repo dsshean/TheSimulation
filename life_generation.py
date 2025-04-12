@@ -37,12 +37,12 @@ def extract_location_from_text(text: str, default: str = "Unknown Location") -> 
 # --- Helper Function (Keep as is) ---
 async def _call_llm_and_get_validated_data( llm_service: LLMService, prompt: str, response_model: Type[T], operation_description: str ) -> Optional[Dict]:
      # ... (function code remains the same) ...
-     try:
-         response_dict = await llm_service.generate_content( prompt=prompt, response_model=response_model )
-         if not response_dict: logger.error(f"LLM call for '{operation_description}' returned None/empty."); return None
-         if "error" in response_dict: error_msg = response_dict["error"]; # ... (error logging) ...; logger.error(f"LLM error during '{operation_description}': {error_msg}"); return None
-         logger.debug(f"Success for '{operation_description}'."); return response_dict
-     except Exception as e: logger.error(f"Exception calling LLM for '{operation_description}': {e}", exc_info=True); return None
+    try:
+        response_dict = await llm_service.generate_content( prompt=prompt, response_model=response_model )
+        if not response_dict: logger.error(f"LLM call for '{operation_description}' returned None/empty."); return None
+        if "error" in response_dict: error_msg = response_dict["error"]; # ... (error logging) ...; logger.error(f"LLM error during '{operation_description}': {error_msg}"); return None
+        logger.debug(f"Success for '{operation_description}'."); return response_dict
+    except Exception as e: logger.error(f"Exception calling LLM for '{operation_description}': {e}", exc_info=True); return None
 
 
 async def generate_initial_relationships( llm_service: LLMService, persona_details_str: str ) -> Optional[Dict[str, List[Dict]]]:
@@ -145,7 +145,7 @@ Ensure every year from {birth_year} to {last_year_to_generate} is included.
 
              # Basic range check (types checked by Pydantic)
              if isinstance(year_num, int) and birth_year <= year_num <= last_year_to_generate:
-                 if year_num in processed_years: logger.warning(f"Duplicate year {year_num}."); valid = False; break
+                 if year_num in processed_years: logger.warning(f"Duplicate year {year_num}."); valid = False; break 
                  summaries_dict[year_num] = (summary_text, location_text) # Store tuple
                  processed_years.add(year_num)
              else: logger.warning(f"Invalid content yearly: {item_dict}, Year {year_num} range?"); valid = False; break
@@ -534,17 +534,17 @@ async def generate_life_summary_sequentially(
     total_summarized_years = 0
     last_year_to_generate = current_year
     if birth_year <= last_year_to_generate:
-         yearly_result = await generate_yearly_summaries(llm_service, persona_details_str, initial_relationships_str, birth_year, last_year_to_generate, current_year)
-         if yearly_result:
-             yearly_summaries, birth_month, birth_day = yearly_result
-             life_summary["birth_month"] = birth_month
-             life_summary["birth_day"] = birth_day
-             life_summary["yearly_summaries"] = yearly_summaries
-             total_summarized_years = len(yearly_summaries)
-             logger.info(f"Stored birthday & {total_summarized_years} yearly summaries with locations.")
-         else:
-             logger.error("Failed yearly summaries/birthday. Cannot proceed reliably without yearly context.")
-             return life_summary # Return potentially incomplete summary
+        yearly_result = await generate_yearly_summaries(llm_service, persona_details_str, initial_relationships_str, birth_year, last_year_to_generate, current_year)
+        if yearly_result:
+            yearly_summaries, birth_month, birth_day = yearly_result
+            life_summary["birth_month"] = birth_month
+            life_summary["birth_day"] = birth_day
+            life_summary["yearly_summaries"] = yearly_summaries
+            total_summarized_years = len(yearly_summaries)
+            logger.info(f"Stored birthday & {total_summarized_years} yearly summaries with locations.")
+        else:
+            logger.error("Failed yearly summaries/birthday. Cannot proceed reliably without yearly context.")
+            return life_summary # Return potentially incomplete summary
     else:
         logger.warning(f"Birth year {birth_year} > current year {last_year_to_generate}. Skipping generation.")
         return life_summary # Nothing to generate
@@ -642,22 +642,21 @@ async def generate_life_summary_sequentially(
         target_date = today - timedelta(days=i)
         if target_date.year >= birth_year:
             if birth_month and birth_day:
-                 # Ensure birth date calculation uses the target_date's year
-                 try:
-                     birth_date_this_year = date(target_date.year, birth_month, birth_day)
-                     if target_date.year == birth_year and target_date < birth_date_this_year:
-                         continue
-                 except ValueError: # Handle invalid birth date combination (e.g., Feb 29 in non-leap year)
-                     logger.warning(f"Could not form valid birth date {birth_month}-{birth_day} for year {target_date.year}, proceeding without exact day check.")
-                     # If birth year, still check month at least
-                     if target_date.year == birth_year and target_date.month < birth_month:
-                         continue
+                # Ensure birth date calculation uses the target_date's year
+                try:
+                    birth_date_this_year = date(target_date.year, birth_month, birth_day)
+                    if target_date.year == birth_year and target_date < birth_date_this_year:
+                        continue
+                except ValueError: # Handle invalid birth date combination (e.g., Feb 29 in non-leap year)
+                    logger.warning(f"Could not form valid birth date {birth_month}-{birth_day} for year {target_date.year}, proceeding without exact day check.")
+                    # If birth year, still check month at least
+                    if target_date.year == birth_year and target_date.month < birth_month:
+                        continue
+                days_for_hourly.append((target_date.year, target_date.month, target_date.day))
+            else:
+                break # Stop if we go before birth year
 
-            days_for_hourly.append((target_date.year, target_date.month, target_date.day))
-        else:
-            break # Stop if we go before birth year
-
-    days_for_hourly.reverse()
+        days_for_hourly.reverse() 
     logger.info(f"Generating hourly breakdown for last {len(days_for_hourly)} days (up to 7): {days_for_hourly}")
 
     for year, month, day in days_for_hourly:

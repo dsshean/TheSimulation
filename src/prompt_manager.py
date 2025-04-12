@@ -1,253 +1,558 @@
+# src/prompt_manager.py
 import json
-from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
-from src.models import (
-    WorldState, ImmediateEnvironment, WorldReactionProfile, DayResponse,
-    EmotionAnalysisResponse, ActionDecisionResponse, WorldStateResponse,
-    ImmediateEnvironmentResponse
-) # Import models from src
+from typing import Dict, List, Optional, TYPE_CHECKING, Any
+from src.models import ActionDecisionResponse, AllowedActionVerbs # Import the literal
+
+# Use TYPE_CHECKING to avoid circular imports for type hints
+if TYPE_CHECKING:
+    from src.models import (
+        WorldState, ImmediateEnvironment, WorldReactionProfile,
+        EmotionAnalysisResponse, ActionDecisionResponse, DayResponse,
+        WorldProcessUpdateResponse # If used for schema generation
+    )
+
+# Helper function to generate schema refs safely
+def get_model_schema(model_class: type) -> Dict:
+    try:
+        return model_class.model_json_schema(mode='validation')
+    except Exception:
+        return {"type": "object", "properties": {"error": {"type": "string", "description": "Schema generation failed"}}}
+
 
 class PromptManager:
     """Manages all prompts used in the simulation."""
 
+    # <<< MODIFIED: generate_day_arc_prompt >>>
     @staticmethod
-    def analyze_information_prompt(information: str, context: Optional[Dict] = None) -> str:
-        context_str = json.dumps(context, indent=2) if context else "No context provided."
+    def generate_day_arc_prompt(persona: Dict, world_state: Dict) -> str:
+        """Generates a prompt to create a narrative arc for the current day."""
+        persona_summary = f"""
+        Name: {persona.get('name', 'Unknown')}
+        Age: {persona.get('age', '?')}
+        Occupation: {persona.get('occupation', '?')}
+        Personality: {', '.join(persona.get('personality_traits', ['Unknown']))}
+        Goals: {', '.join(persona.get('goals', ['None']))}
+        Current Emotional State: {persona.get('current_state', {}).get('emotional', 'Neutral')}
+        """.strip()
+        world_context = f"""
+        Date: {world_state.get('current_date', '?')} ({world_state.get('day_of_week', '?')})
+        Location Context: {world_state.get('city_name', '?')}, {world_state.get('country_name', '?')}
+        General Climate: {world_state.get('social_climate', '?')} / {world_state.get('economic_condition', '?')}
+        Major Events: {', '.join(world_state.get('major_events', ['None']))}
+        Weather Forecast (if known): {world_state.get('forecast', 'Unknown')}
+        """.strip() # Added day_of_week and forecast for more context
+
         return f"""
-        Information to analyze:
-        {information}
+        Persona Summary:
+        {persona_summary}
 
-        Context (previous world state or other relevant info):
-        {context_str}
+        World Context (Start of Day):
+        {world_context}
 
-        Based on this, update the world state. Focus on making realistic and plausible changes to the world.
-        Return the updated world state as a JSON object.
+        Task: Like a Dungeon Master setting the scene, outline the character's *expected* plan or narrative arc for the entire upcoming day (from waking until sleeping).
+        This arc should describe a **complete daily cycle** with a clear beginning, middle, and end, reflecting the character's likely routine, goals, occupation, and personality.
+        Keep the arc **realistic and grounded**. Avoid overly dramatic, mysterious, or open-ended scenarios. Focus on plausible daily activities and interactions. The arc provides a backdrop; specific events will unfold during simulation.
+
+        Good Examples (Realistic, Complete Day Cycle):
+        - "A typical workday: Commute to the office, focus on the [Project X] deadline with a brief lunch break, head home, make a simple dinner, and unwind before bed."
+        - "A planned day off: Sleep in, meet [Friend's Name] for brunch, run some errands downtown, maybe catch a movie in the evening, then relax at home."
+        - "Focus on [Personal Goal]: Spend the morning preparing, attend the [Event/Appointment] in the afternoon, followed by reflection and a quiet evening processing the outcome."
+        - "A busy day balancing work and family: Juggle work responsibilities from home, handle [Family Task] mid-day, have dinner with family, and prepare for the next day."
+
+        Bad Examples (Avoid these):
+        - "An ordinary day turns extraordinary when a mysterious object is found..." (Avoid mystery/fantasy)
+        - "The character decides to investigate the strange occurrences..." (Too open-ended, not a full day plan)
+        - "Wake up and see what happens." (Not an arc)
+        - "Go to work." (Too brief, lacks daily cycle)
+
+        Output ONLY the narrative arc description as plain text (1-3 concise sentences).
+        """
+
+    # <<< Keep existing methods initialize_world_state_from_news_prompt, initialize_world_state_from_context_prompt, etc. as is >>>
+    @staticmethod
+    def initialize_world_state_from_news_prompt(news_results: str, config: Dict, current_datetime: Dict) -> str:
+        """Prompt to initialize world state based on CURRENT news and config."""
+        from src.models import WorldState
+        location_config = config.get("location", {})
+        city = location_config.get("city", "this city")
+
+        return f"""
+        Current Real-World Context & News:
+        Date: {current_datetime['date']}
+        Time: {current_datetime['time']}
+        Day: {current_datetime['day_of_week']}
+
+        Recent News Snippets for {city}:
+        {news_results if news_results else "No specific news retrieved."}
+
+        Base World Configuration (Location):
+        {json.dumps(location_config, indent=2)}
+
+        Task: Create a detailed, rich, and plausible WorldState JSON object based *primarily* on the provided real-world context and news.
+        Infer conditions like social/economic/political climate, utility status, etc., realistically from the news and general knowledge of the location ({city}). If news is sparse, make plausible assumptions based on the location and current date/time.
+        Populate ALL fields of the WorldState model, providing specific details. Use Celsius for temperature. Determine the day_phase based on the time. Use standard YYYY-MM-DD and HH:MM formats.
+
+        Respond ONLY with the JSON object matching the WorldState schema:
+        {json.dumps(get_model_schema(WorldState), indent=2)}
         """
 
     @staticmethod
-    def initialize_world_state_prompt(news_results: str, config: Dict) -> str:
+    def initialize_world_state_from_context_prompt(date: str, time: str, location: Dict, context_summary: str) -> str:
+        """Prompt to initialize world state based on PAST context from a life summary."""
+        from src.models import WorldState
+        city = location.get('city', 'Unknown City')
         return f"""
-        News results:
-        {news_results}
+        Target Historical Context:
+        Date: {date}
+        Time: {time}
+        Location: {city}, {location.get('region', '?')}, {location.get('country', '?')}
 
-        World configuration:
-        {json.dumps(config, indent=2)}
+        Relevant Summary of Character's Life/Situation around this time:
+        {context_summary}
 
-        Based on this information, create a comprehensive world state with the following elements:
-        - current_time: The current time in 24-hour format
-        - current_date: The current date in YYYY-MM-DD format
-        - city_name: The name of the city
-        - country_name: The name of the country
-        - region_name: The name of the region or state
-        - weather_condition: Current weather (sunny, cloudy, rainy, etc.)
-        - temperature: Current temperature with units
-        - forecast: Brief weather forecast for next 24 hours
-        - social_climate: General social mood and atmosphere
-        - economic_condition: Current economic situation
-        - major_events: List of significant events happening in the area
-        - local_news: List of recent local news items
-        - transportation_status: Status of public transit and traffic
-        - utility_status: Status of power, water, internet services
-        - public_announcements: List of official announcements
-        - trending_topics: List of topics people are discussing
-        - current_cultural_events: List of ongoing cultural events
-        - sports_events: List of sports events
-        - public_health_status: Current public health situation
-        - public_safety_status: Current safety and security situation
+        Task: Create a detailed, rich, and plausible WorldState JSON object representing the world *at the specified historical date, time, and location*.
+        Base the state on general knowledge of that time period and location, influenced by the provided character context summary.
+        Infer conditions like weather (typical for the season/date/location), social/economic/political climate, major events (plausible for the time), etc.
+        Populate ALL fields of the WorldState model, providing specific details. Use Celsius for temperature. Determine the day_phase based on the time. Use standard YYYY-MM-DD and HH:MM formats.
 
-        Create a realistic and detailed world state based on the news and configuration.
-        Return the updated world state as a JSON object using the WorldStateResponse schema.
+        Respond ONLY with the JSON object matching the WorldState schema:
+        {json.dumps(get_model_schema(WorldState), indent=2)}
         """
 
     @staticmethod
-    def initialize_immediate_environment_prompt(world_state: Dict, location: str) -> str:
+    def initialize_immediate_environment_prompt(world_state: Dict, location_name: str) -> str:
+        """Prompt to initialize a rich immediate environment."""
+        from src.models import ImmediateEnvironment
+        world_context_summary = f"""
+        Time: {world_state.get('current_time')} on {world_state.get('current_date')} ({world_state.get('day_phase')})
+        Location: {world_state.get('city_name')}, {world_state.get('district_neighborhood', 'Unknown Area')}
+        Weather: {world_state.get('weather_condition')}, Temp: {world_state.get('temperature_c')}C
+        Social Climate: {world_state.get('social_climate')}
+        Major Events: {', '.join(world_state.get('major_events',[]))}
+        """
+
         return f"""
-        World State:
-        {json.dumps(world_state, indent=2)}
+        Current World State Context:
+        {world_context_summary}
 
-        Current Location: {location}
+        Target Location Name: {location_name}
 
-        Based on this information, create a detailed immediate environment for this location with the following elements:
-        - current_location_name: Specific name of the current location
-        - location_type: Type of location (restaurant, park, office, etc.)
-        - indoor_outdoor: Whether the location is indoor or outdoor
-        - noise_level: How loud or quiet it is
-        - lighting: Lighting conditions
-        - temperature_feeling: How the temperature feels
-        - air_quality: Quality of the air
-        - present_people: Types of people present
-        - crowd_density: How crowded the location is
-        - social_atmosphere: Social mood of the location
-        - ongoing_activities: Activities happening around
-        - nearby_objects: Objects that can be interacted with
-        - available_services: Services available at this location
-        - exit_options: Ways to leave this location
-        - interaction_opportunities: Opportunities for interaction
-        - visible_features: Notable visible features
-        - audible_sounds: Sounds that can be heard
-        - noticeable_smells: Smells that can be detected
-        - seating_availability: Availability of seating
-        - food_drink_options: Available food and drinks
-        - restroom_access: Access to restrooms
-        - recent_changes: Recent changes to the environment
-        - ongoing_conversations: Topics being discussed nearby
-        - attention_drawing_elements: Things that draw attention
+        Task: Create a detailed, rich, and plausible ImmediateEnvironment JSON object for the character entering '{location_name}' given the world state context.
+        Determine the 'location_type'. Describe the physical conditions (lighting, noise, temp feel, humidity, smells), social environment (people types, specific NPCs with names/roles if plausible, density, atmosphere), available options/interactions (objects, services, exits, POIs), and sensory details (visuals, sounds).
+        Populate ALL fields of the ImmediateEnvironment model. Be specific and immersive. If some details are unknowable, use reasonable defaults or indicate uncertainty where appropriate within the description strings.
 
-        Create a realistic and detailed immediate environment that would be consistent with the world state and location.
-        Return the updated environment as a JSON object using the ImmediateEnvironmentResponse schema.
+        Respond ONLY with the JSON object matching the ImmediateEnvironment schema:
+        {json.dumps(get_model_schema(ImmediateEnvironment), indent=2)}
         """
 
     @staticmethod
     def process_update_prompt(world_state: Dict, immediate_environment: Dict,
-                            simulacra_action: Dict, reaction_profile: WorldReactionProfile) -> str:
-        """Create a prompt for processing an update based on the simulacra's action."""
-
-        # Create guidance based on the reaction profile
-        profile_guidance = f"""
-        WORLD REACTION PROFILE:
-
-        1. Consequence Severity: {reaction_profile.consequence_severity.upper()}
-        - {"Actions have minimal consequences" if reaction_profile.consequence_severity == "mild" else
-        "Actions have normal, expected consequences" if reaction_profile.consequence_severity == "moderate" else
-        "Actions have amplified consequences"}
-
-        2. Social Responsiveness: {reaction_profile.social_responsiveness.upper()}
-        - {"People tend to be unfriendly or antagonistic" if reaction_profile.social_responsiveness == "hostile" else
-        "People react normally based on circumstances" if reaction_profile.social_responsiveness == "neutral" else
-        "People tend to be helpful and accommodating" if reaction_profile.social_responsiveness == "friendly" else
-        "People largely ignore the character"}
-
-        3. Environmental Stability: {reaction_profile.environmental_stability.upper()}
-        - {"Environment changes little, predictable" if reaction_profile.environmental_stability == "stable" else
-        "Environment changes at a normal, realistic pace" if reaction_profile.environmental_stability == "dynamic" else
-        "Environment frequently changes in unexpected ways"}
-
-        4. Coincidence Frequency: {reaction_profile.coincidence_frequency.upper()}
-        - {"Few coincidences, highly realistic cause-and-effect" if reaction_profile.coincidence_frequency == "rare" else
-        "Normal level of coincidences" if reaction_profile.coincidence_frequency == "occasional" else
-        "Many coincidences (meeting just the right person, etc.)"}
-
-        5. Challenge Level: {reaction_profile.challenge_level.upper()}
-        - {"Obstacles are simpler than expected" if reaction_profile.challenge_level == "easy" else
-        "Obstacles require appropriate effort" if reaction_profile.challenge_level == "normal" else
-        "Obstacles require exceptional effort"}
-
-        6. Narrative Tone: {reaction_profile.narrative_tone.upper()}
-        - {"Humorous situations tend to arise" if reaction_profile.narrative_tone == "comedic" else
-        "Emotionally significant events occur" if reaction_profile.narrative_tone == "dramatic" else
-        "Everyday, ordinary events predominate" if reaction_profile.narrative_tone == "mundane" else
-        "Tense, uncertain situations develop"}
-
-        7. Opportunity Frequency: {reaction_profile.opportunity_frequency.upper()}
-        - {"Few new opportunities present themselves" if reaction_profile.opportunity_frequency == "scarce" else
-        "Realistic number of opportunities" if reaction_profile.opportunity_frequency == "normal" else
-        "Many opportunities appear"}
-
-        8. Serendipity: {reaction_profile.serendipity.upper()}
-        - {"Rarely stumble upon helpful things" if reaction_profile.serendipity == "low" else
-        "Occasionally find useful things by chance" if reaction_profile.serendipity == "medium" else
-        "Frequently make fortunate discoveries"}
-
-        9. World Awareness: {reaction_profile.world_awareness.upper()}
-        - {"Character's actions go largely unnoticed" if reaction_profile.world_awareness == "invisible" else
-        "Appropriate recognition of actions" if reaction_profile.world_awareness == "normal" else
-        "Character's actions receive unusual attention"}
-
-        10. Karmic Response: {reaction_profile.karmic_response.upper()}
-        - {"Good/bad actions quickly lead to rewards/consequences" if reaction_profile.karmic_response == "strong" else
-        "Some connection between moral choices and outcomes" if reaction_profile.karmic_response == "moderate" else
-        "No special connection between moral choices and outcomes"}
+                            simulacra_action: Dict, reaction_profile: 'WorldReactionProfile',
+                            initiator_reflection: Optional[str],
+                            initiator_thought_process: Optional[str],
+                            step_duration_minutes: int,
+                            recent_narrative_updates: List[str]
+                           ) -> str:
         """
+        Create a prompt for processing an update based on the simulacra's action,
+        reaction profile, agent's internal state, step duration, recent narratives,
+        and **enforcing world constraints**.
+        """
+        from src.models import ImmediateEnvironment, WorldProcessUpdateResponse # Keep imports local
+
+        profile_guidance = reaction_profile.get_description() # Get text description
+
+        # --- Format Internal State Context ---
+        internal_context = "[Agent's internal state not provided]"
+        if initiator_reflection or initiator_thought_process:
+            internal_context_lines = ["--- Agent's Internal State (Leading to Action) ---"]
+            if initiator_reflection:
+                internal_context_lines.append(f"Reflection: {initiator_reflection}")
+            if initiator_thought_process:
+                internal_context_lines.append(f"Thought Process: {initiator_thought_process}")
+            internal_context_lines.append("--- End Internal State ---")
+            internal_context = "\n".join(internal_context_lines)
+
+        # --- Format Recent Narrative History ---
+        narrative_history_context = "[No recent narrative history provided]"
+        if recent_narrative_updates:
+            history_lines = []
+            reversed_history = list(reversed(recent_narrative_updates[-3:])) # Get last 3 max
+            for i, narrative in enumerate(reversed_history):
+                 history_lines.append(f"Narrative (T-{i+1}): {narrative[:150]}...")
+            narrative_history_context = "--- Recent Narrative History ---\n" + "\n".join(history_lines) + "\n--- End History ---"
+
+        # --- NEW: Format World Constraints Context ---
+        current_time = world_state.get("current_time", "12:00")
+        current_hour = 12
+        try: current_hour = int(current_time.split(':')[0])
+        except Exception: pass # Ignore errors, use default
+        day_phase = world_state.get("day_phase", "Midday").lower()
+        weather = world_state.get("weather_condition", "Clear").lower()
+        is_night = current_hour < 6 or current_hour >= 22 or day_phase in ["night", "late night"]
+        is_business_hours = 9 <= current_hour < 17 # Stricter 9-5 business hours
+
+        world_constraints_context = f"""
+        --- CURRENT WORLD STATE & RULES (ENFORCE THESE) ---
+        Current Time: {current_time} ({day_phase})
+        Weather: {weather}
+
+        **Location Access Rules:**
+        - Libraries, most stores, government buildings, schools are generally CLOSED at night ({is_night}). Assume standard business hours (e.g., 9am-5pm or 10am-8pm) unless otherwise specified.
+        - Bars/Clubs may be open late; restaurants vary. Homes/apartments are accessible 24/7 to residents. Parks are often open but might be unsafe/empty at night.
+        - Specific Location: '{immediate_environment.get('current_location_name', 'Unknown')}' (Type: {immediate_environment.get('location_type', 'Unknown')})
+
+        **Action Constraints:**
+        - Travel takes time ({step_duration_minutes} min available). Cannot teleport.
+        - Severe weather ({'Yes' if weather in ['heavy rain', 'thunderstorm', 'blizzard', 'hurricane', 'tornado'] else 'No'}) may prevent travel or outdoor actions.
+        - Actions must be plausible for the location (e.g., cannot 'use library computer' if not at a library).
+        --- END WORLD STATE & RULES ---
+        """
+        # --- END: World Constraints Context ---
 
         agent_input = f"""
         Current World State:
-        {json.dumps(world_state, indent=2)}
+        {json.dumps(world_state, indent=2, default=str)}
 
         Current Immediate Environment:
-        {json.dumps(immediate_environment, indent=2)}
+        {json.dumps(immediate_environment, indent=2, default=str)}
 
-        Simulacra action:
-        {json.dumps(simulacra_action, indent=2)}
+        {narrative_history_context}
 
+        {world_constraints_context} # <<< INSERTED CONSTRAINTS HERE
+
+        Simulacra Action Attempted (over {step_duration_minutes} minutes):
+        {json.dumps(simulacra_action, indent=2, default=str)}
+
+        {internal_context}
+
+        WORLD REACTION PROFILE GUIDANCE (Interpret these guidelines):
         {profile_guidance}
 
-        Analyze how the immediate environment should react to this action, considering:
-        1. Physical laws and plausibility
-        2. Environmental responses
-        3. Social responses from people present
-        4. Any changes to the surroundings
-        5. New opportunities or limitations created by the action
+        **Task:** Analyze the outcome of the *attempted* simulacra action over the specified duration ({step_duration_minutes} minutes).
+        **Crucially, you MUST apply the WORLD STATE & RULES.** If the action is impossible due to time, location, weather, or plausibility constraints, simulate the *failure* and its immediate consequences.
 
-        Focus primarily on updating the immediate environment, as this is what's directly affected by the simulacra's action.
-        Only update the world state if the action would realistically have broader implications.
+        **Consider:**
+        1. **Constraint Check:** FIRST, check if the action is possible based on the WORLD STATE & RULES.
+           - If **IMPOSSIBLE** (e.g., trying to enter a closed library at 1 AM):
+             - The `updated_environment` MUST reflect the character's state *after failing* (e.g., still outside the library). `current_location_name` should NOT change to the target if entry failed.
+             - `observations` MUST clearly state the failure and the reason (e.g., "The library doors are locked.", "A sign indicates it's closed.").
+             - `consequences` should reflect the failure (e.g., "Failed to enter the library.").
+             - Reflect NPC reactions *if* they observe the failed attempt.
+           - If **POSSIBLE**: Proceed to simulate the successful action's effects.
+        2. Plausibility over {step_duration_minutes} min.
+        3. Direct environmental changes (objects moved, sounds, states).
+        4. Social responses from NPCs present (update 'specific_npcs_present' list: names/roles/status). Consider initiator's intent (reflection/thought process).
+        5. Natural progression of NPCs/world, consistent with history.
+        6. Changes to atmosphere, opportunities, POIs.
+        7. Broader world state changes ONLY if action has significant ripple effects AND is possible.
 
-        For consequences and observations, provide a LIST of specific, detailed statements.
-        Each consequence or observation should be a complete sentence describing one specific effect or thing noticed.
+        **Output Generation:** Generate a JSON response containing:
+        - 'updated_environment': The *complete* ImmediateEnvironment object state *at the end* of the {step_duration_minutes} min duration, reflecting the *actual outcome* (success or failure based on constraints). Ensure `specific_npcs_present` is a list of dicts: {{'name': 'string', 'role': 'string', 'status': 'string'}}.
+        - 'world_state_changes': Dictionary of *changed* WorldState keys (only if applicable and action was possible). {{}} if none.
+        - 'consequences': LIST of strings describing direct, notable consequences (reflecting success or failure).
+        - 'observations': LIST of strings describing what character perceives *after* the attempt (e.g., success details or failure reason).
+
+        Ensure the response strictly adheres to the specified JSON structure.
         """
 
-        prompt_json_output = "\nRespond in the following JSON format: " + json.dumps(
+        # The JSON output structure definition remains the same
+        prompt_json_output = "\nRespond ONLY with the following JSON format (do NOT include comments): " + json.dumps(
             {
-                "updated_environment": "The updated immediate environment after the action (JSON object following ImmediateEnvironment schema)",
-                "world_state_changes": "Any changes to the world state (JSON object with only the changed fields, if applicable)",
-                "consequences": ["List of specific consequences of the action, each as a complete sentence"],
-                "observations": ["List of specific things the simulacra would observe, each as a complete sentence"]
+                "updated_environment": { # Placeholder: Provide the full ImmediateEnvironment object here
+                    "current_location_name": "string",
+                    "location_type": "string",
+                    # ... other ImmediateEnvironment fields ...
+                    "specific_npcs_present": [
+                        {"name": "string", "role": "string", "status": "string"},
+                         # ... potentially more NPCs ...
+                    ],
+                    # ... rest of ImmediateEnvironment fields ...
+                    "attention_drawing_elements": ["string"]
+                },
+                "world_state_changes": {"key": "new_value", "...": "..."}, # Changes only, or {}
+                "consequences": ["List of strings"],
+                "observations": ["List of strings"]
             }
-        )
+        , indent=2)
         return agent_input + prompt_json_output
 
     @staticmethod
-    def reflect_on_situation_prompt(observations: str, persona_state: Dict) -> str:
+    def reflect_on_situation_prompt(observations: str, immediate_environment: Dict, persona_state: Dict) -> str:
+        """Prompt for character reflection."""
+        from src.models import DayResponse # For schema
+        persona_summary_lines = [
+            f"- You are {persona_state.get('name', 'Unknown')}, {persona_state.get('age', '?')} years old, working as a {persona_state.get('occupation', '?')}." ,
+            f"- Your personality traits include: {', '.join(persona_state.get('personality_traits', ['unknown']))}.",
+            f"- Your current goals are: {', '.join(persona_state.get('goals', ['none specified']))}.",
+            f"- Physically you feel: {persona_state.get('current_state', {}).get('physical', 'normal')}.",
+            f"- Emotionally you feel: {persona_state.get('current_state', {}).get('emotional', 'neutral')}.",
+            f"- Mentally you are: {persona_state.get('current_state', {}).get('mental', 'aware')}.",
+            f"- Recent memories: {'; '.join(persona_state.get('memory', {}).get('short_term', ['nothing specific']))}."
+        ]
+        persona_summary = "\n".join(persona_summary_lines)
+
         reflection_prompt = f"""
-        {observations}
+        Current Observations:
+        {observations if observations else "You observe your surroundings."}
 
-        Consider your personality as {persona_state['name']}, a {persona_state['age']}-year-old {persona_state['occupation']} who is {', '.join(persona_state['personality_traits'])},
-        your current physical state ({persona_state['current_state']['physical']}),
-        emotional state ({persona_state['current_state']['emotional']}),
-        and mental state ({persona_state['current_state']['mental']}).
+        Detailed Immediate Environment:
+        {json.dumps(immediate_environment, indent=2, default=str)}
 
-        Think about your goals: {', '.join(persona_state['goals'])}
+        Your Persona Summary:
+        {persona_summary}
 
-        Consider your short-term memories of {', '.join(persona_state['memory']['short_term'])} and long-term experiences of {', '.join(persona_state['memory']['long_term'])}.
+        Task: Reflect deeply on the current situation. Consider your persona (traits, goals, memories, current state) and everything you are observing in the detailed environment. What are your internal thoughts, interpretations, feelings, and potential intentions right now? What stands out to you? What connections do you make?
         """
 
-        prompt_json_output = "\nRespond in the following JSON format: " + json.dumps(
-            DayResponse.model_json_schema()["properties"] # Use schema for format
-        )
+        prompt_json_output = "\nRespond ONLY with the following JSON format: " + json.dumps(
+            get_model_schema(DayResponse) # Schema for {'reflect': '...'}
+        , indent=2)
         return reflection_prompt + prompt_json_output
 
     @staticmethod
     def analyze_emotions_prompt(situation: str, current_emotional_state: str) -> str:
+        """Prompt for emotional analysis."""
+        from src.models import EmotionAnalysisResponse # For schema
         prompt_template = f"""
-Situation:
-{situation}
+        Situation & Your Reflection:
+        {situation}
 
-Current emotional state:
-{current_emotional_state}
+        Your previous primary emotional state:
+        {current_emotional_state}
+
+        Task: Analyze your emotional response to this situation and your reflection. Identify the primary emotion you are feeling *now*, its intensity (Low, Medium, High), any secondary emotion, and provide a concise summary of your *new* overall emotional state in the 'emotional_update' field.
         """
-
-        prompt_json_day = "\nRespond in the following JSON format: " + json.dumps(
-             EmotionAnalysisResponse.model_json_schema()["properties"] # Use schema for format
-        )
-        return prompt_template + prompt_json_day
+        prompt_json_output = "\nRespond ONLY with the following JSON format: " + json.dumps(
+            get_model_schema(EmotionAnalysisResponse)
+        , indent=2)
+        return prompt_template + prompt_json_output
 
     @staticmethod
-    def decide_action_prompt(reflection: str, emotional_analysis: Dict, goals: List[str], immediate_environment: Dict) -> str:
+    def decide_action_prompt(
+        reflection: str,
+        emotional_analysis: Dict[str, Any],
+        goals: List[str],
+        immediate_environment: Dict[str, Any],
+        persona_state: Dict[str, Any],
+        retrieved_background: str,
+        step_duration_minutes: int,
+        last_action_taken: Optional[str],
+        world_state: Dict # <<< ADDED world_state for grounding context >>>
+    ) -> str:
+        """
+        Prompt for deciding the next action, with grounding rules and anti-repetition.
+        """
+        from src.models import ActionDecisionResponse
+        persona_name = persona_state.get('name', 'Unknown')
+        traits_str = ", ".join(persona_state.get('personality_traits', ['Unknown']))
+        allowed_actions_list = list(AllowedActionVerbs.__args__)
+        allowed_actions_str = ", ".join(f"'{action}'" for action in allowed_actions_list)
+
+        background_section = "[No relevant background retrieved or available]"
+        if retrieved_background and not retrieved_background.startswith("["): background_section = retrieved_background.strip()
+        duration_guidance = ""
+        if step_duration_minutes <= 5: duration_guidance = "Short step: brief action."
+        elif step_duration_minutes <= 30: duration_guidance = "Moderate step: focused activity."
+        else: duration_guidance = f"Long step ({step_duration_minutes} min): significant activity."
+
+        last_action_context = f"Your immediate previous action was: {last_action_taken}" if last_action_taken else "This is the first action."
+
+        # --- NEW: Grounding in Reality Context ---
+        grounding_context = f"""
+        --- GROUNDING IN REALITY (IMPORTANT!) ---
+        Current Time: {world_state.get('current_time', 'Unknown')} ({world_state.get('day_phase', '?')})
+        Current Location: {immediate_environment.get('current_location_name', 'Unknown')} ({immediate_environment.get('location_type', '?')})
+        Weather: {world_state.get('weather_condition', 'Unknown')}
+
+        **RULES TO FOLLOW:**
+        1. **Time Awareness:** Is your destination likely open now ({world_state.get('current_time', '?')})? Libraries, stores, schools usually have specific hours. Avoid planning actions for closed locations.
+        2. **Location Specificity:** If moving, be specific (e.g., "Joe's Diner on Main St").
+        3. **Weather:** Is travel/outdoor activity safe/practical in the current weather? ({world_state.get('weather_condition', 'Unknown')})
+        4. **Plausibility:** Is the action feasible in your *current* location? (e.g., you can't 'use' a library computer if you're in a park).
+        5. **Travel Time:** You have {step_duration_minutes} mins. Moving takes time.
+
+        *The simulation will prevent impossible actions later, but you should PLAN realistically NOW.*
+        --- END GROUNDING ---
+        """
+        # --- END: Grounding Context ---
+
         prompt_template = f"""
-        Reflection:
-        {reflection}
+        You are {persona_name}, a {persona_state.get('age', '?')}-year-old {persona_state.get('occupation', 'Unknown')}.
+        Your core personality traits are: {traits_str}.
 
-        Emotional Analysis:
-        {json.dumps(emotional_analysis, indent=2)}
+        --- TIME & RECENT ACTION CONTEXT ---
+        The current simulation step duration is {step_duration_minutes} minutes.
+        {duration_guidance}
+        {last_action_context}
+        **RULE: You MUST choose an action DIFFERENT from your last one ('{last_action_taken or 'N/A'}').**
 
-        Considering your goals:
-        {json.dumps(goals, indent=2)}
+        {grounding_context} # <<< INSERTED GROUNDING RULES HERE
 
-        Your immediate environment:
-        {json.dumps(immediate_environment, indent=2)}
+        --- YOUR CURRENT STATE & PERCEPTION ---
+        Your Internal Reflection (based on situation AFTER last action):
+        {reflection.strip()}
 
-        What action will you take? Consider your personality traits, current state, available options in your environment, and what would be most consistent with who you are.
+        Your Current Emotional State Analysis:
+        {json.dumps(emotional_analysis, indent=2, default=str)}
+
+        Your Current Goals:
+        {json.dumps(goals, indent=2, default=str)}
+
+        Relevant Background from Life Summary (Memory):
+        {background_section}
+
+        Current Immediate Environment (What you perceive):
+        {json.dumps(immediate_environment, indent=2, default=str)}
+
+        --- TASK ---
+        Based on your internal state, perception, background, goals, the step duration, the **strict rule against repeating your last action**, and the **GROUNDING IN REALITY rules**, decide your next primary action.
+
+        **ALLOWED ACTIONS:** You MUST choose the 'action' verb from this specific list: {allowed_actions_str}.
+        *   Use 'talk' for dialogue.
+        *   Use 'move' for changing location.
+        *   Use 'wait' for pausing.
+        *   Use 'observe' for focused looking/listening.
+        *   Use 'use' for interacting with items (operating, consuming, manipulating).
+        *   Use 'think' for internal planning, analysis, or recall.
+        *   Use 'search' for actively looking for something.
+        *   Use 'read'/'write' for text interaction.
+        *   Use 'rest' for physical rest/sleep.
+        *   Use 'get'/'drop' for picking up/placing items.
+        *   Use 'other' ONLY if the intended action genuinely does not fit any other category. Provide clear details if using 'other'.
+
+        **CRITICAL EVALUATION:** Consider the outcome of your last action AND the grounding rules. If analyzing clues feels stuck or unrealistic, actively choose a DIFFERENT, *plausible* kind of action (e.g., interact, move, rest, plan, use an object differently).
+
+        1. Explain 'thought_process': Justify why this NEW, REALISTIC action is the best choice now, considering the anti-repetition rule and grounding constraints.
+        2. State the 'action' clearly.
+        3. Provide 'action_details' or null.
+
+        Ensure the action is plausible and selected ONLY from the allowed list.
         """
 
-        prompt_json_output = "\nRespond in the following JSON format: " + json.dumps(
-             ActionDecisionResponse.model_json_schema()["properties"] # Use schema for format
-        )
+        # Generate JSON output format using get_model_schema
+        try:
+            json_output_format = get_model_schema(ActionDecisionResponse)
+            prompt_json_output = "\n\nRespond ONLY with the following JSON format:\n" + json.dumps(json_output_format, indent=2)
+        except Exception as e:
+            prompt_json_output = """
+Respond ONLY with the following JSON format:
+{
+    "thought_process": "string",
+    "action": "string",
+    "action_details": {
+        "target": "string | null",
+        "utterance": "string | null",
+        "target_location": "string | null",
+        "item": "string | null",
+        "manner": "string | null",
+        "duration": "string | null"
+    } | null
+}"""
         return prompt_template + prompt_json_output
+
+    @staticmethod
+    def generate_initial_narrative_prompt(persona: Dict, world_state: Dict, immediate_environment: Dict) -> str:
+        """Generates a prompt to create the initial narrative context for the simulation start."""
+        persona_context = f"""
+        Name: {persona.get('Name', persona.get('name','Unknown'))}
+        Age: {persona.get('Age', persona.get('age','Unknown'))}
+        Occupation: {persona.get('Occupation', persona.get('occupation','Unknown'))}
+        Personality traits: {', '.join(persona.get('Personality_Traits', persona.get('personality_traits', ['Unknown'])))}
+        Goals: {', '.join(persona.get('goals', ['Unknown']))}
+        Physical state: {persona.get('current_state', {}).get('physical', 'Unknown')}
+        Emotional state: {persona.get('current_state', {}).get('emotional', 'Unknown')}
+        Mental state: {persona.get('current_state', {}).get('mental', 'Unknown')}
+        Short-term memories: {', '.join(persona.get('memory', {}).get('short_term', ['Unknown']))}
+        Long-term memories: {', '.join(persona.get('memory', {}).get('long_term', ['Unknown']))}
+        """.strip()
+
+        world_context = f"""
+        Time: {world_state.get('current_time', 'Unknown')}
+        Date: {world_state.get('current_date', 'Unknown')}
+        City: {world_state.get('city_name', 'Unknown')}
+        Weather: {world_state.get('weather_condition', 'Unknown')}
+        Social climate: {world_state.get('social_climate', 'Unknown')}
+        Major events: {', '.join(world_state.get('major_events', ['None']))}
+        """.strip()
+
+        location_name = immediate_environment.get('current_location_name', 'Unknown Location')
+
+        return f"""
+        Task: Create a brief narrative context (2-3 paragraphs) explaining how the character arrived at their current situation at the start of the simulation.
+
+        Character Information:
+        {persona_context}
+
+        World Information:
+        {world_context}
+
+        Current Location Name: {location_name}
+
+        The narrative should explain:
+        1. Why the character is plausibly at this specific location ({location_name}) right now ({world_state.get('current_time')}).
+        2. What they were likely doing earlier today leading up to this moment.
+        3. What their immediate concerns, thoughts, or state of mind might be, connecting to their goals/personality.
+        4. Briefly touch upon how their current emotional/physical state relates to recent events.
+
+        Make the narrative realistic, engaging, and specific to this character and situation. It should provide a smooth entry point into the simulation. Avoid stating "The simulation starts...". Write from a 3rd person perspective.
+        Respond ONLY with the narrative text.
+        """
+
+    # <<< Kept generate_narrative_update_prompt as is >>>
+    @staticmethod
+    def generate_narrative_update_prompt(persona: Dict, previous_actions: List[str],
+                                         world_state: Dict, immediate_environment: Dict,
+                                         consequences: List[str], observations: List[str],
+                                         step_duration_minutes: int,
+                                         recent_narrative_updates: List[str],
+                                         initiator_reflection: Optional[str],
+                                         initiator_thought_process: Optional[str],
+                                         day_arc: Optional[str] = None) -> str: # <<< Added day_arc parameter
+        """Generates a prompt to create a narrative update, including the day's arc."""
+        # NOTE: Still not explicitly adding reflection/thought here unless needed later.
+        persona_context = f"Name: {persona.get('name', '?')}, Feeling: {persona.get('current_state',{}).get('emotional', '?')}"
+        world_context = f"Time: {world_state.get('current_time')}, Loc: {immediate_environment.get('current_location_name', '?')}, Weather: {world_state.get('weather_condition')}"
+        last_simulacra_action = previous_actions[-1] if previous_actions else "No specific action listed."
+        consequences_text = "\n".join([f"- {c}" for c in consequences]) if consequences else "None listed."
+        observations_text = "\n".join([f"- {o}" for o in observations]) if observations else "None listed."
+        narrative_focus = ""
+        if step_duration_minutes <= 5: narrative_focus = "Focus on immediate action/result."
+        elif step_duration_minutes <= 30: narrative_focus = f"Describe progression over {step_duration_minutes} mins."
+        else: narrative_focus = f"Summarize events over {step_duration_minutes} mins."
+        narrative_history_context = "[No recent narrative history provided]"
+        last_narrative_snippet = ""
+        if recent_narrative_updates:
+            history_lines = []; reversed_history = list(reversed(recent_narrative_updates[-3:]))
+            if reversed_history: last_narrative_snippet = reversed_history[0]
+            for i, narrative in enumerate(reversed_history): history_lines.append(f"Narrative (T-{i+1}): {narrative[:150]}...")
+            narrative_history_context = "Recent Narrative History:\n" + "\n".join(history_lines)
+        anti_stagnation_instruction = ""
+        if ("analyz" in last_simulacra_action.lower() and "analyz" in last_narrative_snippet.lower()) or \
+           ("mystery" in last_simulacra_action.lower() and "mystery" in last_narrative_snippet.lower()):
+             anti_stagnation_instruction = "**NARRATIVE CONTINUITY:** Previous narrative seemed similar. Ensure this update shows a *change*, *conclusion*, *interruption*, or clear *shift in focus*. Avoid repeating unresolved contemplation."
+
+        # <<< ADDED: Day Arc Context Formatting >>>
+        day_arc_context = f"\nUnderlying Theme/Arc for Today: {day_arc}" if day_arc else ""
+
+        return f"""
+        Task: Write narrative update (1-2 paragraphs) for last {step_duration_minutes} minutes.
+
+        Character Context (end): {persona_context}
+        World Context (end): {world_context}
+        {day_arc_context} # <<< INSERTED DAY ARC CONTEXT HERE
+
+        --- Key Inputs ---
+        Action Taken (start): {last_simulacra_action}
+        Resulting Consequences (end): {consequences_text}
+        New Observations (end): {observations_text}
+        {narrative_history_context}
+        --- End Key Inputs ---
+
+        Instructions: Write 3rd person narrative for past {step_duration_minutes} mins. Start with action initiation. {narrative_focus}
+        **Subtly weave the 'Underlying Theme/Arc for Today' into the narrative if relevant to the action/outcome, but don't force it unnaturally.**
+        **IMPORTANT:** The narrative must reflect the *actual outcome*, including any failures due to world constraints (e.g., "tried to enter the library, but found it locked").
+        {anti_stagnation_instruction}
+        Use history for continuity but ensure story progresses. Incorporate consequences/observations accurately. Show, don't tell.
+        Respond ONLY with narrative text.
+        """
