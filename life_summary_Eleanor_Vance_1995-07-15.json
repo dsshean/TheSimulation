@@ -1,0 +1,400 @@
+{
+  "persona_details": {
+    "Name": "Eleanor Vance",
+    "Age": 28,
+    "Occupation": "Librarian",
+    "Current_location": "River Row Flats, 82 Craven St, Asheville, NC 28806",
+    "Personality_Traits": [
+      "Intelligent",
+      "Introverted",
+      "Empathetic",
+      "Organized",
+      "Anxious"
+    ],
+    "Birthplace": "Portland, Oregon",
+    "Birthdate": "1995-07-15",
+    "Birthtime": "06:30",
+    "Education": "Master's in Library Science",
+    "Physical_Appearance": "Slightly built, with long, wavy auburn hair, green eyes, and glasses. Often wears comfortable, practical clothing.",
+    "Hobbies": "Reading (obviously), hiking, watercolor painting, collecting vintage postcards.",
+    "Skills": "Expert in cataloging and information retrieval, proficient in multiple languages (French, Spanish), excellent researcher, skilled in bookbinding and repair.",
+    "Languages": "English (native), French (fluent), Spanish (conversational)",
+    "Health_Status": "Generally healthy, occasional migraines, manages anxiety with mindfulness techniques.",
+    "Family_Background": "Grew up in a middle-class family with two younger siblings. Parents are supportive but somewhat traditional in their views.",
+    "Life_Goals": "To make a positive impact on her community through her work, to create a welcoming and inclusive space in the library, to overcome her anxieties and live a more fulfilling life.",
+    "Notable_Achievements": "Successfully implemented a new digital archiving system at her previous library, awarded a grant for community outreach programs.",
+    "Fears": "Public speaking, failure, disappointing others, being alone.",
+    "Strengths": "Intelligence, empathy, organizational skills, dedication, strong work ethic.",
+    "Weaknesses": "Anxiety, introversion, tendency to overthink things, difficulty asserting herself.",
+    "Ethnicity": "Caucasian",
+    "Religion": null,
+    "Political_Views": "Progressive, environmentally conscious.",
+    "Favorite_Foods": "Vegetarian cuisine, particularly Mediterranean and Indian dishes, dark chocolate.",
+    "Favorite_Music": "Classical music, indie folk, jazz.",
+    "Favorite_Books": "Classics like 'Pride and Prejudice' and 'Jane Eyre', contemporary literary fiction by authors like Margaret Atwood and Elena Ferrante.",
+    "Favorite_Movies": "Independent films, documentaries, historical dramas.",
+    "Pet_Peeves": "Loud chewing, people who don't return books on time, misinformation.",
+    "Dreams": "To write a novel, to travel the world, to find a partner who understands and appreciates her.",
+    "Past_Traumas": "Witnessed a traumatic event in her childhood that contributed to her anxiety."
+  },
+  "generation_info": {
+    "generated_at": "2025-04-13T23:17:55.051488",
+    "current_year": 2025,
+    "current_month": 4,
+    "current_day": 13,
+    "current_hour": 23
+  },
+  "birth_year": 1995,
+  "birth_month": 7,
+  "birth_day": 15,
+  "initial_relationships": {
+    "parents": [
+      {
+        "name": "Robert Vance",
+        "relationship": "Father",
+        "details": "A retired engineer, somewhat traditional in his views but supportive of Eleanor's career."
+      },
+      {
+        "name": "Susan Vance",
+        "relationship": "Mother",
+        "details": "A former teacher, caring and supportive, but sometimes struggles to understand Eleanor's introverted nature."
+      }
+    ],
+    "siblings": [
+      {
+        "name": "Daniel Vance",
+        "relationship": "Younger Brother",
+        "details": "Age 25, works as a software developer. More outgoing and adventurous than Eleanor."
+      },
+      {
+        "name": "Emily Vance",
+        "relationship": "Younger Sister",
+        "details": "Age 22, currently in college studying environmental science. Shares Eleanor's progressive views."
+      }
+    ]
+  },
+  "yearly_summaries": {
+    "1995": {
+      "summary": "Eleanor Vance was born in Portland, Oregon, on July 15, 1995. The year was marked by events such as the United Nations Year for Tolerance and significant historical moments that shaped the world.",
+      "location": "Portland, Oregon",
+      "news": "- Major Events of 1995 - Historical Moments That Defined the Year ...: Major Events of 1995: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 1995 - Wikipedia: 1995 was designated as: United Nations Year for Tolerance World Year of Peoples' Commemoration of th...\n- What Happened In 1995 - Historical Events 1995 - EventsHistory: What happened in the year 1995 in history? Famous historical events that shook and changed the world...\n- Top News Stories from 1995 - Infoplease: Steve Fossett made a flight of more than 5,430 mi. from Seoul, South Korea, to Leader, Saskatchewan,...\n- A Year in History: 1995 Timeline - Historic Newspapers: The year that brought us the 'trial of the century', iconic films, and scientific discoveries; 1995 ..."
+    },
+    "1996": {
+      "summary": "In 1996, while Eleanor was a baby, major world events included the bankruptcy of Fokker, a major aircraft manufacturer. Eleanor continued to grow and develop in Portland, Oregon, under the care of her parents.",
+      "location": "Portland, Oregon",
+      "news": "- Major Events of 1996 - Historical Moments That Defined the Year ...: Major Events of 1996: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 1996 - Wikipedia: March 15 - Fokker, a major manufacturer of small size aircraft, goes bankrupt in Netherlands. [4] Ma...\n- What Happened In 1996 - Historical Events 1996 - EventsHistory: What happened in the year 1996 in history? Famous historical events that shook and changed the world...\n- 1996 Archives | HISTORY: Discover what happened in this year with HISTORY's summaries of major events, anniversaries, famous ...\n- Historical Events in 1996 - On This Day: Historical events from year 1996. Learn about 507 famous, scandalous and important events that happe..."
+    },
+    "1997": {
+      "summary": "As a toddler in 1997, Eleanor was developing rapidly. Globally, the Republic of Zaire joined the World Trade Organization. Eleanor's family life in Portland continued, with her parents providing a stable environment.",
+      "location": "Portland, Oregon",
+      "news": "- 1997 - Wikipedia: 1997 was a common year starting on Wednesday of the Gregorian calendar, the 1997th ... the first tim...\n- A Year in History: 1997 Timeline - Historic Newspapers: 1997 Timeline January. January 1: The Republic of Zaira joins the World Trade Organisations, as Zair...\n- Historical Events in 1997 - On This Day: Historical events from year 1997. Learn about 672 famous, scandalous and important events that happe...\n- What Happened In 1997 - Historical Events 1997 - EventsHistory: Historical Events for the Year 1997. 1st January » Democratic Republic of the Congo known as Zaire o...\n- Top News Stories from 1997 - Infoplease: Current Events. View captivating images and news briefs about critical government decisions, medical..."
+    },
+    "1998": {
+      "summary": "In 1998, Eleanor was three years old. Russia began circulating the new Russian ruble. Eleanor was likely beginning preschool or daycare, engaging in early learning and social activities within her Portland community.",
+      "location": "Portland, Oregon",
+      "news": "- 1998 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 8 April 2...\n- Historical Events in 1998 - On This Day: Historical events from year 1998. Learn about 344 famous, scandalous and important events that happe...\n- Major Events of 1998 - Historical Moments That Defined the Year ...: Major Events of 1998: Key Historical Moments You Need to Know. ... 06 Jun 1998 FIFA World Cup Final:...\n- What Happened In 1998 - Historical Events 1998 - EventsHistory: Historical Events for the Year 1998. 1st January » Russia begins to circulate new Russian ruble call...\n- A Year in History: 1998 Timeline | Historic Newspapers: 1998 Sporting Events. 1998 was a particularly eventful year for sport, with many different events ta..."
+    },
+    "1999": {
+      "summary": "By 1999, Eleanor was four. An avalanche destroyed the village of Galtür, Austria. Eleanor continued her early childhood development in Portland, perhaps showing early signs of her intelligence and introverted nature.",
+      "location": "Portland, Oregon",
+      "news": "- Historical Events in 1999 - On This Day: Historical events from year 1999. Learn about 295 famous, scandalous and important events that happe...\n- 1999 - Wikipedia: 1999 Galtür avalanche: An avalanche destroys the village of Galtür, Austria, killing 31. [6] Februar...\n- What Happened In 1999 - Historical Events 1999 - EventsHistory: What happened in the year 1999 in history? Famous historical events that shook and changed the world...\n- Major Events of 1999 - Historical Moments That Defined the Year ...: Major Events of 1999: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 20 Things You Won't Believe Happened in 1999 - Best Life: From \"The Sixth Sense\" to \"SpongeBob,\" we've rounded up the most iconic events from the year 1999. Y..."
+    },
+    "2000": {
+      "summary": "In 2000, Eleanor was five years old. The last original weekday 'Peanuts' comic strip was published. She may have been preparing for or starting kindergarten, marking the beginning of her formal education in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- What Happened In 2000 - Historical Events 2000 - EventsHistory: Historical Events for the Year 2000. 3rd January » The last original weekday 'Peanuts' comic strip i...\n- 2000 - Wikipedia: 2000 was a century leap year starting on Saturday of the Gregorian calendar, the 2000th year of the ...\n- Major Events of 2000 - Historical Moments That Defined the Year ...: Major Events of 2000: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- Timeline of the 2000s | Britannica - Encyclopedia Britannica: In a discussion of potential names for the 2000s, American author and journalist Walter Isaacson sug...\n- 15 Major Historical Events That Happened in the 2000s: 15 Major Historical Events That Happened in the 2000s The early piece of the ten years saw the long-..."
+    },
+    "2001": {
+      "summary": "In 2001, Eleanor was six years old. Wikipedia was launched. This year likely involved settling into elementary school and continued development of her skills and interests in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Historical Events in 2001 - On This Day: Historical events from year 2001. Learn about 305 famous, scandalous and important events that happe...\n- What Happened In 2001 - Historical Events 2001 - EventsHistory: What happened in the year 2001 in history? Famous historical events that shook and changed the world...\n- 2001 - Wikipedia: 2001 (MMI) was a common year starting on Monday of the Gregorian calendar, the 2001st year of the Co...\n- Major Events of 2001 - Historical Moments That Defined the Year ...: Major Events of 2001: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- Major events in 2001 timeline: 2001 Wikipedia is launched Wikipedia is a free, web-based, collaborative, multilingual encyclopedia ..."
+    },
+    "2002": {
+      "summary": "In 2002, Eleanor was seven years old. Taiwan officially joined the World Trade Organization. Eleanor continued her elementary school education, developing her love for reading and perhaps displaying early organizational skills in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Major Events of 2002 - Historical Moments That Defined the Year ...: Major Events of 2002: Key Historical Moments You Need to Know. ... 29 Jun 2002 FIFA World Cup Final ...\n- Historical Events in 2002 - On This Day: Historical events from year 2002. Learn about 276 famous, scandalous and important events that happe...\n- What Happened In 2002 - Historical Events 2002 - EventsHistory: Historical Events for the Year 2002. 1st January » Taiwan officially joins the World Trade Organizat...\n- 2002 - Wikipedia: The world population on January 1, 2002, was estimated to be 6.272 billion people, and it increased ...\n- 29 Moments And Things That Happened In 2002 - BuzzFeed: 29. And finally, the Sanyo SCP-5300 became the very first cell phone to have a built-in camera to be..."
+    },
+    "2003": {
+      "summary": "In 2003, Eleanor was eight years old. The earthquake caused the destruction of the ancient citadel of Arg-é Bam. She was immersed in her elementary education, likely showing an aptitude for learning and beginning to form her personality in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- What Happened In 2003 - Historical Events 2003 - EventsHistory: What happened in the year 2003 in history? Famous historical events that shook and changed the world...\n- 2003 - Wikipedia: 2003 (MMIII) was a common year starting on Wednesday of the Gregorian calendar, the 2003rd year of t...\n- 2003 major events | Future Timeline: In addition, the earthquake caused the destruction of the ancient citadel of Arg-é Bam, a UNESCO Wor...\n- Historical Events in 2003 - On This Day: Historical events from year 2003. Learn about 255 famous, scandalous and important events that happe...\n- Major Events of 2003 - Historical Moments That Defined the Year ...: Major Events of 2003: Key Historical Moments You Need to Know Every year brings its own set of pivot..."
+    },
+    "2004": {
+      "summary": "In 2004, Eleanor was nine years old. Many popular films were released such as Shrek 2. Eleanor continued with her schooling in Portland, possibly becoming more involved in extracurricular activities and deepening her passion for reading.",
+      "location": "Portland, Oregon",
+      "news": "- Historical Events in 2004 - On This Day: Historical events from year 2004. Learn about 348 famous, scandalous and important events that happe...\n- 2004 - Wikipedia: 2004 was a year marked by many popular and highly grossing film releases such as Shrek 2, Spider Man...\n- Major Events of 2004 - Historical Moments That Defined the Year ...: Major Events of 2004: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- What Happened In 2004 - Historical Events 2004 - EventsHistory: Historical Events for the Year 2004. 1st January » In a Motion of no confidence vote of confidence, ...\n- 50 Things That Happened In 2004 - BuzzFeed: 50 Pop Culture Moments From 20 Years Ago That Make 2004 Feel Like It Was A Whole Different Universe ..."
+    },
+    "2005": {
+      "summary": "In 2005, Eleanor was ten years old. It was the International Year for Sport and Physical Education. Eleanor was likely finishing elementary school, developing her interests, and showing early signs of her empathetic nature in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Major Events of 2005 - Historical Moments That Defined the Year ...: Major Events of 2005: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- What Happened In 2005 - Historical Events 2005 - EventsHistory: What happened in the year 2005 in history? Famous historical events that shook and changed the world...\n- 2005 - Wikipedia: 2005 was designated as the International Year for Sport and Physical Education and the International...\n- 2005: Facts & Events That Happened in This Year - The Fact Site: 2005 was an eventful year that left a significant mark on history, with groundbreaking developments ...\n- Historical Events in 2005 - On This Day: Historical events from year 2005. Learn about 298 famous, scandalous and important events that happe..."
+    },
+    "2006": {
+      "summary": "In 2006, Eleanor was eleven years old. Major news stories included developments around the world. Eleanor would have started middle school, which involved navigating social dynamics and further academic pursuits in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Historical Events in 2006 - On This Day: Historical events from year 2006. Learn about 275 famous, scandalous and important events that happe...\n- Major Events of 2006 - Historical Moments That Defined the Year ...: Major Events of 2006: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 2006 - Wikipedia: 2006 (MMVI) was a common year starting on Sunday of the Gregorian calendar, the 2006th year of the C...\n- What Happened In 2006 - Historical Events 2006 - EventsHistory: What happened in the year 2006 in history? Famous historical events that shook and changed the world...\n- 10 big news stories that happened in 2006 (when OpenLearn was born): How much do you remember about 2006? We take a look back at ten of the biggest news stories from the..."
+    },
+    "2007": {
+      "summary": "In 2007, Eleanor was twelve years old. Bulgaria and Romania officially joined the European Union. Eleanor continued middle school, honing her skills in reading and potentially engaging in activities that fostered her organizational skills in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- 2007 - Wikipedia: March 13-April 28 - The 2007 Cricket World Cup is held in the West Indies with Australia defeating S...\n- What Happened In 2007 - Historical Events 2007 - EventsHistory: Historical Events for the Year 2007. 1st January » Bulgaria and Romania officially join the European...\n- Historical Events in 2007 - On This Day: Historical events from year 2007. Learn about 278 famous, scandalous and important events that happe...\n- Major Events of 2007 - Historical Moments That Defined the Year ...: Major Events of 2007: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 2007: Facts & Events That Happened in This Year - The Fact Site: 2007 was, in many ways, a turning point for the world, with major milestones occurring in science an..."
+    },
+    "2008": {
+      "summary": "In 2008, Eleanor was thirteen years old. Barack Obama was chosen as president. Eleanor was likely navigating her teenage years in Portland, developing her interests and perhaps struggling with anxiety as she entered high school.",
+      "location": "Portland, Oregon",
+      "news": "- 25 Major Historical Events That Happened in 2008: This article will feature 25 major historical events that happened in 2008. 1. Barack Obama is chose...\n- What Happened In 2008 - Historical Events 2008 - EventsHistory: Historical Events for the Year 2008. 1st January » Cyprus and Malta join the Eurozone.; 17th January...\n- 2008 - Wikipedia: 2008 was a leap year starting on Tuesday of the Gregorian calendar, the 2008th year of the Common Er...\n- Major Events of 2008 - Historical Moments That Defined the Year ...: Major Events of 2008: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- Historical Events in 2008 - On This Day: Historical events from year 2008. Learn about 304 famous, scandalous and important events that happe..."
+    },
+    "2009": {
+      "summary": "In 2009, Eleanor was fourteen years old. Usain Bolt won the 100m with a new world record. Eleanor would have been in high school, focusing on her studies and developing her interests in literature and the arts in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Facts About 50 Major Events That Happened In 2009 - Facts.net: 16 Aug 2009: Usain Bolt won 100m with a new world record of 9.58s. During the finals of the World At...\n- 2009 - Wikipedia: Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1. ... reactions to the e...\n- Historical Events in 2009 - On This Day: Historical events from year 2009. Learn about 250 famous, scandalous and important events that happe...\n- Top 10 stories of 2009 - WORLD: By the third quarter of 2009 there were halting signs that the nation's worst recession since the Gr...\n- 2009: Facts & Events That Happened in This Year - The Fact Site: 2009 also saw Michael Jackson's final performance, just days before his death. Meanwhile, the world ..."
+    },
+    "2010": {
+      "summary": "In 2010, Eleanor was fifteen years old. The first iPad was released. Eleanor was continuing high school in Portland, likely excelling academically and further developing her introverted tendencies and love for reading.",
+      "location": "Portland, Oregon",
+      "news": "- 2010 - Wikipedia: 2010 (MMX) was a common year starting on Friday of the Gregorian calendar, the 2010th year of the Co...\n- Major Events of 2010 - Historical Moments That Defined the Year ...: Major Events of 2010: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 14 Major Events of the 2010s - HISTORY: Look back at 14 events, achievements, tragedies and otherwise memorable moments that stood out durin...\n- These 20 Events From 2010 Will Make You Feel So Old - Best Life: From the first iPad to Lady Gaga's meat dress, 2010 was full of major moments....\n- 15 Major Historical Events That Happened Between 2010 And 2020: The past decade, from 2010 to 2020, has seen a wide range of historical events and milestones that h..."
+    },
+    "2011": {
+      "summary": "In 2011, Eleanor was sixteen years old. A bomb exploded as Copts left a New Year's Eve service in Alexandria, Egypt. Eleanor was likely focused on her studies, reading, and possibly beginning to consider her future education and career options in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- 2011 - Wikipedia: Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1.5 May. 1.6 June. 1.7 Ju...\n- What Happened In 2011 - Historical Events 2011 - EventsHistory: Historical Events for the Year 2011. 1st January » A bomb 2011 Alexandria bombing e.g explodes as Co...\n- 2011: Facts & Events That Happened in This Year - The Fact Site: 2011 was also the beginning of the second decade of the 21st century. While people commonly think of...\n- Historical Events in 2011 - On This Day: Historical events from year 2011. Learn about 191 famous, scandalous and important events that happe...\n- Decade in Review: A look back at what happened in 2011: The newspaper published its last edition on 10 July 2011 after it was embroiled in a phone hacking s..."
+    },
+    "2012": {
+      "summary": "In 2012, Eleanor was seventeen years old. There were several major events in world news. Eleanor would have been preparing for college applications, focusing on her academics and possibly exploring her interest in library science in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- 2012's Top 10 moments in world news: What follows is a look back at 10 of the most significant and memorable moments in news, from around...\n- Historical Events in 2012 - On This Day: Historical events from year 2012. Learn about 744 famous, scandalous and important events that happe...\n- 2012 - Wikipedia: December 21 - 2012 phenomenon: End of 13th b'ak'tun in the Mayan calendar, supposed end of the world...\n- Here's A Timeline Of The 15 Biggest News Stories Of 2012: A woman waits to hear about her sister, a teacher, following a shooting at the Sandy Hook Elementary...\n- 10 Historical Events that Happened in 2012 - Discover Walks: The year 2012 saw the sensational changes in Bedouin nations ignited by the Middle Easterner Spring ..."
+    },
+    "2013": {
+      "summary": "In 2013, Eleanor was eighteen years old. China declared an 'East China Sea air-defense identification zone'. Eleanor likely graduated from high school and began her undergraduate studies, perhaps at a local university in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Historical Events in 2013 - On This Day: Historical events from year 2013. Learn about 755 famous, scandalous and important events that happe...\n- Top 10 International News Stories | Top 10 Everything of 2013 - World ...: The quarrel came to a head in November when China declared an \"East China Sea air-defense identifica...\n- 2013 - Wikipedia: 2013 was a common year starting on Tuesday of the Gregorian calendar, the 2013th year of the Common ...\n- Top 19 Major Events In 2013 - AARP: From royal babies to famous twerkers, this slideshow covers the major events in 2013 that impacted o...\n- The Year in Review: the biggest stories of 2013 - The Verge: The once-reigning king of the smartphone world finally launched its much-delayed next-generation Bla..."
+    },
+    "2014": {
+      "summary": "In 2014, Eleanor was nineteen years old. The year saw the surge of the West African Ebola epidemic. Eleanor would have been immersed in her undergraduate studies, likely pursuing courses related to literature, languages, or history in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2014 - Council on Foreign Relations: As 2014 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- Year in Review: The Top Stories of 2014 - NBC News: Four months later, Malaysia's national carrier suffered a second major loss when one of its planes, ...\n- 15 Major Historical Events That Happened in 2014: This article will investigate fifteen major historical events that happened in 2014. We will take a ...\n- 2014 - Wikipedia: The year 2014 was marked by the surge of the West African Ebola epidemic, which began in 2013, becom...\n- The Biggest News Stories of 2014: — -- The past 12 months featured a number of major news events that captivated the world ... started..."
+    },
+    "2015": {
+      "summary": "In 2015, Eleanor turned twenty. World leaders agreed on climate change at a summit. Eleanor continued her undergraduate studies, possibly exploring her interests in bookbinding and repair as a hobby in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2015: As 2015 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 15 Important Historical Events That Happened In 2015: Toward the finish of 2015, world pioneers agreed on environmental change at a gigantic highest point...\n- 2015 - Wikipedia: February 14-March 29 - The 2015 Cricket World Cup is held in Australia and New Zealand with Australi...\n- Major global events that shook 2015 - CNBC: This year saw some seismic events take place around the world. CNBC looks back at some of the most s...\n- Year in Review: 13 Biggest News Stories of 2015 - ABC News: Major Murder Trials Former Marine Cpl. Eddie Ray Routh stands during his capital murder trial at the..."
+    },
+    "2016": {
+      "summary": "In 2016, Eleanor was twenty-one years old. The first Olympic Games were held in South America. Eleanor continued her undergraduate studies in Portland. She may have been exploring her future career options, further solidifying her interest in library science.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2016: As 2016 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 16 stories that defined 2016 - CBS News: 2016 WTF? 59:43 It's nearly impossible to sum up the year 2016 with a single word, phrase, or story....\n- 2016 - Wikipedia: 2016 was a leap year starting on Friday of the Gregorian calendar, the 2016th year of the Common Era...\n- The 10 Most Significant World Events in 2016: Stories began appearing midway through 2016 asking whether it was the worst year ever.It wasn't.It's...\n- Decade in Review: A look back at what happened in 2016: The first Olympic Games to be held in South America was a roaring success, with more than 11,000 ath..."
+    },
+    "2017": {
+      "summary": "In 2017, Eleanor was twenty-two years old. A special counsel investigation began into President Trump. Eleanor likely graduated with her bachelor's degree and began to consider graduate programs. She might have started volunteering or working part-time in a library in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2017 - Council on Foreign Relations: As 2017 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 2017 Year in Review: Here are the top 10 biggest news stories: Authorities stand near a damaged Home Depot truck after a motorist drove onto a bike path near the W...\n- 2017 - Wikipedia: 1 Events. Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1.5 May. 1.6 Ju...\n- 2017 Events - Pop Culture, U.S. Politics & World - HISTORY: 2017 yielded a special counsel investigation into President Trump, protests over Confederate monumen...\n- Major Events of 2017 - Historical Moments That Defined the Year ...: Major Events of 2017: Key Historical Moments You Need to Know. Every year brings its own set of pivo..."
+    },
+    "2018": {
+      "summary": "In 2018, Eleanor was twenty-three years old. The world's last male northern white rhinoceros died. Eleanor likely applied to and began a Master's program in Library Science. She likely continued living in Portland during this time.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2018 - Council on Foreign Relations: As 2018 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 15 Major Historical Events That Happened in 2018 - Discover Walks: 15 Major Historical Events That Happened in 2018 2018 was a time of major historical events that wil...\n- 2018 Events - Pop Culture, U.S. Politics & World - HISTORY: All the major chapters in the American story, from Indigenous beginnings to the present day. ... inc...\n- 2018 - Wikipedia: March 19 - The world's last male northern white rhinoceros dies in Kenya, making the subspecies func...\n- Historical Events in 2018 - On This Day: Historical events from year 2018. Learn about 1,303 famous, scandalous and important events that hap..."
+    },
+    "2019": {
+      "summary": "In 2019, Eleanor was twenty-four years old. There were major world events. Eleanor continued her Master's program, delving into cataloging, information retrieval, and potentially studying French or Spanish. She might also have been working part-time in a library in Portland.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2019 - Council on Foreign Relations: As 2019 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 2019: Facts & Events That Happened in This Year - The Fact Site: Explore the events of 2019, from political turmoil to climate activism, and royal births, as we bid ...\n- Major Events of 2019 - Historical Moments That Defined the Year ...: Major Events of 2019: Key Historical Moments You Need to Know ... 07 Jul 2019 FIFA Women's World Cup...\n- 2019 Events - Pop Culture, U.S. Politics & World - HISTORY: USA players lifts their trophy after winning the 2019 FIFA Women's World Cup France Final match betw...\n- 2019 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 10 April ..."
+    },
+    "2020": {
+      "summary": "In 2020, Eleanor was twenty-five years old. The COVID-19 pandemic began. Eleanor was likely completing her Master's in Library Science, potentially facing challenges due to the pandemic. She was in Portland, perhaps doing remote learning.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2020: As 2020 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 2020 events: Yep, these all happened in the year from hell - New York Post: 2020 was full of major, world-shifting events. Here's a list and timeline of all the crazy things th...\n- 2020 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 12 April ...\n- 2020 Events - Pop Culture, U.S. Politics & World | HISTORY: Politics and World Events President Donald Trump (R) and Democratic Presidential candidate, former U...\n- 15 Major Historical Events That Happened Between 2010 And 2020: The past decade, from 2010 to 2020, has seen a wide range of historical events and milestones that h..."
+    },
+    "2021": {
+      "summary": "In 2021, Eleanor was twenty-six years old. The United States—and the world—continued to confront the consequences of the momentous events of 2020. Eleanor likely graduated with her Master's degree and began looking for librarian positions, perhaps initially in the Portland area.",
+      "location": "Portland, Oregon",
+      "news": "- Ten Most Significant World Events in 2021 - Council on Foreign Relations: As 2021 comes to a close, here are the top ten most notable world events of the past year....\n- 2021 - Wikipedia: Most major events scheduled for 2020 that were postponed due to the pandemic were hosted in 2021, in...\n- 15 Crucial Historical Events That Happened in 2021: The Covid-19 pandemic was one of the significant events of 2020, and its effects were still being fe...\n- Major Events of 2021 - Historical Moments That Defined the Year ...: Major Events of 2021: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 2021 Events - Pop Culture, U.S. Politics & World | HISTORY: In 2021, the United States—and the world—continued to confront the consequences of the momentous eve..."
+    },
+    "2022": {
+      "summary": "In 2022, at twenty-seven, Eleanor continued her job search, focusing on opportunities where she could make a positive impact. She may have moved to Asheville, North Carolina, after securing a librarian position there.",
+      "location": "Portland, Oregon & Asheville, North Carolina",
+      "news": "- Ten Most Significant World Events in 2022 - Council on Foreign Relations: As 2022 comes to a close, here are the top ten most notable world events of the past year....\n- The year in review: Top news stories of 2022 month-by-month: \"Sunday Morning\" host Jane Pauley looks back on key events of a dramatic year....\n- The biggest news events of 2022 - in pictures | World Economic Forum: The year 2022 has been full of rapid and unexpected changes. From severe flooding in Pakistan to the...\n- Historical Events in 2022 - On This Day: Historical events from year 2022. Learn about 837 famous, scandalous and important events that happe...\n- The biggest events of 2022: In today's issue of NotedDC, we'll look back at some of the biggest political and global events in 2..."
+    },
+    "2023": {
+      "summary": "In 2023, at twenty-eight, Eleanor had settled into her role as a librarian in Asheville, North Carolina. She likely began implementing new ideas and systems, potentially using her skills in cataloging and information retrieval.",
+      "location": "Asheville, North Carolina",
+      "news": "- Ten Most Significant World Events in 2023 - Council on Foreign Relations: As 2023 comes to a close, here are the top ten most notable world events of the year. Post by James ...\n- 2023 Year in Review | Timeline of Historical Events | Britannica: Explore the defining historical milestones of 2023, from technological advancements to international...\n- 2023: Facts & Events That Happened in This Year - The Fact Site: Here you'll discover a collection of fascinating and unforgettable events that shaped the world in 2...\n- Top 10 Biggest Events of 2023 - TheTopTens: This was the worst event of 2023, and the most impactful on the world, possibly even causing a World...\n- Year Ender | A look at the top global events of 2023: Here's a recap of all major world events in 2023. 1) Hamas' October attack on Israel. Palestinian mi..."
+    },
+    "2024": {
+      "summary": "In 2024, Eleanor continues her work as a librarian in Asheville, North Carolina, focusing on making a positive impact on her community and creating a welcoming space in the library. She continues her mindfulness techniques to manage her anxiety.",
+      "location": "Asheville, North Carolina",
+      "news": "- Ten Most Significant World Events in 2024 - Council on Foreign Relations: As 2024 comes to a close, here are the ten most notable world events of the year. Article by James M...\n- Top 10 major events that shook the world in 2024 - The Federal News: Top 10 major events that shook the world in 2024 From dramatic ousters of autocratic rulers and topp...\n- 2024: Year in Review | Pop Culture, Images, Events, & Timeline - Britannica: The year was marked by historic elections and global unrest. People in more than 60 countries—repres...\n- 2024 - Wikipedia: Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1.5 May. 1.6 June. 1.7 Ju...\n- Historical Events in 2024 - On This Day: Historical events from year 2024. Learn about 787 famous, scandalous and important events that happe..."
+    },
+    "2025": {
+      "summary": "In 2025, Eleanor is still working as a librarian in Asheville. Eleanor continues to refine her skills, perhaps taking on more responsibility at the library. A major power outage at Heathrow Airport disrupts travel globally.",
+      "location": "Asheville, North Carolina",
+      "news": "- Top international events in 2025 you can't miss — EAST WEST: CULTURAL AND ARTISTIC EVENTS EXPO 2025 OSAKA (APRIL 13 - OCTOBER 13, OSAKA, JAPAN). Osaka will becom...\n- 2025 - Wikipedia: A major power outage causes Heathrow Airport in London to completely shut down, with disruption expe...\n- 2025: Calendar Events, Holidays, Happenings, Milestones and the Journey ...: Historical Milestone Events, Anniversaries, Births, Deaths in 2025 Historical People. Elvis Presley ...\n- These are some of the major events coming up in 2025: The world's indigenous people, like this Himba woman from Namibia, are honoured with a special UN da...\n- 2025 Sports Calendar: The Year in Major Events - SportsTravel: Want to keep track of major events throughout the sports world this year? We have you covered right ..."
+    }
+  },
+  "monthly_summaries": {
+    "2025": {
+      "3": {
+        "summary": "Asheville is experiencing a revival in 2025, marked by new openings and collaborations. A portion of ticket sales will support the Always Asheville Fund, benefiting small, independent travel businesses. Over 200 people protested in downtown Asheville following the termination of federal workers. The Western North Carolina Orchid Society hosted an event where guests could purchase orchid plants. AmeriHealth Caritas North Carolina Wellness and Opportunity Center had events in Asheville.",
+        "location": "Asheville, North Carolina",
+        "news": "- Press Release: Asheville Resilience Meets Revival in 2025 | Explore ...: A portion of ticket sales will support the Always Asheville Fund, benefiting small, independent trav...\n- Asheville Bucket List 2025: Resilience Meets Revival | Explore Asheville: Asheville's revival is a model of resilience in 2025, marking a chapter of new openings, collaborati...\n- More than 200 people protest in downtown Asheville as part of 'March ...: The protests followed the terminations of thousands of federal workers across every part of the coun...\n- Top Events & Festivals in Asheville, NC | Explore Asheville: Hosted by the Western North Carolina Orchid Society, guests can purchase orchid plants, view dazzlin...\n- Events - AVLtoday: AmeriHealth Caritas North Carolina Wellness and Opportunity Center | Asheville, NC..."
+      },
+      "4": {
+        "summary": "Asheville is hosting top spring events in 2025, including the Harlem Globetrotters. Construction is underway for the Beacon Bike Park and Events Lawn in Swannanoa as part of Asheville's ongoing revival. Major sports events include a celebrity tennis match benefiting the Asheville region. Spring events and festivals are taking place throughout Western North Carolina.",
+        "location": "Asheville, North Carolina",
+        "news": "- Top 2025 Spring Events in Asheville: Here is a look at the top 2025 spring events in Asheville: ... 2025: Harlem Globetrotters 2025 World...\n- Asheville Bucket List 2025: Resilience Meets Revival: Beacon Bike Park and Events Lawn - Construction is underway for this transformative project in Swann...\n- Major Sports Events in Asheville, 2025: 2025 Asheville Sports Events. Celebrity Tennis Match is All Aces for the Asheville Region - Harrah's...\n- Asheville Anew: Resilience Meets Revival in 2025: Asheville's revival is a model of resilience, with 2025 marking a chapter of new openings, collabora...\n- Spring 2025 Events & Festivals in Western North Carolina | Asheville ...: Spring 2025 Events and Activities in Western North Carolina Spring in Western North Carolina is a ti..."
+      }
+    }
+  },
+  "daily_summaries": {
+    "2025": {
+      "4": {
+        "13": {
+          "summary": "On April 13, 2025, Asheville features events such as Phuncle Sam performing in North Carolina, the Greenville Drive at Asheville Tourists baseball game at Lewis McCormick Field, and various activities highlighted in the 'Things to Do in Asheville This Weekend' guide.",
+          "location": "Asheville, NC",
+          "news": "- Phuncle Sam - Sunday, Apr 13, 2025 3:00pm - Asheville, NC: North Carolina Nearby Towns. X. See Nearby Cities. Asheville; Woodfin; Enka; Skyland; Weaverville; A...\n- Things to Do in Asheville This Weekend -- April 11-13, 2025 | Explore ...: The best events in Asheville, N.C. for April 11-13, 2025. Skip to main content. This Weekend in Ashe...\n- Top 2025 Spring Events in Asheville: Here is a look at the top 2025 spring events in Asheville: ... July 6, 2025: Disney's The Little Mer...\n- Greenville Drive at Asheville Tourists - 13 APR 2025 - Events.com: Ticket listings for Greenville Drive at Asheville Tourists at Lewis McCormick Field in Asheville, No...\n- April 2025: More than 100 things to do in Asheville and beyond: The 2025 Asheville Maker Faire is a free event happening from 10 a.m. - 3 p.m. at the Mission Health..."
+        },
+        "12": {
+          "summary": "April 12, 2025, in Asheville includes events like Makerspace at the Asheville Art Museum, Ripe performing in Asheville, 'Into the Woods' at Asheville Community Theatre, and Ty Segall at Orange Peel. The Asheville Maker Faire also takes place from 10 a.m. - 3 p.m. at the Mission Health.",
+          "location": "Asheville, NC",
+          "news": "- Things to do in Asheville, N.C. this week - The Citizen-Times: Makerspace is 1 - 4 p.m. April 12 at Asheville Art Museum. Free for members or included with museum ...\n- Top 2025 Spring Events in Asheville: Get in Gear Fest, April 26, 2025: Connect with some of Western North Carolina's top gear makers and ...\n- Things to Do in Asheville This Weekend -- April 11-13, 2025 | Explore ...: Into the Woods at Asheville Community Theatre, 7:30 p.m. Ty Segall at Orange Peel, 8 p.m. Runaway Gi...\n- Ripe - Saturday, Apr 12, 2025 8:00pm - Asheville, NC - AmericanTowns.com: North Carolina Nearby Towns. X. See Nearby Cities. Asheville; Woodfin; Enka; Skyland; Weaverville; A...\n- April 2025: More than 100 things to do in Asheville and beyond: The 2025 Asheville Maker Faire is a free event happening from 10 a.m. - 3 p.m. at the Mission Health..."
+        },
+        "11": {
+          "summary": "April 11, 2025, in Asheville features Ty Segall Solo Acoustic, Truck City AVL at Tanger Outlets Asheville, and various events listed in the 'Things to Do in Asheville This Weekend' guide.",
+          "location": "Asheville, NC",
+          "news": "- Top 2025 Spring Events in Asheville: Here is a look at the top 2025 spring events in Asheville: ... April 11, 2025: Ty Segall Solo Acoust...\n- Things to Do in Asheville This Weekend -- April 11-13, 2025 | Explore ...: The best events in Asheville, N.C. for April 11-13, 2025. Skip to main content. This Weekend in Ashe...\n- Asheville.com Events Calendar - Concerts, Nightlife & More: Upcoming events and things to do in Asheville, NC. Browse the events calendar for festivals, concert...\n- Things to do in Asheville, N.C. this week - The Citizen-Times: Asheville Parks & Recreation brings Truck City AVL to Tanger Outlets Asheville from 1 - 4 p.m. April...\n- Music Calendar - LiveMusicAsheville.com: Asheville area live music calendar including Black Mountain, Mills River, Weaverville, Madispn Count..."
+        },
+        "10": {
+          "summary": "April 10, 2025, in Asheville includes events such as 'Into the Woods' at Asheville Community Theatre, Ty Segall at Orange Peel, Runaway Gin, and the Get in Gear Fest on April 26. Asheville is gearing up for spring events and festivals.",
+          "location": "Asheville, NC",
+          "news": "- Top 2025 Spring Events in Asheville: Get in Gear Fest, April 26, 2025: Connect with some of Western North Carolina's top gear makers and ...\n- Asheville Events Calendar | Explore Asheville: Asheville loves a good gathering. Our calendar is brimming with events of all kinds, from laidback l...\n- Top 40 Asheville Spring Events & Festivals - RomanticAsheville.com: See our Top 40 Spring events and festivals in Asheville & nearby towns during April & May in the Blu...\n- Asheville Events Calendar 2025 - AllEvents.in: Explore all the happening events in Asheville in 2025 with us that best suit your interest. Theatre ...\n- Things to Do in Asheville This Weekend -- April 11-13, 2025 | Explore ...: Into the Woods at Asheville Community Theatre, 7:30 p.m. Ty Segall at Orange Peel, 8 p.m. Runaway Gi..."
+        },
+        "9": {
+          "summary": "April 9, 2025, in Asheville, includes the Asheville Beer Week from May 15-29 and is a reminder for disaster-area taxpayers to file taxes by May 1, 2025.",
+          "location": "Asheville, NC",
+          "news": "- Top 2025 Spring Events in Asheville: Asheville Beer Week, May 15-29, 2025: Cheers to the happenings, faces, and places that make the Ashe...\n- Business Buzz: April 9, 2025 - Asheville Area Chamber of Commerce: More info. Resources IRS reminds disaster-area taxpayers that they have until May 1, 2025, to file t...\n- Asheville Events Calendar | Explore Asheville: View all upcoming, annual and regularly scheduled events happening in Asheville, from live music and...\n- April 2025: More than 100 things to do in Asheville and beyond: April 2025: Your guide to things to do in Asheville and across Western North Carolina Things to do w...\n- Spring 2025 Events & Festivals in Western North Carolina | Asheville ...: Discover the best spring 2025 events in Western North Carolina! From Asheville's vibrant arts scene ..."
+        },
+        "8": {
+          "summary": "April 8, 2025, in Asheville, features Asheville Beer Week from May 15-29, various events throughout Western North Carolina, and numerous activities listed in the Asheville Events Calendar.",
+          "location": "Asheville, NC",
+          "news": "- Top 2025 Spring Events in Asheville: Asheville Beer Week, May 15-29, 2025: Cheers to the happenings, faces, and places that make the Ashe...\n- Asheville Events Calendar | Explore Asheville: View all upcoming, annual and regularly scheduled events happening in Asheville, from live music and...\n- Western North Carolina's 2025 Events Invite Locals and Tourists to ...: From small-town block parties to world-class festivals tucked into our rolling hills, WNC's April, M...\n- April 2025: More than 100 things to do in Asheville and beyond: April 2025: Your guide to things to do in Asheville and across Western North Carolina Things to do w...\n- Asheville Events Calendar 2025 - AllEvents.in: Explore all the happening events in Asheville in 2025 with us that best suit your interest. Theatre ..."
+        },
+        "7": {
+          "summary": "April 7, 2025, in Asheville highlights Asheville Beer Week from May 15-29, Maker Faire Asheville 2025, and various events in Western North Carolina.",
+          "location": "Asheville, NC",
+          "news": "- Top 2025 Spring Events in Asheville | Explore Asheville: Asheville Beer Week, May 15-29, 2025: Cheers to the happenings, faces, and places that make the Ashe...\n- Western North Carolina's 2025 Events Invite Locals and Tourists to ...: From small-town block parties to world-class festivals tucked into our rolling hills, WNC's April, M...\n- Asheville Events Calendar | Explore Asheville: View all upcoming, annual and regularly scheduled events happening in Asheville, from live music and...\n- The biggest events happening in Asheville, NC - AVLtoday: Maker Faire Asheville 2025 | Saturday, April 5 | 10 a.m.-3 p.m. | Mission Health / A-B Tech Conferen...\n- Asheville Events Calendar 2025 - AllEvents.in: Explore all the happening events in Asheville in 2025 with us that best suit your interest. Theatre ..."
+        }
+      }
+    }
+  },
+  "hourly_breakdowns": {
+    "2025": {
+      "4": {
+        "13": {
+          "activities": {
+            "0": ["Sleeping", "Asheville, NC"],
+            "6": [
+              "Waking up, mindfulness exercises for anxiety",
+              "Asheville, NC"
+            ],
+            "7": [
+              "Breakfast (vegetarian), reading news about Heathrow Airport power outage",
+              "Asheville, NC"
+            ],
+            "8": ["Commuting to the library", "Asheville, NC - Library"],
+            "9": [
+              "Arriving at work, checking emails and planning the day",
+              "Asheville, NC - Library"
+            ],
+            "10": ["Cataloging new book arrivals", "Asheville, NC - Library"],
+            "11": [
+              "Assisting patrons with research requests",
+              "Asheville, NC - Library"
+            ],
+            "12": [
+              "Lunch break (Mediterranean salad), reading a chapter of 'Jane Eyre'",
+              "Asheville, NC - Library"
+            ],
+            "13": [
+              "Working on the digital archiving system",
+              "Asheville, NC - Library"
+            ],
+            "14": [
+              "Preparing for a community outreach program grant application",
+              "Asheville, NC - Library"
+            ],
+            "15": [
+              "Assisting patrons, answering questions about Asheville events (Phuncle Sam, baseball game)",
+              "Asheville, NC - Library"
+            ],
+            "16": ["Bookbinding and repair work", "Asheville, NC - Library"],
+            "17": [
+              "Reviewing the library budget for upcoming events",
+              "Asheville, NC - Library"
+            ],
+            "18": ["Commuting home from work", "Asheville, NC - Library"],
+            "19": [
+              "Dinner (Indian dish), listening to classical music",
+              "Asheville, NC"
+            ],
+            "20": [
+              "Watercolor painting, working on a vintage postcard collection",
+              "Asheville, NC"
+            ],
+            "21": ["Reading contemporary literary fiction", "Asheville, NC"],
+            "22": [
+              "Relaxing with mindfulness exercises, preparing for bed",
+              "Asheville, NC"
+            ],
+            "23": ["Sleeping", "Asheville, NC"]
+          },
+          "news": "- Things to Do in Asheville This Weekend -- April 11-13, 2025 | Explore ...: Find things to do in Asheville, NC this weekend, April 11-13, 2025....\n- Top 2025 Spring Events in Asheville: June 13, 2025: Modest Mouse at Asheville Yards June 14, 2025: Dispatch with John Butler Band, G. Lov...\n- Your guide to things to do in Asheville and WNC this week: And be sure to visit wncparent.com for even more things to do this month. WNC businesses, we want yo...\n- Asheville Events Calendar | Explore Asheville: View all upcoming, annual and regularly scheduled events happening in Asheville, from live music and...\n- April 2025: More than 100 things to do in Asheville and beyond: April 2025: Your guide to things to do in Asheville and across Western North Carolina Things to do w..."
+        },
+        "12": {
+          "activities": {
+            "7": [
+              "Wakes up, does mindfulness exercises to manage anxiety.",
+              "Asheville, NC"
+            ],
+            "8": ["Prepares and eats a vegetarian breakfast.", "Asheville, NC"],
+            "9": [
+              "Travels to the Asheville Maker Faire at Mission Health.",
+              "Asheville, NC"
+            ],
+            "10": [
+              "Attends the Asheville Maker Faire.",
+              "Mission Health, Asheville, NC"
+            ],
+            "11": [
+              "Explores the exhibits at the Asheville Maker Faire.",
+              "Mission Health, Asheville, NC"
+            ],
+            "12": [
+              "Eats lunch at the Asheville Maker Faire.",
+              "Mission Health, Asheville, NC"
+            ],
+            "13": [
+              "Continues exploring the Asheville Maker Faire.",
+              "Mission Health, Asheville, NC"
+            ],
+            "14": ["Travels to the Asheville Art Museum.", "Asheville, NC"],
+            "15": [
+              "Attends Makerspace at the Asheville Art Museum.",
+              "Asheville Art Museum, Asheville, NC"
+            ],
+            "16": [
+              "Participates in Makerspace at the Asheville Art Museum.",
+              "Asheville Art Museum, Asheville, NC"
+            ],
+            "17": ["Travels home.", "Asheville, NC"],
+            "18": ["Prepares and eats dinner.", "Asheville, NC"],
+            "19": ["Reads a book.", "Asheville, NC"],
+            "20": ["Works on watercolor painting.", "Asheville, NC"],
+            "21": ["Listens to classical music.", "Asheville, NC"],
+            "22": ["Prepares for bed.", "Asheville, NC"],
+            "23": ["Goes to sleep.", "Asheville, NC"]
+          },
+          "news": "- Things to do in Asheville, N.C. this week - The Citizen-Times: WNC events for the week of April 11 - Here's what to know ... 4 p.m. April 12 at Asheville Art Museu...\n- Top 2025 Spring Events in Asheville: June 13, 2025: Modest Mouse at Asheville Yards; June 14, 2025: Dispatch with John Butler Band, G. Lo...\n- Things to Do in Asheville This Weekend -- April 11-13, 2025 | Explore ...: The best events in Asheville, N.C. for April 11-13, 2025. Skip to main content. This Weekend in Ashe...\n- Asheville Festival Guide 2025 | Find Culture & Street Fairs In Asheville: 02 May 2025: Comedy at Catawba Naomi Karavani (SATURDAY) Catawba Brewing Company South Slope Ashevil...\n- April 2025: More than 100 things to do in Asheville and beyond: The 2025 Asheville Maker Faire is a free event happening from 10 a.m. - 3 p.m. at the Mission Health..."
+        }
+      }
+    }
+  }
+}

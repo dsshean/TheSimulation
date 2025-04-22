@@ -1,0 +1,3 @@
+google-adk
+python-dotenv
+# Add litellm if using non-Google models via LiteLlm

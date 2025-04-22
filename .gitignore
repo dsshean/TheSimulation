@@ -1,14 +1,2 @@
-logs.log
-posslogs.log
-output-new.json
 .env
-logs.*
-posslogs.*
-dumpall.py
-log_archive
-svmflat.py
-flatdat*.py
-fetchhistorical.py
-simulation.log
-bak
-test
+adk-samples/
