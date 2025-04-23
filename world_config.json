@@ -1,0 +1,20 @@
+{
+  "world_type": "real",
+  "sub_genre": "realtime",
+  "description": "A simulation mirroring the current real world in Closter, New Jersey, United States. Standard physics apply.",
+  "rules": {
+    "allow_teleportation": false,
+    "time_progression_rate": 1.0,
+    "weather_effects_travel": true,
+    "historical_date": null
+  },
+  "location": {
+    "city": "Asheville",
+    "state": "NC",
+    "country": "United States",
+    "coordinates": {
+      "latitude": 40.9737,
+      "longitude": -73.9599
+    }
+  }
+}
