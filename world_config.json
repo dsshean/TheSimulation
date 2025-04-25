@@ -1,7 +1,7 @@
 {
   "world_type": "real",
   "sub_genre": "realtime",
-  "description": "A simulation mirroring the current real world in Closter, New Jersey, United States. Standard physics apply.",
+  "description": "A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply.",
   "rules": {
     "allow_teleportation": false,
     "time_progression_rate": 1.0,

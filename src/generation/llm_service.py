@@ -8,9 +8,6 @@ from pydantic import BaseModel, ValidationError # Added ValidationError
 from google import genai
 from google.genai import types
 
-logging.getLogger("google.genai").setLevel(logging.WARNING)  # Suppress INFO logs
-logging.getLogger("google.adk").setLevel(logging.WARNING)    # Suppress INFO logs
-
 logger = logging.getLogger(__name__)
 
 # Type variable for Pydantic models

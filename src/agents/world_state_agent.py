@@ -1,27 +1,38 @@
-# src/agents/simulacra.py
+# src/agents/world_state_agent.py (Updater & Executor Role)
+import logging
 from google.adk.agents import Agent
+from google.adk.tools import FunctionTool
 from src.config import settings
-from src.tools import simulacra_tools
-from src.prompts import simulacra_instructions # Import instructions
+# Ensure world_state_tools has both update_and_get_world_state AND execute_physical_actions_batch defined
+from src.tools import world_state_tools
+from src.prompts import world_state_instructions
 from rich.console import Console
 
-# Assuming tools are imported correctly from their respective modules
-# Adjust imports based on your actual file structure
-from src.tools.world_state_tools import (
-    get_full_world_state
-)
-from src.prompts.world_state_instructions import WORLD_STATE_INSTRUCTION
+console = Console()
+logger = logging.getLogger(__name__)
 
-# Define the World State Agent
-world_state_agent = Agent(
-    name="world_state_agent",
-    model=settings.MODEL_GEMINI_PRO, # Choose an appropriate model
-    instruction=WORLD_STATE_INSTRUCTION,
-    description="Determines and reports the current state of the simulation world based on configuration and real-time data (if applicable).",
-    tools=[
-        get_full_world_state
-    ],
-    # output_key="current_world_state" # Optional: Automatically save output to state
-)
+try:
+    world_state_agent = Agent(
+        name="world_state_agent",
+        model=settings.MODEL_GEMINI_PRO,
+        description=(
+            "Manages the overall simulation state. In Phase 1, it updates world time and dynamics. "
+            "In Phase 4b, it executes approved physical actions (like movement) based on a provided batch, modifying the state." # Added execution role
+        ),
+        instruction=world_state_instructions.WORLD_STATE_INSTRUCTION, # Ensure instructions cover both roles if needed, or rely on trigger message context
+        tools=[
+            # Tool for Phase 1
+            FunctionTool(world_state_tools.update_and_get_world_state),
+            # --- ADDED BACK: Tool for Phase 4b ---
+            FunctionTool(world_state_tools.execute_physical_actions_batch),
+            # --- END ADDED BACK ---
+        ],
+        # Output key might capture confirmation/summary depending on phase
+        output_key="world_state_agent_confirmation",
+    )
+    console.print(f"Agent '[bold blue]{world_state_agent.name}[/bold blue]' defined (State Updater & Executor Role).") # Updated Role Desc
 
-# print("world_state_agent defined.")
+except Exception as e:
+    console.print(f"[bold red]Error creating world_state_agent:[/bold red] {e}")
+    console.print_exception(show_locals=True)
+    world_state_agent = None

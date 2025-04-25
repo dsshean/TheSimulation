@@ -1,141 +1,109 @@
-# src/tools/narration_tools.py
+# src/tools/narration_tools.py (Narrator Context Tool - Modified for Individual Narration)
+
 from google.adk.tools.tool_context import ToolContext
 from rich.console import Console
-import json # Import json
-import datetime # Import datetime
+import json
+import logging
+from typing import List, Dict, Any
 
 console = Console()
+logger = logging.getLogger(__name__)
 
-# --- TOOL TO READ SIMULACRA INTENT FROM STATE ---
-def get_last_simulacra_action_details(tool_context: ToolContext) -> dict:
+# State keys read by this tool (ensure these match simulation_loop.py)
+WORLD_STATE_KEY = "current_world_state"
+INTERACTION_RESULT_KEY_FORMAT = "simulacra_{}_interaction_result"
+SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
+SIMULACRA_GOAL_KEY_FORMAT = "simulacra_{}_goal"
+SIMULACRA_PERSONA_KEY_FORMAT = "simulacra_{}_persona"
+SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
+SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
+SIMULACRA_MONOLOGUE_KEY_FORMAT = "last_simulacra_{}_monologue"
+ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result"
+
+# --- MODIFIED Tool ---
+def get_narration_context(
+    tool_context: ToolContext,
+    target_simulacra_id: str # <<< Expect the target ID
+) -> Dict[str, Any]:
     """
-    Retrieves the details of the Simulacra's last intended action from the session state.
-    Reads from the 'last_simulacra_action' state key.
+    Gathers context specifically for the target_simulacra_id for narration.
+    Includes world state, and the target simulacra's status, goal, persona,
+    last monologue, intent, validation, and interaction results for the turn.
+    Optionally clears the interaction result key for the target simulacra after reading.
     """
-    console.print("[dim yellow]--- Tool: Narrator retrieving last Simulacra action details from state ---[/dim yellow]")
-    action_details = tool_context.state.get('last_simulacra_action', {}) # Get the dictionary, default to empty
-    if isinstance(action_details, str):
-        # Handle case where it might have been saved as a JSON string accidentally
-        try:
-            action_details = json.loads(action_details)
-        except json.JSONDecodeError:
-            console.print(f"[yellow]Warning: 'last_simulacra_action' was a string but not valid JSON: {action_details}[/yellow]")
-            action_details = {"error": "Invalid format in state"}
-    elif not isinstance(action_details, dict):
-        console.print(f"[yellow]Warning: 'last_simulacra_action' was not a dictionary: {type(action_details)}[/yellow]")
-        action_details = {"error": "Unexpected data type in state"}
+    console.print(f"[dim magenta]--- Tool (Narrator): Getting Context for '{target_simulacra_id}' ---[/dim magenta]")
+    context = {"status": "error", "error_message": f"Context gathering failed for {target_simulacra_id}"} # Default error
+    state_keys_to_clear = {}
+    warnings = []
 
-    # Ensure essential keys exist, provide defaults if not
-    if not action_details:
-         console.print("[yellow]--- Tool: No action details found in 'last_simulacra_action' state. ---[/yellow]")
-         return {"action": "none", "error": "No action details found in state."}
-    else:
-        # Ensure 'action' key exists
-        if 'action' not in action_details:
-            action_details['action'] = 'unknown' # Mark as unknown if missing
-            action_details['error'] = "Action type missing in state data."
-        console.print(f"[dim yellow]--- Tool: Retrieved Action Details: {action_details} ---[/dim yellow]")
-        return action_details
+    if not target_simulacra_id:
+         logger.error("get_narration_context called without target_simulacra_id!")
+         return {"status": "error", "error_message": "Missing target_simulacra_id"}
 
-def set_simulacra_daily_goal(goal: str, tool_context: ToolContext) -> str:
-    """Sets or updates the Simulacra's main goal for the current simulation cycle (e.g., day)."""
-    console.print(f"[dim cyan]--- Tool: Setting Simulacra goal to: [italic]{goal}[/italic] ---[/dim cyan]")
-    tool_context.state["simulacra_goal"] = goal
-    result_msg = f"Simulacra goal updated to: {goal}"
-    tool_context.state["last_goal_update"] = result_msg # Store result in state
-    return result_msg
-
-# --- MODIFIED SUMMARY TOOL ---
-def get_current_simulation_state_summary(tool_context: ToolContext) -> dict:
-    """
-    Retrieves key current state information AND world context for the Narrator.
-    Reads 'world_time', 'simulacra_location', 'simulacra_goal', 'last_narration',
-    and the full 'current_world_state' dictionary from the session state.
-    Returns a combined dictionary for the Narrator.
-    """
-    console.print("[dim cyan]--- Tool: Retrieving enhanced simulation state summary ---[/dim cyan]")
-
-    # Basic state info
-    summary = {
-        "world_time": tool_context.state.get("world_time", "Unknown"),
-        "simulacra_location": tool_context.state.get("simulacra_location", "Unknown"),
-        "simulacra_goal": tool_context.state.get("simulacra_goal", "None set"),
-        "last_narration": tool_context.state.get("last_narration", "None")
-    }
-
-    # Attempt to get the detailed world state generated by world_state_agent
-    world_state_context = tool_context.state.get("current_world_state")
-
-    if isinstance(world_state_context, dict):
-        console.print("[dim cyan]--- Tool: Found 'current_world_state' dictionary. Merging relevant parts. ---[/dim cyan]")
-        # Add the full world state context under a specific key
-        summary["world_state_context"] = world_state_context
-        # Optionally pull out key pieces for easier access if needed by narrator prompt
-        summary["world_type"] = world_state_context.get("world_type", "unknown")
-        summary["location_name"] = f"{world_state_context.get('location',{}).get('city','Unknown')}, {world_state_context.get('location',{}).get('state','Unknown')}"
-        if "current_weather" in world_state_context and isinstance(world_state_context["current_weather"], dict):
-             summary["weather_summary"] = world_state_context["current_weather"].get("weather", {}).get("current", {}).get("description", "Unknown")
-        else:
-             summary["weather_summary"] = "Not available"
-        if "current_time" in world_state_context and isinstance(world_state_context["current_time"], dict):
-             summary["current_time_str"] = world_state_context["current_time"].get("time", "Unknown")
-        else:
-             summary["current_time_str"] = summary["world_time"] # Fallback to basic time
-    else:
-        console.print("[bold yellow]--- Tool: Warning - 'current_world_state' not found or not a dictionary in session state. ---[/bold yellow]")
-        summary["world_state_context"] = {"error": "'current_world_state' missing or invalid."}
-        summary["world_type"] = "unknown"
-        summary["location_name"] = "Unknown"
-        summary["weather_summary"] = "Not available"
-        summary["current_time_str"] = summary["world_time"] # Fallback
-
-    tool_context.state["last_state_summary"] = summary # Store result in state
-    console.print(f"[dim cyan]--- Tool: Enhanced summary retrieved: {json.dumps(summary, indent=2)} ---[/dim cyan]")
-    return summary
-# --- END MODIFIED SUMMARY TOOL ---
-
-
-# --- Tool to advance time ---
-def advance_time(minutes: int, tool_context: ToolContext) -> str:
-    """Advances the world clock by a specified number of minutes (e.g., for waiting or narrative flow)."""
-    console.print(f"[dim magenta]--- Tool: Narrator advancing time by {minutes} minutes ---[/dim magenta]")
     try:
-        minutes_int = int(minutes) # Ensure it's an integer
-        current_time_str = tool_context.state.get("world_time", "Day 1, 09:00") # Get current time string
+        state = tool_context.state
 
-        # !!! Placeholder time addition logic - IMPLEMENT ROBUST PARSING/ADDING !!!
-        # This simple placeholder just appends, replace with actual datetime math
-        # Example using basic parsing (assumes format like 'Day X, HH:MM'):
-        try:
-            # This parsing is very basic and assumes a fixed format. Needs improvement.
-            parts = current_time_str.split(', ')
-            day_part = parts[0]
-            time_part = parts[1]
-            current_dt = datetime.datetime.strptime(time_part, "%H:%M")
-            new_dt = current_dt + datetime.timedelta(minutes=minutes_int)
-            # Basic day rollover check (doesn't handle multiple day increments)
-            if new_dt.day != current_dt.day:
-                 day_num = int(day_part.split(' ')[1])
-                 day_part = f"Day {day_num + 1}"
+        # 1. Get Final World State (Global Context)
+        world_state = state.get(WORLD_STATE_KEY, {})
+        if not isinstance(world_state, dict):
+            logger.warning(f"'{WORLD_STATE_KEY}' invalid in state.")
+            world_state = {"error": f"'{WORLD_STATE_KEY}' missing or invalid."}
+        narration_world_context = {
+            "world_time": world_state.get("world_time", "Unknown Time"),
+            "location_details": world_state.get("location_details", {})
+        }
 
-            new_time_str = f"{day_part}, {new_dt.strftime('%H:%M')}"
+        # 2. Fetch data specific to the target simulacra
+        sim_location = state.get(SIMULACRA_LOCATION_KEY_FORMAT.format(target_simulacra_id), "Unknown Location")
+        sim_goal = state.get(SIMULACRA_GOAL_KEY_FORMAT.format(target_simulacra_id), "Unknown Goal")
+        sim_persona = state.get(SIMULACRA_PERSONA_KEY_FORMAT.format(target_simulacra_id), {})
+        sim_status = state.get(SIMULACRA_STATUS_KEY_FORMAT.format(target_simulacra_id), {})
+        sim_monologue = state.get(SIMULACRA_MONOLOGUE_KEY_FORMAT.format(target_simulacra_id), "[No monologue recorded]")
+        sim_intent = state.get(SIMULACRA_INTENT_KEY_FORMAT.format(target_simulacra_id), None)
+        sim_validation = state.get(ACTION_VALIDATION_KEY_FORMAT.format(target_simulacra_id), None)
 
-        except Exception as parse_e:
-            console.print(f"[bold red]Error parsing time '{current_time_str}' for advancement: {parse_e}. Using simple append.[/bold red]")
-            new_time_str = f"{current_time_str} (+{minutes_int}m)" # Fallback
+        # 3. Get Interaction Result for the target Simulacra
+        interaction_result_key = INTERACTION_RESULT_KEY_FORMAT.format(target_simulacra_id)
+        sim_interaction = state.get(interaction_result_key, None)
+        if sim_interaction is not None:
+            # Decide if you want to clear this state key after narration
+            # state_keys_to_clear[interaction_result_key] = None # Uncomment to clear
+            logger.info(f"Interaction result retrieved for {target_simulacra_id} from '{interaction_result_key}'.")
 
-        tool_context.state["world_time"] = new_time_str
-        result_msg = f"Time advanced by {minutes_int} minutes. Current time is now {new_time_str}."
-        tool_context.state["last_time_update"] = {"status": "success", "message": result_msg} # Store result
-        console.print(f"[dim magenta]--- Tool: Narrator updated time: {new_time_str} ---[/dim magenta]")
-        return result_msg
-    except ValueError:
-         error_msg = "Invalid input: 'minutes' must be an integer."
-         console.print(f"[bold red]{error_msg}[/bold red]")
-         return error_msg
+        # 4. Construct the focused context dictionary
+        context = {
+            "status": "success", # Indicate success
+            "target_simulacra_id": target_simulacra_id,
+            "world_state": narration_world_context,
+            "simulacra_context": {
+                "location": sim_location,
+                "goal": sim_goal,
+                "persona": sim_persona,
+                "status": sim_status,
+                "last_monologue": sim_monologue,
+                "intent_this_turn": sim_intent,
+                "validation_result": sim_validation,
+                "interaction_result": sim_interaction
+            }
+        }
+        logger.info(f"Context gathered successfully for {target_simulacra_id}")
+
+        # 5. Clear state keys if marked
+        if state_keys_to_clear:
+            if tool_context.actions:
+                tool_context.actions.state_delta.update(state_keys_to_clear)
+                logger.info(f"Signaled clearing of state keys: {list(state_keys_to_clear.keys())}")
+            else:
+                 logger.warning(f"ToolContext.actions is None, cannot signal state clearing for {target_simulacra_id}.")
+                 warnings.append("System Warning: Could not signal clearing of state keys.")
+
+        if warnings:
+            context["warnings"] = warnings
+
     except Exception as e:
-         error_msg = f"Error advancing time: {e}"
-         console.print(f"[bold red]{error_msg}[/bold red]")
-         # console.print_exception(show_locals=True) # Optional
-         return error_msg
+        logger.exception(f"Error gathering narration context for {target_simulacra_id}: {e}")
+        context = {"status": "error", "error_message": f"Exception gathering context for {target_simulacra_id}: {e}"}
 
+    logger.debug(f"Returning narration context for {target_simulacra_id}.")
+    return context
+# --- END MODIFIED Tool ---

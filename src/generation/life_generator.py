@@ -30,9 +30,7 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.pretty import pretty_repr
 from rich.tree import Tree
-# --- Configure Logger ---
 # Standard logging for background info
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 # Rich console for user-facing status updates during generation
 console = Console()

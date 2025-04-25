@@ -1,91 +1,158 @@
-# src/tools/npc_tools.py (Updated for LLM Responses)
+# src/tools/npc_tools.py (Interaction Resolver Tools)
 
 from google.adk.tools.tool_context import ToolContext
 from rich.console import Console
-
-# --- Add LLMService and settings imports ---
-from src.generation.llm_service import LLMService # Or adjust path as needed
-from src.config import settings # To get the model name
-# --- End Add ---
-
+import json
+import logging
+from typing import List, Dict, Any
 
 console = Console()
+logger = logging.getLogger(__name__)
 
-def generate_npc_response(
-    received_message: str,
-    npc_name: str,
-    npc_role: str,
-    tool_context: ToolContext # Added ToolContext parameter
-) -> dict:
+# State key formats/names
+WORLD_STATE_KEY = "current_world_state"
+# Key format where WE writes validation status
+ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_action_validation"
+# Key format where this agent writes interaction results
+INTERACTION_RESULT_KEY_FORMAT = "simulacra_{}_interaction_result"
+# Assumes this key holds ['id1', 'id2'] - needed to find validation keys
+ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
+
+def get_validated_interactions(tool_context: ToolContext) -> Dict[str, Any]:
     """
-    Generates a response for the NPC using an LLM, based on the received message,
-    the NPC's name, role, and current simulation context. Saves the response
-    to the 'last_npc_interaction' state key.
-
-    :param received_message: The message received by the NPC from the Simulacra.
-    :param npc_name: The name of the NPC.
-    :param npc_role: The role or identity of the NPC (e.g., person, animal, object).
-    :param tool_context: The tool context for accessing state.
-    :return: A dictionary containing the generated response under the key 'result'.
+    Retrieves validated 'talk' and 'interact' actions from session state,
+    along with relevant context (world state, character states).
+    It looks for state keys like 'simulacra_X_action_validation'.
     """
-    console.print(f"[dim magenta]--- Tool: Generating response for NPC: [i]{npc_name}[/i] (Role: {npc_role}) ---[/dim magenta]")
-    console.print(f"[dim magenta]   Received Message: '{received_message}'[/dim magenta]")
+    console.print("[dim blue]--- Tool (NPC): Getting Validated Interactions ---[/dim blue]")
+    interactions_to_process = []
+    world_state = tool_context.state.get(WORLD_STATE_KEY, {})
+    active_ids = tool_context.state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
+    processed_keys = [] # Keep track of keys we read
 
-    # --- Prepare Context for LLM ---
-    # Get relevant context from state using tool_context
-    current_location = tool_context.state.get("simulacra_location", "an unknown location")
-    current_time = tool_context.state.get("world_time", "an unknown time")
-    # Optionally add other relevant state if needed, e.g., last event summary
-    # last_narration = tool_context.state.get("last_narration", "")
+    logger.info(f"Checking for validated actions for IDs: {active_ids}")
 
-    # --- Construct Prompt for LLM ---
-    prompt = (
-        f"You are role-playing as an NPC in a simulation named '{npc_name}'.\n"
-        f"Your assigned role is: '{npc_role}'.\n"
-        f"The current simulation time is '{current_time}' and the location is '{current_location}'.\n"
-        f"The main character (Simulacra) just said the following to you: '{received_message}'\n\n"
-        f"Instructions:\n"
-        f"- Generate a brief, in-character response based on your name ({npc_name}), your role ({npc_role}), the message you received, and the current context.\n"
-        f"- If your role is 'person', respond naturally.\n"
-        f"- If your role is 'animal', respond with descriptive text representing sounds or actions appropriate for that animal.\n"
-        f"- If your role is 'object', respond in a way that reflects the object's nature (e.g., describing a sensation, a passive observation, or silence if appropriate).\n"
-        f"- If your role is 'abstract entity', respond creatively or cryptically, staying relevant.\n"
-        f"- Keep the response concise (1-3 sentences usually).\n"
-        f"- Do NOT break character. Respond ONLY as the NPC would.\n\n"
-        f"NPC Response:"
-    )
+    for sim_id in active_ids:
+        validation_key = ACTION_VALIDATION_KEY_FORMAT.format(sim_id)
+        validation_data = tool_context.state.get(validation_key)
 
-    # --- Call LLMService ---
-    generated_text = f"({npc_name} does not respond.)" # Default response
+        if isinstance(validation_data, dict) and validation_data.get("validation_status") in ["approved", "modified"]:
+            action_type = validation_data.get("action_type")
+            # Only process 'talk' or 'interact' types here
+            if action_type in ["talk", "interact"]:
+                logger.info(f"Found validated '{action_type}' action for {sim_id} to process.")
+                interactions_to_process.append(validation_data) # Pass the whole validation dict
+                processed_keys.append(validation_key)
+            else:
+                 # Log physical actions validated but not handled here
+                 if action_type: logger.info(f"Skipping validated physical action '{action_type}' for {sim_id} (handled by Executor).")
+                 processed_keys.append(validation_key) # Mark as processed even if skipped
+        elif validation_data:
+             # Action might be rejected or invalid format
+             logger.warning(f"Action for {sim_id} at key '{validation_key}' was not approved/modified or is invalid: {validation_data}")
+             processed_keys.append(validation_key) # Mark as processed to potentially clear later
+
+
+    # Optionally clear the validation keys now or let the update tool do it
+    # for key in processed_keys:
+    #    if tool_context.actions: tool_context.actions.state_delta[key] = None
+
+    # Extract relevant parts of world state for the LLM context
+    context_for_llm = {
+        "world_description": world_state.get("description", ""),
+        "current_time": tool_context.state.get("world_time", "Unknown"),
+        "npc_states": tool_context.state.get("npc_states", {}),
+        "simulacra_states": {}, # Populate with status of relevant sims
+        "location_data": world_state.get("location_data", {})
+    }
+    # Populate simulacra states for context
+    for sim_id in active_ids:
+         context_for_llm["simulacra_states"][sim_id] = {
+             "location": tool_context.state.get(f"simulacra_{sim_id}_location"),
+             "status": tool_context.state.get(f"simulacra_{sim_id}_status")
+         }
+
+
+    result = {
+        "status": "success",
+        "interactions": interactions_to_process,
+        "context": context_for_llm
+    }
+    logger.debug(f"Returning {len(interactions_to_process)} interactions for processing.")
+    return result
+
+
+def update_interaction_results(results: List[Dict[str, Any]], tool_context: ToolContext) -> Dict[str, Any]:
+    """
+    Updates the session state with the results of processed interactions
+    (e.g., dialogue responses, object state changes) and clears the
+    corresponding action validation keys.
+
+    Args:
+        results: A list of dictionaries, where each dict contains at least
+                 'simulacra_id' and the 'result_payload' (the outcome determined
+                 by the NpcAgent LLM, e.g., {"dialogue": "NPC says hi", "npc_state_change": {...}}).
+        tool_context: The tool context.
+
+    Returns:
+        A status dictionary.
+    """
+    console.print(f"[dim blue]--- Tool (NPC): Updating State with {len(results)} Interaction Results ---[/dim blue]")
+    state_changes = {}
+    errors = []
+
+    if not isinstance(results, list):
+        logger.error(f"Invalid results format: {results}. Must be a list of dicts.")
+        return {"status": "error", "message": "Invalid results format."}
+
+    for result_item in results:
+        if not isinstance(result_item, dict):
+            logger.warning(f"Skipping invalid item in results list: {result_item}")
+            continue
+
+        sim_id = result_item.get("simulacra_id")
+        payload = result_item.get("result_payload")
+
+        if not sim_id:
+            logger.warning(f"Missing 'simulacra_id' in result item: {result_item}")
+            errors.append("Result item missing simulacra_id.")
+            continue
+        if payload is None: # Payload could be empty dict/list/None legitimately
+             logger.warning(f"Missing 'result_payload' in result item for {sim_id}: {result_item}")
+             errors.append(f"Result item missing payload for {sim_id}.")
+             continue
+
+        # Store the result payload under the specific key
+        result_key = INTERACTION_RESULT_KEY_FORMAT.format(sim_id)
+        state_changes[result_key] = payload
+        logger.info(f"Prepared state update for '{result_key}'.")
+
+        # Mark the corresponding validation key for clearing
+        validation_key = ACTION_VALIDATION_KEY_FORMAT.format(sim_id)
+        state_changes[validation_key] = None
+        logger.info(f"Prepared clearing of validation key '{validation_key}'.")
+
+        # --- TODO: Apply state changes derived *from* the payload ---
+        # Example: If payload contains {"npc_state_change": {"Merchant Bob": {"activity": "closing stall"}}}
+        # You would need logic here to merge this into tool_context.state["npc_states"]
+        # Example: If payload contains {"object_state_change": {"Computer": {"power": "off"}}}
+        # You would need logic here to merge this into tool_context.state["object_states"]
+        # This requires defining how the LLM should structure state change requests in result_payload.
+        pass # Add state update logic based on payload structure here
+
+
+    # Update the state directly via context
     try:
-        llm_service = LLMService(model_name=settings.MODEL_GEMINI_FLASH) # Use Flash or Pro as needed
-        raw_llm_response = llm_service.generate_content_text(prompt=prompt)
-
-        if raw_llm_response:
-            # Clean up potential LLM artifacts like quoting its own response
-            generated_text = raw_llm_response.strip().strip('"').strip("'")
-        else:
-            console.print(f"[yellow]Warning: LLM returned empty response for NPC {npc_name}.[/yellow]")
-
+        tool_context.state.update(state_changes)
+        logger.info(f"Applied interaction result state changes: {list(state_changes.keys())}")
+        status = "success"
     except Exception as e:
-        console.print(f"[bold red]--- Tool Error (generate_npc_response LLM call): {e} ---[/bold red]")
-        generated_text = f"({npc_name} seems unable to respond due to an error.)"
-
-    # --- Format Final Output and Update State ---
-    # Add NPC name for clarity, unless the response already implies it strongly
-    # You might adjust this formatting based on how you want it presented
-    if npc_role == "person" and not generated_text.lower().startswith(f"{npc_name.lower()} says"):
-         final_response_string = f"{npc_name}: \"{generated_text}\""
-    elif npc_role == "animal" or npc_role == "object" or npc_role == "abstract entity":
-         final_response_string = f"({npc_name} - {npc_role}): {generated_text}" # Describe non-verbal response
-    else: # Default or unknown role
-         final_response_string = f"{npc_name}: {generated_text}"
+        logger.exception(f"Error applying state changes for interaction results: {e}")
+        status = "error"
+        errors.append(f"Failed to apply state changes: {e}")
 
 
-    console.print(f"[dim magenta]--- Tool: Generated NPC Response: {final_response_string} ---[/dim magenta]")
-
-    # Save the final response to state for the Narrator (Step 7/8)
-    tool_context.state['last_npc_interaction'] = final_response_string
-
-    # Return the result dictionary as expected by the framework/Narrator
-    return {"result": final_response_string}
+    final_result = {"status": status}
+    if errors:
+        final_result["errors"] = errors
+    return final_result

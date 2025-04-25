@@ -1,0 +1,50 @@
+{
+  "simulacra_sim1_location": "City: Asheville, State: NC, Country: United States",
+  "simulacra_sim1_goal": "Figure things out.",
+  "simulacra_sim1_persona": {
+    "Name": "Eleanor Vance",
+    "Occupation": "Librarian",
+    "Personality_Traits": [
+      "Intelligent",
+      "Introverted",
+      "Empathetic",
+      "Organized",
+      "Anxious"
+    ]
+  },
+  "simulacra_sim1_status": {
+    "condition": "Normal",
+    "mood": "Neutral"
+  },
+  "simulacra_sim2_location": "City: Asheville, State: NC, Country: United States",
+  "simulacra_sim2_goal": "Figure things out.",
+  "simulacra_sim2_persona": {
+    "Name": "Eleanor Vance_2",
+    "Occupation": "Librarian",
+    "Personality_Traits": [
+      "Intelligent",
+      "Introverted",
+      "Empathetic",
+      "Organized",
+      "Anxious"
+    ]
+  },
+  "simulacra_sim2_status": {
+    "condition": "Normal",
+    "mood": "Neutral"
+  },
+  "active_simulacra_ids": [
+    "sim1",
+    "sim2"
+  ],
+  "current_world_state": {
+    "world_time": "2025-04-25T13:01:59.375321",
+    "location_details": {
+      "Town Square": "A bustling square with a fountain.",
+      "Market Square": "Rows of stalls selling various goods.",
+      "City: Asheville, State: NC, Country: United States": "A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply."
+    },
+    "npcs": {},
+    "objects": {}
+  }
+}

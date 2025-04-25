@@ -1,181 +1,146 @@
-# src/tools/world_state_tools.py (Simplified with Orchestrator Tool & Explicit Save)
+# src/tools/world_state_tools.py (Executor Tool)
+
 import json
-import datetime
-from pathlib import Path
-import requests # Assuming needed for news/weather eventually
-from GoogleNews import GoogleNews
-from dotenv import load_dotenv
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+
+from google.adk.tools.tool_context import ToolContext
 from rich.console import Console
-from src.tools.python_weather.client import Client as WeatherClient # Alias to avoid name clash
-from src.tools.python_weather.constants import IMPERIAL
-from google.adk.tools.tool_context import ToolContext # Import ToolContext
 
-# Instantiate Console & Clients
+# --- ADD/VERIFY Constants Definitions HERE ---
+WORLD_STATE_KEY = "current_world_state" # Make sure this line exists and is spelled correctly
+SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
+SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
+SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
+ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
+ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result" # Ensure this matches simulation_loop.py
+# --- END Constants Definitions ---
+
 console = Console()
-googlenews = GoogleNews()
+logger = logging.getLogger(__name__)
 
-# --- Helper Function for Config Reading ---
-def _read_world_config(config_file_path: str) -> dict:
-    """Internal helper to read the world configuration."""
-    console.print(f"[dim blue]Helper: Reading world config from: {config_file_path}[/dim blue]")
-    try:
-        config_path = Path(config_file_path)
-        if not config_path.is_file():
-            console.print(f"[bold red]Helper: Config file not found at {config_path.resolve()}[/bold red]")
-            return {"status": "error", "error_message": f"Config file not found: {config_file_path}"}
-        with open(config_path, 'r') as f:
-            config_data = json.load(f)
-        console.print("[dim green]Helper: Successfully read world config.[/dim green]")
-        config_data['status'] = 'success'
-        return config_data
-    except Exception as e:
-        console.print(f"[bold red]Helper: Failed to read world config file {config_file_path}: {e}[/bold red]")
-        return {"status": "error", "error_message": f"Could not read config file: {e}"}
+DEFAULT_TIME_INCREMENT_SECONDS = 60 * 5 # 5 minutes
 
-# --- Helper Function for Weather ---
-def _get_current_weather(location: str) -> dict:
-    """Internal helper to fetch weather."""
-    console.print(f"[dim blue]Helper: Fetching weather for {location}...[/dim blue]")
-    try:
-        with WeatherClient(unit=IMPERIAL) as client:
-            forecast = client.get(location)
-            current_date = datetime.date.today()
-            daily_forecasts_details = [
-                f"Date: {daily.date}, Max Temp: {daily.highest_temperature}°F, Min Temp: {daily.lowest_temperature}°F, Sunrise: {daily.sunrise}, Sunset: {daily.sunset}"
-                for daily in forecast.daily_forecasts if daily.date == current_date
-            ]
-            hourly_forecasts_details = [
-                f"Time: {hourly.time}, Temp: {hourly.temperature}°F, Description: {hourly.description}"
-                for daily in forecast.daily_forecasts if daily.date == current_date
-                for hourly in daily.hourly_forecasts
-            ]
-            daily_summary = "\n".join(daily_forecasts_details) if daily_forecasts_details else "No daily forecast available for today."
-            hourly_summary = "\n".join(hourly_forecasts_details[:5]) if hourly_forecasts_details else "No hourly forecast available for today."
-
-            weather_data = {
-                 "current": {
-                     "temperature_fahrenheit": forecast.temperature,
-                     "description": forecast.description,
-                     "humidity_percent": forecast.humidity,
-                     "precipitation_percent": forecast.precipitation
-                 },
-                 "daily_summary": daily_summary,
-                 "hourly_forecast_summary": hourly_summary,
-                 "timestamp": datetime.datetime.now().isoformat()
-             }
-            console.print(f"[dim green]Helper: Weather fetched successfully for {location}.[/dim green]")
-            return {"status": "success", "weather": weather_data}
-    except Exception as e:
-        console.print(f"[bold red]Helper: Error fetching weather for {location}: {e}[/bold red]")
-        return {"status": "error", "error_message": f"Error fetching weather: {e}"}
-
-# --- Helper Function for News ---
-def _get_current_news(query: str) -> dict:
-    """Internal helper to fetch news."""
-    console.print(f"[dim blue]Helper: Fetching news for query: '{query}'...[/dim blue]")
-    try:
-        googlenews.clear()
-        googlenews.set_lang('en')
-        googlenews.set_period('1d')
-        googlenews.search(query)
-        results = googlenews.result()
-        if results:
-            headlines = " | ".join(f"{result['title']} - {result.get('desc', 'No description')}" for result in results[:3])
-            console.print(f"[dim green]Helper: News fetched successfully for '{query}'.[/dim green]")
-            return {"status": "success", "headlines": headlines, "timestamp": datetime.datetime.now().isoformat()}
-        else:
-             console.print(f"[dim yellow]Helper: No relevant news found for '{query}' in the last day.[/dim yellow]")
-             return {"status": "success", "headlines": "No relevant news found for the last day.", "timestamp": datetime.datetime.now().isoformat()}
-    except Exception as e:
-        console.print(f"[bold red]Helper: Error fetching news for query '{query}': {e}[/bold red]")
-        # Check for specific rate limit error
-        if "HTTP Error 429" in str(e):
-             return {"status": "error", "error_message": "News API rate limit exceeded. Try again later."}
-        return {"status": "error", "error_message": f"News data unavailable: {e}"}
-
-# --- Helper Function for Time ---
-def _get_current_time(location: str) -> dict:
-    """Internal helper to get current time (placeholder)."""
-    console.print(f"[dim blue]Helper: Getting current time for {location}...[/dim blue]")
-    # !!! Replace with actual time zone logic !!!
-    try:
-        now = datetime.datetime.now() # Fallback to local time
-        current_time_str = now.strftime("%Y-%m-%d %H:%M:%S %Z%z")
-        timezone_str = str(now.astimezone().tzinfo)
-        console.print(f"[dim green]Helper: Current time retrieved for {location}.[/dim green]")
-        return {
-            "status": "success",
-            "time": current_time_str,
-            "timezone": timezone_str,
-            "timestamp": now.isoformat()
-        }
-    except Exception as e:
-        console.print(f"[bold red]Helper: Error getting time for {location}: {e}[/bold red]")
-        return {"status": "error", "error_message": f"Could not determine time: {e}"}
-
-# --- MAIN ORCHESTRATOR TOOL ---
-def get_full_world_state(tool_context: ToolContext) -> dict:
+# --- Function: update_and_get_world_state ---
+def update_and_get_world_state(tool_context: ToolContext) -> Dict[str, Any]:
     """
-    Orchestrates the gathering of all world state information.
-    Reads config, checks type, calls helper functions for time/weather/news if needed,
-    saves the final state to session state, and returns the compiled dictionary.
+    Updates the world state (time, potentially other dynamics) and returns the complete current state.
     """
-    console.print("[bold cyan]Tool: get_full_world_state starting...[/bold cyan]")
-    final_world_state = {} # Initialize empty dictionary
+    console.print("[dim blue]--- Tool (WorldState): Updating and getting full world state... ---[/dim blue]")
+    state = tool_context.state
 
-    try:
-        # 1. Get config file path from state (set in main.py)
-        config_file_path = tool_context.state.get("world_config_path", "world_config.json") # Default if not set
-        console.print(f"Tool: Using config path from state: {config_file_path}")
+    # --- Time Advancement ---
+    # Uses WORLD_STATE_KEY defined above
+    world_state = state.get(WORLD_STATE_KEY, {})
+    current_time_str = world_state.get("world_time", None)
+    new_time_str = current_time_str # Default to original if parsing fails
 
-        # 2. Load Configuration using helper
-        config_data = _read_world_config(config_file_path)
-        if config_data.get("status") == "error":
-            console.print("[bold red]Tool: Error reading config. Saving error state.[/bold red]")
-            final_world_state = config_data # Use error dict as the state
-            # --- EXPLICIT STATE SAVE ---
-            tool_context.state['current_world_state'] = final_world_state
-            console.print("[bold red]Tool: Saved error state to 'current_world_state'.[/bold red]")
-            # --- END EXPLICIT SAVE ---
-            return final_world_state # Return error
+    if current_time_str:
+        try:
+            current_time_dt = datetime.fromisoformat(current_time_str)
+            time_increment = timedelta(seconds=DEFAULT_TIME_INCREMENT_SECONDS)
+            new_time_dt = current_time_dt + time_increment
+            new_time_str = new_time_dt.isoformat()
+            world_state["world_time"] = new_time_str
+            logger.info(f"Advanced world time from {current_time_str} to {new_time_str}")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error parsing/advancing time tick '{current_time_str}': {e}. Returning original.")
+        except Exception as e:
+             logger.exception(f"Unexpected error during time advancement for '{current_time_str}': {e}")
+    else:
+        logger.warning("World time not found in state. Cannot advance time.")
 
-        # 3. Initialize Final Output (already done above)
+    # --- Other State Updates (Optional) ---
+    # world_state["weather"] = "Slightly cloudy" # Example
 
-        # 4. Copy Base Info
-        final_world_state["world_type"] = config_data.get("world_type", "unknown")
-        final_world_state["sub_genre"] = config_data.get("sub_genre", "unknown")
-        final_world_state["description"] = config_data.get("description", "N/A")
-        final_world_state["rules"] = config_data.get("rules", {})
-        final_world_state["location"] = config_data.get("location", {})
+    # Uses WORLD_STATE_KEY defined above
+    state[WORLD_STATE_KEY] = world_state
+    console.print("[dim blue]--- Tool (WorldState): Finished updating world state. ---[/dim blue]")
+    return world_state
+# --- End function ---
 
-        # 5. Gather Realtime Data (IF Condition Met)
-        if final_world_state["world_type"] == 'real' and final_world_state["sub_genre"] == 'realtime':
-            console.print("[cyan]Tool: Realtime world detected. Gathering time, weather, news...[/cyan]")
-            city = final_world_state.get("location", {}).get("city", "Unknown")
-            state = final_world_state.get("location", {}).get("state", "Unknown")
-            location_string = f"{city}, {state}" if city != "Unknown" else "Default Location"
-            news_query = f"local news in {location_string}"
 
-            # Call helpers and add results to final state
-            final_world_state["current_time"] = _get_current_time(location_string)
-            final_world_state["current_weather"] = _get_current_weather(location_string)
-            final_world_state["current_news"] = _get_current_news(news_query)
-        else:
-            console.print("[cyan]Tool: Not a realtime world. Skipping time/weather/news gathering.[/cyan]")
+# --- Function: execute_physical_actions_batch ---
+def execute_physical_actions_batch(
+    actions_batch: List[Dict[str, Any]],
+    tool_context: ToolContext
+) -> Dict[str, Any]:
+    """
+    Executes a batch of approved physical actions, updating the relevant state.
+    """
+    console.print(f"[dim blue]--- Tool (WorldState): Executing batch of {len(actions_batch)} physical actions... ---[/dim blue]")
+    state = tool_context.state
+    results = {"executed_actions": 0, "failed_actions": 0, "details": []}
 
-        final_world_state["status"] = "success" # Add overall status
+    if not isinstance(actions_batch, list):
+        logger.error(f"execute_physical_actions_batch received invalid input type: {type(actions_batch)}. Expected list.")
+        results["error"] = "Invalid input type for actions_batch."
+        return results
 
-    except Exception as e:
-         # Catch any unexpected error during orchestration
-         console.print(f"[bold red]Tool: UNEXPECTED error in get_full_world_state: {e}[/bold red]")
-         final_world_state = {"status": "error", "error_message": f"Unexpected error in state tool: {e}"}
+    for action_detail in actions_batch:
+        sim_id = action_detail.get("sim_id")
+        action_type = action_detail.get("action_type")
+        details = action_detail.get("details", {}) # Original intent details
 
-    # --- EXPLICIT STATE SAVE (Success or Catch Block) ---
-    tool_context.state['current_world_state'] = final_world_state
-    console.print("[bold green]Tool: Saved final state to 'current_world_state'.[/bold green]")
-    # --- END EXPLICIT SAVE ---
+        if not sim_id or not action_type:
+            logger.warning(f"Skipping invalid action in batch: {action_detail}")
+            results["failed_actions"] += 1
+            results["details"].append({"sim_id": sim_id, "status": "failed", "reason": "Missing sim_id or action_type"})
+            continue
 
-    # 6. Final Output Generation
-    console.print("[bold green]Tool: get_full_world_state returning final dictionary.[/bold green]")
-    return final_world_state
+        try:
+            if action_type == "move":
+                destination = details.get("destination")
+                origin = details.get("origin", "Unknown") # Get origin from intent if available
+                location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
 
+                if destination:
+                    # Update the simulacra's location in the state
+                    state[location_key] = destination
+                    logger.info(f"Executed move for {sim_id}: {origin} -> {destination}")
+                    results["executed_actions"] += 1
+                    results["details"].append({"sim_id": sim_id, "action": "move", "status": "success", "destination": destination})
+                    # --- Clear intent and validation after execution ---
+                    intent_key = SIMULACRA_INTENT_KEY_FORMAT.format(sim_id)
+                    validation_key = ACTION_VALIDATION_KEY_FORMAT.format(sim_id)
+                    if intent_key in state: del state[intent_key]
+                    if validation_key in state: del state[validation_key]
+                    # --- End Clear ---
+                else:
+                    logger.warning(f"Move action for {sim_id} missing destination in details: {details}")
+                    results["failed_actions"] += 1
+                    results["details"].append({"sim_id": sim_id, "action": "move", "status": "failed", "reason": "Missing destination"})
+
+            elif action_type == "interact":
+                # --- Placeholder for interaction execution ---
+                target = details.get("target") # e.g., object ID or NPC ID
+                interaction_type = details.get("interaction_type") # e.g., 'pickup', 'use', 'open'
+                logger.info(f"Executing interaction for {sim_id}: Type={interaction_type}, Target={target}")
+                # Add logic here to modify world state based on interaction
+                # e.g., change object state, update NPC relationship, add item to inventory
+                # Example: if target in state.get(WORLD_STATE_KEY, {}).get("objects", {}):
+                #             state[WORLD_STATE_KEY]["objects"][target]["state"] = "used"
+                results["executed_actions"] += 1
+                results["details"].append({"sim_id": sim_id, "action": "interact", "status": "success", "target": target})
+                # --- Clear intent and validation after execution ---
+                intent_key = SIMULACRA_INTENT_KEY_FORMAT.format(sim_id)
+                validation_key = ACTION_VALIDATION_KEY_FORMAT.format(sim_id)
+                if intent_key in state: del state[intent_key]
+                if validation_key in state: del state[validation_key]
+                # --- End Clear ---
+                # --- End Placeholder ---
+
+            else:
+                logger.warning(f"Unsupported physical action type '{action_type}' for {sim_id}")
+                results["failed_actions"] += 1
+                results["details"].append({"sim_id": sim_id, "action": action_type, "status": "failed", "reason": "Unsupported action type"})
+
+        except Exception as exec_e:
+            logger.exception(f"Error executing action for {sim_id}: {action_detail}")
+            results["failed_actions"] += 1
+            results["details"].append({"sim_id": sim_id, "action": action_type, "status": "failed", "reason": str(exec_e)})
+
+    console.print(f"[dim blue]--- Tool (WorldState): Finished executing batch. Success: {results['executed_actions']}, Failed: {results['failed_actions']} ---[/dim blue]")
+    return results
+# --- End function ---
