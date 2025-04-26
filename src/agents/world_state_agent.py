@@ -1,11 +1,11 @@
-# src/agents/world_state_agent.py (Updater & Executor Role)
+# src/agents/world_state_agent.py (Updater Role)
 import logging
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from src.config import settings
-# Ensure world_state_tools has both update_and_get_world_state AND execute_physical_actions_batch defined
-from src.tools import world_state_tools
-from src.prompts import world_state_instructions
+# Import tools for Phase 1
+from src.tools import world_state_tools, world_engine_tools # Need both tool modules
+from src.prompts import world_state_instructions # Phase 1 instructions
 from rich.console import Console
 
 console = Console()
@@ -16,21 +16,20 @@ try:
         name="world_state_agent",
         model=settings.MODEL_GEMINI_PRO,
         description=(
-            "Manages the overall simulation state. In Phase 1, it updates world time and dynamics. "
-            "In Phase 4b, it executes approved physical actions (like movement) based on a provided batch, modifying the state." # Added execution role
+            "Manages the start-of-turn world state update. In Phase 1, it fetches "
+            "real-world details (weather, news) and advances the simulation time." # Updated description
         ),
-        instruction=world_state_instructions.WORLD_STATE_INSTRUCTION, # Ensure instructions cover both roles if needed, or rely on trigger message context
+        instruction=world_state_instructions.WORLD_STATE_INSTRUCTION, # Phase 1 instructions
         tools=[
-            # Tool for Phase 1
+            # Tool for Phase 1 - Syncing Details
+            FunctionTool(world_engine_tools.get_setting_details), # Moved from world_engine_agent
+            # Tool for Phase 1 - Updating Time
             FunctionTool(world_state_tools.update_and_get_world_state),
-            # --- ADDED BACK: Tool for Phase 4b ---
-            FunctionTool(world_state_tools.execute_physical_actions_batch),
-            # --- END ADDED BACK ---
+            # REMOVED: FunctionTool(world_state_tools.execute_physical_actions_batch),
         ],
-        # Output key might capture confirmation/summary depending on phase
-        output_key="world_state_agent_confirmation",
+        output_key="world_state_agent_confirmation", # Captures the confirmation text
     )
-    console.print(f"Agent '[bold blue]{world_state_agent.name}[/bold blue]' defined (State Updater & Executor Role).") # Updated Role Desc
+    console.print(f"Agent '[bold blue]{world_state_agent.name}[/bold blue]' defined (Phase 1 State Updater Role).") # Updated Role Desc
 
 except Exception as e:
     console.print(f"[bold red]Error creating world_state_agent:[/bold red] {e}")

@@ -1,13 +1,17 @@
 # src/tools/simulacra_tools.py (Correct ID reading in check_self_status)
 import json
-from typing import Dict, Any
+import logging
+import os  # Add os import
+from typing import Any, Dict
+
 from google.adk.tools.tool_context import ToolContext
 from rich.console import Console
+
 from src.generation.llm_service import LLMService
-import logging
 
 console = Console()
-logger = logging.getLogger(__name__)
+        
+logger = logging.getLogger(__name__) # Ensure logger is defined
 
 # --- MODIFIED: State key formats expect base ID (e.g., 'eleanor_vance') ---
 SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
@@ -18,6 +22,10 @@ SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent" # Used by intent tools
 SIMULACRA_MONOLOGUE_KEY_FORMAT = "last_simulacra_{}_monologue" # Keep 'last_' prefix
 # --- END MODIFIED ---
 WORLD_STATE_KEY = "current_world_state"
+
+# --- WORKAROUND: Define temp file path ---
+TEMP_LOCATION_FILE = "temp_sim_locations.json"
+# ---
 
 # --- Tools ---
 
@@ -54,18 +62,6 @@ def generate_internal_monologue(
         persona_key = SIMULACRA_PERSONA_KEY_FORMAT.format(simulacra_id)   # -> 'simulacra_eleanor_vance_persona'
         # ---
 
-        # --- Logging uses the correctly formatted keys now ---
-        console.print(f"({simulacra_id}) generate_monologue: Attempting to fetch state for base_id='{simulacra_id}'")
-        console.print(f"  - Using goal_key: '{goal_key}'")
-        console.print(f"  - Using location_key: '{location_key}'")
-        console.print(f"  - Using persona_key: '{persona_key}'")
-        # Log if keys exist *right now*
-        console.print(f"  - Does goal_key exist? {goal_key in tool_context.state}")
-        console.print(f"  - Does location_key exist? {location_key in tool_context.state}")
-        console.print(f"  - Does persona_key exist? {persona_key in tool_context.state}")
-        console.print(f"  - Does WORLD_STATE_KEY exist? {WORLD_STATE_KEY in tool_context.state}")
-        # --- End Logging ---
-
         current_goal = tool_context.state.get(goal_key, "Goal unknown")
         current_location = tool_context.state.get(location_key, "Location unknown")
         persona_data = tool_context.state.get(persona_key, {})
@@ -87,7 +83,7 @@ def generate_internal_monologue(
             traits_str = ', '.join(traits) if isinstance(traits, list) else "Unknown traits"
             persona_summary = f"I am {name}, a {occupation}. My traits are: {traits_str}."
         elif persona_data:
-             persona_summary = f"Background: {str(persona_data)[:100]}" # Fallback if not dict
+             persona_summary = f"Background: {str(persona_data)}" # Fallback if not dict
         # --- END MODIFIED ---
 
         # --- LLM Call Prompt ---
@@ -129,45 +125,85 @@ def check_self_status(simulacra_id: str, tool_context: ToolContext) -> Dict[str,
     """
     Retrieves the current status, location, goal, and full persona for the specified Simulacra ID.
     Requires the simulacra_id to be provided as an argument.
+    WORKAROUND: Reads location primarily from temp_sim_locations.json.
     """
     console.print(f"[dim blue]--- Tool ({simulacra_id}): Checking self status ---[/dim blue]")
 
-    # --- MODIFIED: Directly require and use the provided simulacra_id ---
     if not simulacra_id:
         logger.error("Simulacra ID not provided to check_self_status!")
         return {"error": "Missing required 'simulacra_id' argument."}
-    # --- Use received simulacra_id directly ---
-    status_key = SIMULACRA_STATUS_KEY_FORMAT.format(simulacra_id)     # -> 'simulacra_sim1_status'
-    location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(simulacra_id) # -> 'simulacra_sim1_location'
-    goal_key = SIMULACRA_GOAL_KEY_FORMAT.format(simulacra_id)         # -> 'simulacra_sim1_goal'
-    persona_key = SIMULACRA_PERSONA_KEY_FORMAT.format(simulacra_id)   # -> 'simulacra_sim1_persona'
+
+    status_key = SIMULACRA_STATUS_KEY_FORMAT.format(simulacra_id)
+    location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(simulacra_id)
+    goal_key = SIMULACRA_GOAL_KEY_FORMAT.format(simulacra_id)
+    persona_key = SIMULACRA_PERSONA_KEY_FORMAT.format(simulacra_id)
 
     try:
-        # Use state.get() which is the correct way
+        # Get other info from context as usual
         status_info = tool_context.state.get(status_key, {"error": f"Status not found for {simulacra_id}"})
-        location_info = tool_context.state.get(location_key, f"Location unknown for {simulacra_id}") # Default if key not found
-        goal_info = tool_context.state.get(goal_key, f"Goal unknown for {simulacra_id}")         # Default if key not found
+        goal_info = tool_context.state.get(goal_key, f"Goal unknown for {simulacra_id}")
         persona_info = tool_context.state.get(persona_key, {"error": f"Persona details not found for {simulacra_id}"})
 
+        # --- WORKAROUND: Determine location ---
+        location_info = f"Location unknown for {simulacra_id}" # Default
+        location_source = "Default"
+        try:
+            # Try reading from the temp file first
+            if os.path.exists(TEMP_LOCATION_FILE):
+                with open(TEMP_LOCATION_FILE, "r") as f:
+                    temp_locations = json.load(f)
+                    if simulacra_id in temp_locations:
+                        location_info = temp_locations[simulacra_id]
+                        location_source = "File"
+                        logger.debug(f"WORKAROUND: Used location '{location_info}' from file for {simulacra_id}.")
+                    else:
+                        logger.warning(f"WORKAROUND: {simulacra_id} not found in {TEMP_LOCATION_FILE}.")
+                        location_source = "File (Not Found)"
+            else:
+                 logger.warning(f"WORKAROUND: Temp location file {TEMP_LOCATION_FILE} not found.")
+                 location_source = "File (Missing)"
+
+            # Fallback to tool_context.state only if file read failed/didn't provide location
+            if location_source not in ["File"]:
+                context_location = tool_context.state.get(location_key)
+                if context_location:
+                    location_info = context_location
+                    location_source = "ToolContext"
+                    logger.debug(f"WORKAROUND: Fell back to location '{location_info}' from tool_context for {simulacra_id}.")
+                else:
+                    # Keep the default "Location unknown..."
+                    location_source = "ToolContext (Missing)"
+                    logger.debug(f"WORKAROUND: Location for {simulacra_id} also missing from tool_context.")
+
+        except (FileNotFoundError, json.JSONDecodeError, Exception) as file_e:
+            logger.error(f"WORKAROUND: Error reading temp location file {TEMP_LOCATION_FILE}: {file_e}")
+            location_source = f"File Error ({type(file_e).__name__})"
+            # Attempt fallback to context state on error
+            context_location = tool_context.state.get(location_key)
+            if context_location:
+                 location_info = context_location
+                 location_source += " -> Context Fallback"
+                 logger.debug(f"WORKAROUND: Fell back to location '{location_info}' from tool_context after file error for {simulacra_id}.")
+            else:
+                 location_source += " -> Context Missing"
+        # --- END WORKAROUND ---
+
         full_status = {
-            "id": simulacra_id, # Return the ID as received ('eleanor_vance')
-            "current_location": location_info, # Should contain the value from state or the default
-            "current_goal": goal_info,         # Should contain the value from state or the default
+            "id": simulacra_id,
+            "current_location": location_info, # Use the determined location
+            "current_goal": goal_info,
             "status_summary": status_info,
             "full_persona": persona_info
         }
 
-        # Optionally log or print the retrieved status
-        logger.info(f"Status check for {simulacra_id}: Location={location_info}, Goal={goal_info}")
-        console.print(f"[dim blue]--- Tool ({simulacra_id}): Status retrieved ---[/dim blue]")
-
+        logger.info(f"Status check for {simulacra_id}: Location='{location_info}' (Source: {location_source}), Goal='{goal_info}'")
+        console.print(f"[dim blue]--- Tool ({simulacra_id}): Status retrieved (Location Source: {location_source}) ---[/dim blue]")
         return full_status
 
     except Exception as e:
-        logger.exception(f"Error during status check for {simulacra_id}: {e}")
+        logger.exception(f"Error during check_self_status for {simulacra_id}: {e}")
         console.print(f"[bold red]--- Tool Error (check_self_status for {simulacra_id}): {e} ---[/bold red]")
-        return {"error": f"Failed to retrieve status for {simulacra_id}: {str(e)}"}
-    # --- END MODIFICATION ---
+        return {"error": f"Failed to check status: {e}"}
 
 # --- ACTION TOOLS USE ID ARGUMENT ---
 def attempt_move_to(

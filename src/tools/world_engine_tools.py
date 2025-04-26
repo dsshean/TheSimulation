@@ -17,6 +17,7 @@ def get_setting_details(location: str, tool_context: ToolContext) -> str:
     """
     Provides descriptive details about the specified location based on world state.
     Uses the LLMService to generate location details synchronously.
+    Fetches real-time weather and news. Uses CURRENT REAL-WORLD time for context.
     """
     console.print(f"[dim green]--- Tool: World Engine providing setting details for [i]{location}[/i] ---[/dim green]")
 
@@ -39,9 +40,12 @@ def get_setting_details(location: str, tool_context: ToolContext) -> str:
     world_news = get_news("world news")
 
     # Step 3: Combine all details into a full description
-    current_time = tool_context.state.get("world_time", "an unknown time")
+    # --- MODIFIED: Use current real-world time ---
+    real_time_now_str = datetime.now().isoformat()
+    # current_time = tool_context.state.get("world_time", "an unknown time") # Old way
+    # ---
     full_description = (
-        f"Location: {location}. Time: {current_time}. "
+        f"Location: {location}. Current Real Time: {real_time_now_str}. " # Use real time
         f"Description: {base_description} "
         f"Weather: {weather}. "
         f"Local News: {local_news}. "
@@ -53,12 +57,12 @@ def get_setting_details(location: str, tool_context: ToolContext) -> str:
     if "location_details" not in tool_context.state:
         tool_context.state["location_details"] = {}
 
-    # Set the location details
+    # Store the generated description in the session state
     tool_context.state["location_details"][location] = full_description
-    tool_context.state["last_setting_details"] = full_description
+    console.print("[dim green]--- Tool: Setting details generated ---[/dim green]")
 
-    console.print(f"[dim green]--- Tool: Setting details generated ---[/dim green]")
-    return full_description
+    # Return the description as well (optional, but can be useful)
+    return full_description # Changed to return the string
 
 def get_weather(location: str) -> str:
     """

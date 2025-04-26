@@ -9,7 +9,7 @@ import os
 import sys
 import re # Import re for sanitizing name
 from typing import Dict, Tuple, Any # Added Any for type hint
-from datetime import datetime
+from datetime import datetime, timezone
 # Load environment variables FIRST
 from dotenv import load_dotenv
 load_dotenv()
@@ -33,6 +33,7 @@ from src.agents.world_state_agent import world_state_agent # Updater + Executor 
 from src.agents.world_engine import world_engine_agent # Validator Role
 from src.agents.npc import npc_agent                 # Interaction Resolver Role
 from src.agents.narration import narration_agent     # Narrator Role (Simple)
+from src.agents.world_execution_agent import world_execution_agent # Import the World Execution Agent
 # Import the factory for Simulacra
 from src.agents.simulacra import create_agent as create_simulacra_agent
 
@@ -44,13 +45,28 @@ from src.config import settings
 # --- Simulation Loop ---
 from src.simulation_loop import run_phased_simulation # Import the NEW phased loop
 
-# Setup console and logging
+# Setup console
 console = Console()
-logging.basicConfig(level=logging.ERROR) # INFO shows phase starts, WARNING less verbose
-# # Suppress specific noisy logs if desired
-# logging.getLogger("google.adk").setLevel(logging.ERROR)
-# logging.getLogger("google.genai").setLevel(logging.ERROR)
-# logging.getLogger("urllib3").setLevel(logging.ERROR)
+
+# --- MODIFIED: Configure logging to file ---
+log_filename = "simulation.log"
+logging.basicConfig(
+    level=logging.INFO,  # Capture INFO, WARNING, ERROR, CRITICAL messages
+    # level=logging.DEBUG, # Use DEBUG for more verbose tool/event details
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    filename=log_filename,
+    filemode='w'  # 'w' overwrites the file each run, 'a' appends
+)
+# Optional: Also log to console (in addition to file) at a higher level
+# console_handler = logging.StreamHandler()
+# console_handler.setLevel(logging.WARNING) # Only show warnings and errors on console
+# console_formatter = logging.Formatter('%(levelname)s: %(message)s')
+# console_handler.setFormatter(console_formatter)
+# logging.getLogger('').addHandler(console_handler) # Add handler to root logger
+
+logger = logging.getLogger(__name__) # Get logger for main.py
+logger.info(f"--- Application Start --- Logging configured to file: {log_filename}")
+# --- END MODIFIED ---
 
 
 # --- Constants ---
@@ -110,6 +126,7 @@ def setup_initial_state_multi(num_simulacra: int = 2) -> Dict[str, Any]:
     Uses sanitized character names for IDs (e.g., 'eleanor_vance').
     Loads from simulation_state.json if it exists, otherwise creates initial state
     from world_config.json and life_summary.json, then saves it.
+    *** Overwrites world_time with current time upon loading. ***
     """
     console.print(f"Checking for persistent state file: {STATE_FILE_PATH}")
     if os.path.exists(STATE_FILE_PATH):
@@ -117,6 +134,17 @@ def setup_initial_state_multi(num_simulacra: int = 2) -> Dict[str, Any]:
             with open(STATE_FILE_PATH, 'r') as f:
                 initial_state = json.load(f)
             console.print(f"[green]Loaded existing state from {STATE_FILE_PATH}[/green]")
+
+            # --- ADDED: Overwrite world_time after loading ---
+            now_utc = datetime.now(timezone.utc)
+            current_time_iso = now_utc.isoformat()
+            if WORLD_STATE_KEY in initial_state and isinstance(initial_state[WORLD_STATE_KEY], dict):
+                initial_state[WORLD_STATE_KEY]["world_time"] = current_time_iso
+                logger.info(f"Overwrote world_time in loaded state with current time: {current_time_iso}")
+            else:
+                logger.warning(f"Could not find '{WORLD_STATE_KEY}' or it's not a dict in loaded state. Time not overwritten.")
+            # --- END ADDED ---
+
             # Optional: Validate loaded state structure here if needed
             return initial_state
         except Exception as e:
@@ -236,10 +264,15 @@ def setup_initial_state_multi(num_simulacra: int = 2) -> Dict[str, Any]:
     initial_state[ACTIVE_SIMULACRA_IDS_KEY] = active_ids # Stores ['eleanor_vance', 'eleanor_vance_2']
     console.print(f"Active Simulacra IDs set in state: {active_ids}")
 
-    # --- Add WORLD_STATE_KEY if not exists ---
+    # --- Add WORLD_STATE_KEY if not exists (when creating new) ---
     if WORLD_STATE_KEY not in initial_state:
+         # --- MODIFIED: Use current time when creating new state too ---
+         now_utc = datetime.now(timezone.utc)
+         current_time_iso = now_utc.isoformat()
+         logger.info(f"Setting initial world_time for new state: {current_time_iso}")
+         # ---
          initial_state[WORLD_STATE_KEY] = {
-             "world_time": datetime.now().isoformat(),
+             "world_time": current_time_iso, # Use current time here
              "location_details": { # Base locations
                  "Town Square": "A bustling square with a fountain.",
                  "Market Square": "Rows of stalls selling various goods.",
@@ -283,10 +316,6 @@ async def main_entry():
     # --- Initialize Services ---
     session_service = InMemorySessionService()
     console.print("[yellow]Using InMemorySessionService ('continue' is session-only).[/yellow]")
-    # db_path = "simulation_phased_save.db"
-    # console.print(f"[cyan]Using DatabaseSessionService (DB: {db_path})[/cyan]")
-    # session_service = DatabaseSessionService(db_url=f"sqlite:///{db_path}")
-
     # --- Load or Create Session ---
     sim_agents_config = {} # Will hold config for creating simulacra agents
     if start_mode == "continue":
@@ -333,6 +362,7 @@ async def main_entry():
         "World State": world_state_agent,
         "World Engine (Validator)": world_engine_agent,
         "NPC Interaction": npc_agent,
+        "World Execution": world_execution_agent, # Add World Execution Agent here
         "Narration": narration_agent
     }
     for name, agent_instance in core_agents.items():
@@ -356,9 +386,6 @@ async def main_entry():
             # --- Set agent name to the derived ID ---
             sim_agent.name = agent_id # <<< Agent name is now 'eleanor_vance', etc.
             # ---
-            # Optional: Update description/instructions if they use placeholders
-            # sim_agent.description = sim_agent.description.format(simulacra_id=agent_id)
-            # sim_agent.instructions = sim_agent.instructions.format(simulacra_id=agent_id)
 
             simulacra_agents_dict[agent_id] = sim_agent # Store using agent_id as key
             console.print(f"  - Instantiated Simulacra: {sim_agent.name} (ID: {agent_id})")
@@ -393,6 +420,7 @@ async def main_entry():
             simulacra_agents=simulacra_agents_dict, # Pass the dict of instances
             world_engine_agent=world_engine_agent,
             npc_agent=npc_agent,
+            world_execution_agent=world_execution_agent, # Pass the World Execution Agent
             narration_agent=narration_agent,
             # Pass config
             max_turns=MAX_TURNS
@@ -402,7 +430,6 @@ async def main_entry():
         console.print_exception(show_locals=True)
     finally:
         console.rule("[bold magenta]Simulation Ended[/bold magenta]")
-        # Optional: Clean up session
         # try:
         #     session_service.delete_session(session_id=SESSION_ID) # Correct args for service
         #     console.print(f"Session '{SESSION_ID}' deleted.")

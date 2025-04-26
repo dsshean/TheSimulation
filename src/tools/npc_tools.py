@@ -5,6 +5,9 @@ from rich.console import Console
 import json
 import logging
 from typing import List, Dict, Any
+# --- ADDED: Import formatter ---
+from src.loop_utils import format_iso_timestamp
+# ---
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -17,6 +20,8 @@ ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_action_validation"
 INTERACTION_RESULT_KEY_FORMAT = "simulacra_{}_interaction_result"
 # Assumes this key holds ['id1', 'id2'] - needed to find validation keys
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
+SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location" # Define this
+SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status" 
 
 def get_validated_interactions(tool_context: ToolContext) -> Dict[str, Any]:
     """
@@ -26,22 +31,30 @@ def get_validated_interactions(tool_context: ToolContext) -> Dict[str, Any]:
     """
     console.print("[dim blue]--- Tool (NPC): Getting Validated Interactions ---[/dim blue]")
     interactions_to_process = []
+    # --- Get the main world state dictionary ---
     world_state = tool_context.state.get(WORLD_STATE_KEY, {})
+    # --- Get active simulacra IDs ---
     active_ids = tool_context.state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
     processed_keys = [] # Keep track of keys we read
 
     logger.info(f"Checking for validated actions for IDs: {active_ids}")
 
+    # --- Loop to find interactions_to_process (Existing logic) ---
     for sim_id in active_ids:
         validation_key = ACTION_VALIDATION_KEY_FORMAT.format(sim_id)
         validation_data = tool_context.state.get(validation_key)
 
         if isinstance(validation_data, dict) and validation_data.get("validation_status") in ["approved", "modified"]:
-            action_type = validation_data.get("action_type")
+            # --- MODIFIED: Get action_type from validation_data ---
+            # Assuming validation_data contains the original intent or action type
+            original_intent = validation_data.get("original_intent", {})
+            action_type = original_intent.get("action_type")
+            # ---
             # Only process 'talk' or 'interact' types here
             if action_type in ["talk", "interact"]:
                 logger.info(f"Found validated '{action_type}' action for {sim_id} to process.")
-                interactions_to_process.append(validation_data) # Pass the whole validation dict
+                # Pass the whole validation dict, which includes original intent
+                interactions_to_process.append(validation_data)
                 processed_keys.append(validation_key)
             else:
                  # Log physical actions validated but not handled here
@@ -51,34 +64,36 @@ def get_validated_interactions(tool_context: ToolContext) -> Dict[str, Any]:
              # Action might be rejected or invalid format
              logger.warning(f"Action for {sim_id} at key '{validation_key}' was not approved/modified or is invalid: {validation_data}")
              processed_keys.append(validation_key) # Mark as processed to potentially clear later
+    # --- End Loop ---
 
-
-    # Optionally clear the validation keys now or let the update tool do it
-    # for key in processed_keys:
-    #    if tool_context.actions: tool_context.actions.state_delta[key] = None
-
-    # Extract relevant parts of world state for the LLM context
+    # --- CORRECTED: Build context based on actual world_state structure ---
+    current_time_iso = world_state.get("world_time", "Unknown Time")
     context_for_llm = {
-        "world_description": world_state.get("description", ""),
-        "current_time": tool_context.state.get("world_time", "Unknown"),
-        "npc_states": tool_context.state.get("npc_states", {}),
-        "simulacra_states": {}, # Populate with status of relevant sims
-        "location_data": world_state.get("location_data", {})
+        # "world_description": NO - Key doesn't exist in world_state
+        "current_time": format_iso_timestamp(current_time_iso), # Use formatted time
+        "npcs": world_state.get("npcs", {}), # Use 'npcs' key
+        "simulacra_states": {}, # Populate below
+        "location_details": world_state.get("location_details", {}) # Use 'location_details' key
+        # Add 'objects' if relevant for NPC interactions
+        # "objects": world_state.get("objects", {})
     }
-    # Populate simulacra states for context
-    for sim_id in active_ids:
-         context_for_llm["simulacra_states"][sim_id] = {
-             "location": tool_context.state.get(f"simulacra_{sim_id}_location"),
-             "status": tool_context.state.get(f"simulacra_{sim_id}_status")
-         }
 
+    # Populate simulacra states using their specific state keys
+    for sim_id in active_ids:
+         location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
+         status_key = SIMULACRA_STATUS_KEY_FORMAT.format(sim_id)
+         context_for_llm["simulacra_states"][sim_id] = {
+             "location": tool_context.state.get(location_key, "Unknown Location"),
+             "status": tool_context.state.get(status_key, {"condition": "Unknown", "mood": "Unknown"})
+         }
+    # --- END CORRECTED ---
 
     result = {
         "status": "success",
         "interactions": interactions_to_process,
         "context": context_for_llm
     }
-    logger.debug(f"Returning {len(interactions_to_process)} interactions for processing.")
+    logger.debug(f"Returning {len(interactions_to_process)} interactions for processing with context: {json.dumps(context_for_llm, indent=2)}") # Log context formatted
     return result
 
 

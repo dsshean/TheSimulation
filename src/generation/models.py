@@ -201,9 +201,11 @@ class ActionDecisionResponse(BaseModel):
     action: AllowedActionVerbs
     action_details: Optional[ActionDetails] = None
 
-# Note: The WorldStateResponse, ImmediateEnvironmentResponse, WorldStateChanges,
-# WorldProcessUpdateResponse, EmotionAnalysisResponse, DayResponse models from the
-# provided script are complex and might be specific to a different simulation engine.
-# They are omitted here as the current ADK simulation uses direct state updates
-# and simpler tool return values (dicts, strings). If needed, they could be
-# integrated or adapted for use by the ADK agents/tools.
+class NarrativeItem(BaseModel):
+    """Represents the narrative generated for a single simulacra."""
+    sim_id: str = Field(..., description="The unique identifier of the simulacra.")
+    narrative: str = Field(..., description="The generated narrative paragraph for this simulacra's turn.")
+
+class NarrationOutput(BaseModel):
+    """The structured output containing narratives for all active simulacra."""
+    narratives: List[NarrativeItem] = Field(..., description="A list containing the narrative for each active simulacra.")
