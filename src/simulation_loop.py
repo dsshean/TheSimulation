@@ -15,23 +15,16 @@ from google.adk.sessions import BaseSessionService, Session
 from google.genai import types
 from datetime import datetime, timedelta
 
-# --- MODIFIED: Import the new formatter ---
 from src.loop_utils import print_event_details, parse_json_output, format_iso_timestamp
-# ---
 
 console = Console()
 logger = logging.getLogger(__name__)
 
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
-# Key format where Simulacra write intent (read by Validator)
 SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
-# Key format where WE Validator writes validation status (read in Phase 4b)
 ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result"
-# Key format where NpcAgent writes interaction results
 INTERACTION_RESULT_KEY_FORMAT = "simulacra_{}_interaction_result"
-# Key for the comprehensive world state dict
 WORLD_STATE_KEY = "current_world_state"
-# Key format for Simulacra state needed by tools/execution
 SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
 SIMULACRA_GOAL_KEY_FORMAT = "simulacra_{}_goal"
 SIMULACRA_PERSONA_KEY_FORMAT = "simulacra_{}_persona"
@@ -39,10 +32,7 @@ SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
 SIMULACRA_MONOLOGUE_KEY_FORMAT = "last_simulacra_{}_monologue"
 SIMULACRA_NARRATION_KEY_FORMAT = "simulacra_{}_last_narration"
 TURN_VALIDATION_RESULTS_KEY = "turn_validation_results"
-# --- ADDED: Key for execution narratives from Phase 4b ---
 TURN_EXECUTION_NARRATIVES_KEY = "turn_execution_narratives"
-# ---
-
 
 async def run_phased_simulation(
     runner: Runner,

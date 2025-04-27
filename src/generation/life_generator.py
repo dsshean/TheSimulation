@@ -769,7 +769,6 @@ async def generate_life_summary_sequentially(
 
     return life_summary
 
-# <<< This function definition MUST come AFTER all the functions it calls >>>
 async def generate_new_simulacra_background(
     sim_id: str,
     world_instance_uuid: Optional[str],
@@ -809,7 +808,6 @@ async def generate_new_simulacra_background(
         llm_service=llm_service,
         world_type=world_type,
         world_description=world_description
-        # age_range is implicitly handled by the prompt inside generate_random_persona
     )
 
     # --- Fallback and Birthdate Handling ---
@@ -890,12 +888,8 @@ async def generate_new_simulacra_background(
     except Exception as e:
         logger.error(f"Error saving results to {output_path}: {e}", exc_info=True)
         console.print(Panel(f"[bold red]Error saving results:[/bold red] {e}", title="Save Failed", border_style="red"))
-        # Decide if returning data despite save failure is okay (current code does)
 
-    # Final check if persona_details key exists before returning
     if "persona_details" not in life_data:
         logger.error("Generated life_data is missing the 'persona_details' key before returning.")
-        # Consider returning None here if this is critical
-        # return None
 
     return life_data

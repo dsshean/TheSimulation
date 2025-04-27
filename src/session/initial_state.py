@@ -1,7 +1,3 @@
-# src/session/initial_state.py
-
-# Define DEFAULT initial state
-# This might be overridden in main.py if generation occurs
 default_initial_sim_state = {
     "world_time": "Day 1, 09:00",
     "simulacra_location": "Home",

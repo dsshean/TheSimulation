@@ -1,8 +1,5 @@
-# src/agents/world_engine.py (Validator Role - LlmAgent)
-
 from google.adk.agents import Agent # Agent is alias for LlmAgent
 from src.config import settings
-# Import the original instructions
 from src.prompts import world_engine_instructions
 from rich.console import Console
 import logging
@@ -10,7 +7,6 @@ import logging
 console = Console()
 logger = logging.getLogger(__name__)
 
-# --- Define the World Engine Agent Instance (Validator Role) ---
 world_engine_agent = None
 try:
     world_engine_agent = Agent( # Using Agent (alias for LlmAgent)
@@ -21,9 +17,7 @@ try:
             "proposed actions based on world state context and rules, "
             "outputting a validation JSON."
         ),
-        # Use the original instructions provided by the user
         instruction=world_engine_instructions.WORLD_ENGINE_INSTRUCTION,
-        # No tools needed - Instructions state context and action are provided as input
         tools=[],
         output_key="validation_result", # Save the validation output dictionary
     )

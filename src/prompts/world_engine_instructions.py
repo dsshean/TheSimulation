@@ -1,12 +1,5 @@
-# src/prompts/world_engine_instructions.py
-
-# --- State key formats/names used consistently ---
 _ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
 _SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent" # Where intent is read from
-# --- No longer saving individual results via tool in this version ---
-# _ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result"
-
-# --- Define the desired output structure conceptually for the prompt ---
 _VALIDATION_OUTPUT_SCHEMA_CONCEPT = """
 {
   "simulacra_id_1": {

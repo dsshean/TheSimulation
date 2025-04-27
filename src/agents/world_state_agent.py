@@ -1,9 +1,7 @@
-# src/agents/world_state_agent.py (Updater Role)
 import logging
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from src.config import settings
-# Import tools for Phase 1
 from src.tools import world_state_tools, world_engine_tools # Need both tool modules
 from src.prompts import world_state_instructions # Phase 1 instructions
 from rich.console import Console
@@ -21,11 +19,8 @@ try:
         ),
         instruction=world_state_instructions.WORLD_STATE_INSTRUCTION, # Phase 1 instructions
         tools=[
-            # Tool for Phase 1 - Syncing Details
             FunctionTool(world_engine_tools.get_setting_details), # Moved from world_engine_agent
-            # Tool for Phase 1 - Updating Time
             FunctionTool(world_state_tools.update_and_get_world_state),
-            # REMOVED: FunctionTool(world_state_tools.execute_physical_actions_batch),
         ],
         output_key="world_state_agent_confirmation", # Captures the confirmation text
     )

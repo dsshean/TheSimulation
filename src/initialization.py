@@ -6,7 +6,6 @@ import glob
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 
-# Assuming world_state_tools defines these keys
 try:
     from .tools.world_state_tools import (
         WORLD_STATE_KEY,
@@ -20,12 +19,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# --- Constants for Subdirectories ---
 STATE_DIR = os.path.join("data", "states")
 STATE_FILE_PATTERN = os.path.join(STATE_DIR, "simulation_state_*.json")
 LIFE_SUMMARY_DIR = os.path.join("data", "life_summaries") # Keep for reference if needed here
-
-# --- File I/O Helpers ---
 
 def load_json_file(path: str, default: Optional[Any] = None) -> Optional[Any]:
     """Loads JSON from a file, returning default if file not found or invalid."""
@@ -33,7 +29,6 @@ def load_json_file(path: str, default: Optional[Any] = None) -> Optional[Any]:
         logger.debug(f"File not found: {path}. Returning default.")
         return default
     try:
-        # Specify encoding for broader compatibility
         with open(path, "r", encoding='utf-8') as f:
             return json.load(f)
     except json.JSONDecodeError:
@@ -47,7 +42,6 @@ def save_json_file(path: str, data: Any):
     """Saves data to a JSON file, creating directories if needed."""
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        # Specify encoding and handle non-serializable types like datetime
         with open(path, "w", encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
         logger.info(f"Saved data to {path}")
@@ -56,8 +50,6 @@ def save_json_file(path: str, data: Any):
         # Re-raise after logging so the caller knows saving failed
         raise
 
-# --- Template and Instance Management ---
-
 def load_world_template(template_path: str) -> Dict[str, Any]:
     """Loads the world template configuration file."""
     logger.info(f"Loading world template from: {template_path}")
@@ -65,10 +57,8 @@ def load_world_template(template_path: str) -> Dict[str, Any]:
     if template_data is None:
         logger.critical(f"World template file not found or invalid at {template_path}. Cannot proceed.")
         raise FileNotFoundError(f"World template not found or invalid: {template_path}")
-    # Ensure the template itself doesn't have an instance UUID
     if "world_instance_uuid" in template_data and template_data["world_instance_uuid"]:
         logger.warning(f"Template file {template_path} contains a world_instance_uuid. This should ideally be null or absent in the template.")
-        # Optionally remove it: del template_data["world_instance_uuid"]
     logger.info("World template loaded successfully.")
     return template_data
 
@@ -114,32 +104,26 @@ def load_or_create_simulation_instance(
     world_instance_uuid = None
     state = None
 
-    # --- Attempt to Load ---
     if instance_uuid_to_load:
         potential_path = os.path.join(STATE_DIR, f"simulation_state_{instance_uuid_to_load}.json")
         if os.path.exists(potential_path):
             logger.info(f"Attempting to load specified instance: {instance_uuid_to_load}")
             state = load_json_file(potential_path)
-            # Validate the loaded state against the requested UUID
             if state and state.get("world_instance_uuid") == instance_uuid_to_load:
                 state_file_path = potential_path
                 world_instance_uuid = instance_uuid_to_load
                 logger.info(f"Successfully loaded specified instance state from {state_file_path}")
             else:
-                # File exists but is invalid or UUID mismatch - treat as error for specific load
                 logger.error(f"Specified state file {potential_path} is invalid or has UUID mismatch (Expected: {instance_uuid_to_load}, Found: {state.get('world_instance_uuid')}).")
                 raise ValueError(f"Invalid state file found for specified UUID: {instance_uuid_to_load}")
         else:
-            # Specific UUID requested but file not found - this is an error
             logger.error(f"Specified state file {potential_path} not found for UUID: {instance_uuid_to_load}")
             raise FileNotFoundError(f"Simulation state for specified UUID not found: {instance_uuid_to_load}")
     else:
-        # No specific UUID requested, find and attempt to load the latest existing state file
         latest_state_file = find_latest_simulation_state_file()
         if latest_state_file:
             logger.info(f"Attempting to load latest instance state: {latest_state_file}")
             state = load_json_file(latest_state_file)
-            # Validate loaded state
             if state and state.get("world_instance_uuid"):
                 world_instance_uuid = state.get("world_instance_uuid")
                 state_file_path = latest_state_file
@@ -148,7 +132,6 @@ def load_or_create_simulation_instance(
                 logger.warning(f"Latest state file {latest_state_file} invalid or missing UUID. Will create new.")
                 state = None # Reset state to trigger creation
 
-    # --- Create New If Loading Failed or Not Attempted ---
     if state is None:
         logger.info("Creating new simulation instance state.")
         world_instance_uuid = str(uuid.uuid4())

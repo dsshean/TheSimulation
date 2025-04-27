@@ -1,5 +1,3 @@
-# src/agents/narration.py (Simple Narrator Definition)
-
 from google.adk.agents import Agent # Alias for LlmAgent
 from src.config import settings
 from src.tools import narration_tools
@@ -10,7 +8,6 @@ import logging
 console = Console()
 logger = logging.getLogger(__name__)
 
-# --- Define the Narrator Agent Instance ---
 narration_agent = None
 try:
     narration_agent = Agent(

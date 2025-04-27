@@ -1,8 +1,5 @@
-# --- State key name used in instructions ---
 _ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
 
-# --- Define the desired output structure conceptually for the prompt ---
-# (This is just a descriptive name for the prompt, not a real Pydantic model used by the agent)
 _OUTPUT_SCHEMA_CONCEPT = """
 {
   "simulacra_id_1": "Detailed, immersive narrative paragraph for simulacra 1...",

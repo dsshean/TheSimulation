@@ -2,11 +2,8 @@ import json
 import logging
 from rich.console import Console
 from google.generativeai import types
-# --- ADDED: Import datetime ---
 from datetime import datetime
 from typing import Optional, Any, Dict
-# ---
-
 
 def print_event_details(
     event: Any, # Use Any temporarily to bypass type errors
@@ -16,12 +13,8 @@ def print_event_details(
     max_content_length: int = 5000,
     max_response_length: int = 5000
 ):
-    """Prints details of an agent completion event to the console."""
-    # --- ADDED: Log the actual type to help identify the correct import ---
     logger.debug(f"[{phase_name}] Received event of type: {type(event)}")
-    # ---
 
-    # Access attributes using getattr for safety until the correct type is known
     agent_id = getattr(event, 'author', 'UnknownAuthor')
     is_final = getattr(event, 'is_final_response', lambda: False)() # Call if it's a method
     actions = getattr(event, 'actions', None)
@@ -44,7 +37,6 @@ def print_event_details(
         elif hasattr(part, 'function_response') and part.function_response:
             tool_response = part.function_response
             response_content = getattr(tool_response, 'response', {})
-            # Ensure response content is dictionary-like before converting
             try:
                 response_str = json.dumps(dict(response_content))
             except (TypeError, ValueError):
@@ -53,10 +45,8 @@ def print_event_details(
             console.print(f"[dim green]  {phase_name} ({agent_id}) <- Tool Response: {getattr(tool_response, 'name', 'UnknownTool')} -> {response_display}[/dim green]")
         elif is_final and hasattr(part, 'text'):
             text_content = getattr(part, 'text', '')
-            # parse_json_output(text_content, phase_name, agent_id, console, logger)
             console.print(f"[dim cyan]  {phase_name} ({agent_id}) Final Output: {text_content if text_content else '[No text output]'}[/dim cyan]")
     elif is_final:
-         # Handle cases where there might be a final response without typical content parts
          logger.debug(f"{phase_name} ({agent_id}) Final event with no standard parts. Event: {event}")
 
 
@@ -71,19 +61,15 @@ def parse_json_output(
     Attempts to parse JSON from an agent's final text output, stripping markdown.
     Returns the parsed dictionary or None on failure.
     """
-    # Ensure this part is robust as before
     if not raw_text:
         console.print(f"[yellow]{phase_name}: {agent_name} returned empty final response.[/yellow]")
         return None
 
     json_string_to_parse = raw_text.strip()
 
-    # Strip markdown fences more robustly
     if json_string_to_parse.startswith("```"):
-        # Find the first newline after ```
         first_newline = json_string_to_parse.find('\n')
         if first_newline != -1:
-            # Check if the line is ```json or similar
             lang_spec = json_string_to_parse[:first_newline].strip()
             if lang_spec.startswith("```"): # e.g., ```json, ```
                 json_string_to_parse = json_string_to_parse[first_newline + 1:].strip()
@@ -104,17 +90,13 @@ def parse_json_output(
         console.print(f"[dim]Original Raw Output:[/dim]\n[grey50]{raw_text}[/grey50]")
         return None
 
-# --- ADDED: Timestamp Formatting Function ---
 def format_iso_timestamp(iso_str: Optional[str]) -> str:
     """Formats an ISO timestamp string into 'YYYY-MM-DD h:MM AM/PM'."""
     if not iso_str:
         return "Unknown Time"
     try:
-        # Attempt to parse the ISO string
         dt_obj = datetime.fromisoformat(iso_str)
-        # Format: Year-Month-Day Hour(12-hour, zero-padded):Minute AM/PM
         return dt_obj.strftime("%Y-%m-%d %I:%M %p")
     except (ValueError, TypeError):
-        # If parsing fails, return the original string
         logging.warning(f"Could not parse timestamp for formatting: {iso_str}")
         return iso_str
