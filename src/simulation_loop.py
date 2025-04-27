@@ -4,10 +4,11 @@ import json
 import logging
 from rich.console import Console
 from rich.rule import Rule # Import Rule for visual separators
-from typing import Dict, List, Any, Optional, Set # Keep List/Set if used elsewhere
+from rich.padding import Padding # Import Padding for indentation
+from typing import Dict, List, Any, Optional, Set
 # from pydantic import ValidationError # Remove if only used here
 # ADK Imports
-from google.adk.agents import BaseAgent, ParallelAgent # Removed LlmAgent as it's not directly used here
+from google.adk.agents import BaseAgent, ParallelAgent
 from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, Session
 # Use the existing types import for Content, Part, ToolConfig etc.
@@ -67,33 +68,29 @@ async def run_phased_simulation(
     5. Physical Execution (WorldStateAgent tool)
     6. Narration (NarrationAgent)
     """
-    console.print(f"\n[bold cyan]--- Starting Phased Simulation (Max {max_turns} Turns) ---[/bold cyan]")
+    console.print(Padding(f"\n[bold cyan]--- Starting Phased Simulation (Max {max_turns} Turns) ---[/bold cyan]", (1, 0, 0, 0)))
     console.print(f"Session ID: {session.id}")
 
     user_id = session.user_id
     session_id = session.id
 
-    # --- MODIFIED: Determine initial primary location ---
     initial_primary_location = session.state.get("simulation_primary_location")
     if not initial_primary_location:
         initial_primary_location = "New York City, NY" # Fallback location
         logger.warning(f"Could not find 'simulation_primary_location' in session state. Falling back to default: {initial_primary_location}")
     else:
         logger.info(f"Using initial primary location from session state: {initial_primary_location}")
-    # --- END MODIFIED ---
 
     default_trigger = types.Content(parts=[types.Part(text="Proceed with turn phase.")])
 
     for turn in range(max_turns):
-        console.rule(f"Turn {turn + 1}/{max_turns}", style="cyan")
+        console.rule(f"Turn {turn + 1}/{max_turns}", style="bold cyan")
 
-        # --- REFACTORED: Determine current locations using only Dict ---
         active_sim_ids_for_turn = session.state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
         sim_location_map: Dict[str, str] = {}
 
         if not active_sim_ids_for_turn:
             logger.warning("No active simulacra found at start of turn. Will use initial primary location for query.")
-            # Map remains empty, fallback handled below
         else:
             for sim_id in active_sim_ids_for_turn:
                 loc_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
@@ -102,26 +99,21 @@ async def run_phased_simulation(
                     sim_location_map[sim_id] = current_loc
                 else:
                     logger.warning(f"Could not find location for active sim {sim_id} using key {loc_key}. Using initial primary location as fallback.")
-                    sim_location_map[sim_id] = initial_primary_location # Map fallback location
+                    sim_location_map[sim_id] = initial_primary_location
 
-        # Derive unique locations from the dictionary values
         if sim_location_map:
             unique_locations_for_tool = list(dict.fromkeys(sim_location_map.values()))
         else:
-            # Fallback if map is empty (no active sims or no locations found)
             unique_locations_for_tool = [initial_primary_location]
 
-        logger.info(f"Phase 1: Unique locations to query details for: {unique_locations_for_tool}")
-        # logger.info(f"Phase 1: Simulacra location map: {sim_location_map}") # Keep if useful for debugging
-        # --- END REFACTORED ---
+        logger.info(f"Unique locations to query details for: {unique_locations_for_tool}")
 
         # --- Phase 1: World State Update & Sync (World State Agent) ---
         try:
-            console.print("[reverse yellow] Phase 1: World State Update & Sync [/reverse yellow]")
+            console.print(Rule("Phase 1: World State Update & Sync", style="yellow"))
             runner.agent = world_state_agent
-            console.print(f"[dim]Running WorldStateAgent ({world_state_agent.name}) to sync real-world details and update time...[/dim]")
+            console.print(Padding(f"Running [bold]{world_state_agent.name}[/bold] to sync real-world details and update time...", (0, 0, 0, 2)))
 
-            # Use the derived unique locations
             locations_str = ", ".join([f"'{loc}'" for loc in unique_locations_for_tool])
             phase1_trigger_text = (
                  f"Perform the start-of-turn world state update. "
@@ -129,41 +121,37 @@ async def run_phased_simulation(
                  f"Then, use the 'update_and_get_world_state' tool ONCE to advance world time and get the overall state."
             )
             phase1_trigger = types.Content(parts=[types.Part(text=phase1_trigger_text)])
+            console.print(Padding(f"[dim]Trigger: {phase1_trigger_text}[/dim]", (0, 0, 0, 4)))
 
             async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=phase1_trigger):
+                # Assuming print_event_details adds its own padding/prefix
                 print_event_details(event, "P1", console, logger)
-            console.print("[green]Phase 1 Complete.[/green]")
+            console.print(Padding("[green]Phase 1 Complete.[/green]", (0, 0, 1, 2)))
         except Exception as e:
              logger.exception("Error during World State Update & Sync (Phase 1).")
-             console.print(f"[bold red]Error in Phase 1: {e}. State may be inconsistent.[/bold red]")
+             console.print(Padding(f"[bold red]Error in Phase 1: {e}. State may be inconsistent. Skipping turn.[/bold red]", (0, 0, 1, 2)))
              await asyncio.sleep(1)
-             continue # Skip to next turn on Phase 1 error
+             continue
 
         # --- Phase 2: Parallel Simulacra Intent Generation ---
-        active_sim_ids = session.state.get(ACTIVE_SIMULACRA_IDS_KEY, []) # Gets ['eleanor_vance', 'eleanor_vance_2']
-        # Uses the correct IDs to fetch agent instances from the simulacra_agents dict
+        active_sim_ids = session.state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
         active_sim_instances = [sim_agent for sim_id, sim_agent in simulacra_agents.items() if sim_id in active_sim_ids]
 
         if not active_sim_instances:
-             console.print("[yellow]Phase 2: No active simulacra found. Skipping Intent/Validation/Interaction/Execution.[/yellow]")
-             # Ensure keys expected by later phases are initialized if skipping
+             console.print(Padding("[yellow]Phase 2: No active simulacra found. Skipping Intent/Validation/Interaction/Execution.[/yellow]", (1, 0, 1, 0)))
              session.state[TURN_VALIDATION_RESULTS_KEY] = {}
              session.state[TURN_EXECUTION_NARRATIVES_KEY] = {}
         else:
             try:
-                console.print(f"[reverse yellow] Phase 2: Parallel Simulacra Intent Generation ({len(active_sim_instances)} acting) [/reverse yellow]")
+                console.print(Rule(f"Phase 2: Parallel Simulacra Intent Generation ({len(active_sim_instances)} acting)", style="yellow"))
 
-                # --- ADDED: Clear parent agent before reuse ---
                 for agent_instance in active_sim_instances:
                     if hasattr(agent_instance, 'parent_agent'):
-                        # logger.debug(f"Clearing parent agent for {agent_instance.name} (was {getattr(agent_instance.parent_agent, 'name', 'Unknown')})")
                         agent_instance.parent_agent = None
-                # --- END ADDED ---
 
-                # ParallelAgent uses sub-agents named 'eleanor_vance', etc.
                 parallel_sim_agent = ParallelAgent(name=f"ParallelSimulacra_Turn{turn+1}", sub_agents=active_sim_instances)
                 runner.agent = parallel_sim_agent
-                console.print(f"[dim]Running ParallelAgent ({parallel_sim_agent.name}) for simulacra reflection & intent tools...[/dim]")
+                console.print(Padding(f"Running [bold]{parallel_sim_agent.name}[/bold] for simulacra reflection & intent tools...", (0, 0, 0, 2)))
                 phase2_trigger_text = (
                     "Based on your current status, goal, recent monologue, and the overall world state, "
                     "decide on your primary action/intent for this turn. "
@@ -171,101 +159,90 @@ async def run_phased_simulation(
                     "to reflect and set your intent in the session state."
                 )
                 phase2_trigger = types.Content(parts=[types.Part(text=phase2_trigger_text)])
+                console.print(Padding(f"[dim]Trigger: {phase2_trigger_text}[/dim]", (0, 0, 0, 4)))
+
                 async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=phase2_trigger):
-                    # --- REPLACED with helper function ---
-                    # Note: event.author will be the sub-agent ID (e.g., 'eleanor_vance')
+                    # Assuming print_event_details adds its own padding/prefix
                     print_event_details(event, "P2", console, logger)
-                    # ---
-                console.print("[green]Phase 2 Complete.[/green]")
+                console.print(Padding("[green]Phase 2 Complete.[/green]", (0, 0, 1, 2)))
             except Exception as e:
                  logger.exception("Error during Parallel Simulacra execution (Phase 2).")
-                 console.print(f"[bold red]Error in Phase 2: {e}. Skipping rest of turn phases.[/bold red]")
-                 session.state[TURN_VALIDATION_RESULTS_KEY] = {} # Ensure keys are initialized on error
+                 console.print(Padding(f"[bold red]Error in Phase 2: {e}. Skipping rest of turn phases.[/bold red]", (0, 0, 1, 2)))
+                 session.state[TURN_VALIDATION_RESULTS_KEY] = {}
                  session.state[TURN_EXECUTION_NARRATIVES_KEY] = {}
                  await asyncio.sleep(1)
-                 continue # Skip to next turn
+                 continue
 
         # --- Phase 3 (Validation) ---
         try:
-            console.print("[reverse yellow] Phase 3: Physical Validation [/reverse yellow]")
+            console.print(Rule("Phase 3: Physical Validation", style="yellow"))
             runner.agent = world_engine_agent
-            validation_trigger = types.Content(parts=[types.Part(text="Validate all pending actions based on current world state and rules.")])
-            console.print(f"[dim]Running WorldEngineAgent ({world_engine_agent.name}) to validate intents...")
-            # --- ADDED: Variable to store parsed results ---
+            validation_trigger_text = "Validate all pending actions based on current world state and rules."
+            validation_trigger = types.Content(parts=[types.Part(text=validation_trigger_text)])
+            console.print(Padding(f"Running [bold]{world_engine_agent.name}[/bold] to validate intents...", (0, 0, 0, 2)))
+            console.print(Padding(f"[dim]Trigger: {validation_trigger_text}[/dim]", (0, 0, 0, 4)))
+
             parsed_validation_results = None
-            final_validation_text = None # Store final text to parse after loop
+            final_validation_text = None
 
             async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=validation_trigger):
-                # --- Print Event Details --- START
-                if event.content and event.content.parts:
+                # Assuming print_event_details adds its own padding/prefix
+                print_event_details(event, "P3", console, logger)
+                if event.is_final_response() and event.content and event.content.parts:
                     part = event.content.parts[0]
-                    if hasattr(part, 'function_call') and part.function_call:
-                         tool_call = part.function_call
-                         console.print(f"[dim]  P3 ({event.author}) -> Tool Call: {tool_call.name} args: {dict(tool_call.args)}[/dim]")
-                    elif hasattr(part, 'function_response') and part.function_response:
-                         tool_response = part.function_response
-                         console.print(f"[dim]  P3 ({event.author}) <- Tool Response: {tool_response.name} -> {str(tool_response.response)}...[/dim]")
-                    elif event.is_final_response() and hasattr(part, 'text'):
-                         final_validation_text = part.text
-                # --- Print Event Details --- END
+                    if hasattr(part, 'text'):
+                        final_validation_text = part.text
+                        # --- MODIFIED: Print full final text before parsing ---
+                        console.print(Padding("[bold]Final Validation Output (Raw):[/bold]", (1, 0, 0, 4)))
+                        console.print(Padding(final_validation_text, (0, 0, 1, 4)))
+                        # ---
 
-            # --- Parse the final text AFTER the loop ---
             parsed_validation_results = parse_json_output(
                 final_validation_text, "P3", world_engine_agent.name, console, logger
             )
 
-            # Store results (handle None case from parsing failure)
             session.state[TURN_VALIDATION_RESULTS_KEY] = parsed_validation_results if parsed_validation_results is not None else {}
             if parsed_validation_results is not None:
                 logger.info(f"Stored combined validation results under key '{TURN_VALIDATION_RESULTS_KEY}'.")
+                console.print(Padding(f"Validation results parsed and stored.", (0, 0, 0, 4)))
             else:
                 logger.warning(f"No valid validation results received/parsed from WorldEngine. Storing empty dict under '{TURN_VALIDATION_RESULTS_KEY}'.")
+                console.print(Padding(f"[yellow]Could not parse validation results.[/yellow]", (0, 0, 0, 4)))
 
-            console.print("[green]Phase 3 Complete.[/green]")
+            console.print(Padding("[green]Phase 3 Complete.[/green]", (0, 0, 1, 2)))
         except Exception as e:
             logger.exception("Error during World Engine Validation (Phase 3).")
-            console.print(f"[bold red]Error in Phase 3: {e}. Skipping Interaction/Execution.[/bold red]")
-            session.state[TURN_VALIDATION_RESULTS_KEY] = {} # Ensure key exists but is empty on error
-            session.state[TURN_EXECUTION_NARRATIVES_KEY] = {} # Also init this one
+            console.print(Padding(f"[bold red]Error in Phase 3: {e}. Skipping Interaction/Execution.[/bold red]", (0, 0, 1, 2)))
+            session.state[TURN_VALIDATION_RESULTS_KEY] = {}
+            session.state[TURN_EXECUTION_NARRATIVES_KEY] = {}
             # Fall through to Narration (Phase 5)
 
         # --- Phase 4a (Interaction) ---
-        # Only run if validation succeeded (or partially succeeded)
         if session.state.get(TURN_VALIDATION_RESULTS_KEY):
             try:
-                console.print("[reverse yellow] Phase 4a: Interaction Resolution [/reverse yellow]")
+                console.print(Rule("Phase 4a: Interaction Resolution", style="yellow"))
                 runner.agent = npc_agent
-                interaction_trigger = types.Content(parts=[types.Part(text="Resolve pending 'talk' and 'interact' actions based on validation status.")])
-                console.print(f"[dim]Running NPCAgent ({npc_agent.name}) to resolve interactions using its tools...[/dim]")
+                interaction_trigger_text = "Resolve pending 'talk' and 'interact' actions based on validation status."
+                interaction_trigger = types.Content(parts=[types.Part(text=interaction_trigger_text)])
+                console.print(Padding(f"Running [bold]{npc_agent.name}[/bold] to resolve interactions using its tools...", (0, 0, 0, 2)))
+                console.print(Padding(f"[dim]Trigger: {interaction_trigger_text}[/dim]", (0, 0, 0, 4)))
+
                 async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=interaction_trigger):
-                    # --- Print Event Details --- START
-                    if event.content and event.content.parts:
-                        part = event.content.parts[0]
-                        if hasattr(part, 'function_call') and part.function_call: # Check field exists AND is not None
-                             tool_call = part.function_call
-                             console.print(f"[dim]  P4a ({event.author}) -> Tool Call: {tool_call.name} with args: {dict(tool_call.args)}[/dim]")
-                        elif hasattr(part, 'function_response') and part.function_response: # Check field exists AND is not None
-                             tool_response = part.function_response
-                             console.print(f"[dim]  P4a ({event.author}) <- Tool Response: {tool_response.name} -> {str(tool_response.response)}...[/dim]")
-                        elif event.is_final_response() and hasattr(part, 'text'): # Check for final text
-                             console.print(f"[dim]  P4a ({event.author}) Final Output: {part.text if part.text else '[No text output]'}[/dim]")
-                    # --- Print Event Details --- END
-                console.print("[green]Phase 4a Complete.[/green]")
+                    # Assuming print_event_details adds its own padding/prefix
+                    print_event_details(event, "P4a", console, logger)
+                console.print(Padding("[green]Phase 4a Complete.[/green]", (0, 0, 1, 2)))
             except Exception as e:
                  logger.exception("Error during NPC Interaction Resolution (Phase 4a).")
-                 console.print(f"[bold red]Error in Phase 4a: {e}.[/bold red]")
-                 # Physical execution might still proceed
+                 console.print(Padding(f"[bold red]Error in Phase 4a: {e}.[/bold red]", (0, 0, 1, 2)))
 
         # --- Phase 4b: Physical Action Execution & Narration ---
-        # Only run if validation succeeded (or partially succeeded)
         all_validation_results = session.state.get(TURN_VALIDATION_RESULTS_KEY, {})
         if all_validation_results:
             try:
-                console.print("[reverse yellow] Phase 4b: Physical Execution & Narration [/reverse yellow]")
+                console.print(Rule("Phase 4b: Physical Execution & Narration", style="yellow"))
                 approved_physical_actions_for_batch = []
                 active_sim_ids_for_physical = session.state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
 
-                # --- Build the batch (FILTERED for 'move') ---
                 logger.debug("--- Starting Phase 4b: Checking for approved 'move' actions ---")
                 for sim_id in active_sim_ids_for_physical:
                     validation_result = all_validation_results.get(sim_id)
@@ -275,49 +252,39 @@ async def run_phased_simulation(
                         val_status = validation_result.get("validation_status")
                         estimated_duration = validation_result.get("estimated_duration_seconds")
 
-                        # --- MODIFIED FILTER: Only include 'move' actions ---
                         if val_status in ["approved", "modified"] and action_type == "move":
-                        # --- END MODIFIED FILTER ---
                             logger.info(f"  Action Approved/Modified for {sim_id}: Type={action_type}, Status={val_status}. Adding to batch.")
                             action_detail = {
                                 "sim_id": sim_id,
                                 "action_type": action_type,
                                 "details": original_intent,
-                                "estimated_duration_seconds": estimated_duration # Agent might recalculate
+                                "estimated_duration_seconds": estimated_duration
                             }
                             approved_physical_actions_for_batch.append(action_detail)
-                        # Optional: Log why other types are skipped
                         elif action_type != "move":
                              logger.debug(f"  Skipping action for {sim_id} in Phase 4b: Type '{action_type}' handled elsewhere (e.g., Phase 4a).")
                         else:
                              logger.debug(f"  Action for {sim_id} not added to physical batch (Status: {val_status}, Type: {action_type})")
                     else:
                         logger.debug(f"  Skipping {sim_id}: Missing validation_result in combined dict.")
-                # --- End Building Batch ---
 
                 if approved_physical_actions_for_batch:
-                    # --- Updated Console Message ---
-                    console.print(f"[dim]Found {len(approved_physical_actions_for_batch)} approved 'move' actions. Running WorldExecutionAgent ({world_execution_agent.name}) for execution & narration...[/dim]")
-                    # ---
+                    console.print(Padding(f"Found {len(approved_physical_actions_for_batch)} approved 'move' actions. Running [bold]{world_execution_agent.name}[/bold] for execution & narration...", (0, 0, 0, 2)))
 
-                    # --- Set the agent ---
                     runner.agent = world_execution_agent
 
-                    # --- MODIFIED: Format time for trigger text ---
                     current_world_time_iso = session.state.get(WORLD_STATE_KEY, {}).get("world_time")
-                    current_world_time_str = format_iso_timestamp(current_world_time_iso) # Use formatter
-                    # ---
+                    current_world_time_str = format_iso_timestamp(current_world_time_iso)
 
                     try:
                         actions_json_string = json.dumps(approved_physical_actions_for_batch, indent=2)
                     except TypeError:
                         logger.error("Could not serialize actions batch to JSON for prompt.")
-                        actions_json_string = str(approved_physical_actions_for_batch) # Fallback
+                        actions_json_string = str(approved_physical_actions_for_batch)
 
-                    # --- Trigger text now uses formatted time ---
                     execution_trigger_text = (
                         "You are the world execution engine. Process the following approved 'move' actions. "
-                        f"The current world time is approximately {current_world_time_str}.\n" # Formatted time here
+                        f"The current world time is approximately {current_world_time_str}.\n"
                         "For EACH action:\n"
                         "1. **Infer Specific Locations:** If the 'origin' or 'destination' in the details are general (e.g., a city name, 'Library'), use your knowledge to infer plausible, specific starting and ending locations (e.g., 'Downtown Asheville near Pack Square', 'Pack Memorial Library'). If they are already specific, use them.\n"
                         "2. **Determine Mode of Transport:** Based on the inferred specific locations and general context, decide the most likely mode of transport (e.g., walking, driving, public transit).\n"
@@ -328,48 +295,48 @@ async def run_phased_simulation(
                         f"Actions to process:\n```json\n{actions_json_string}\n```"
                     )
                     execution_trigger = types.Content(parts=[types.Part(text=execution_trigger_text)])
+                    console.print(Padding(f"[dim]Trigger includes {len(approved_physical_actions_for_batch)} actions.[/dim]", (0, 0, 0, 4))) # Simplified trigger print
 
-                    # --- Variable to store parsed results ---
                     parsed_execution_results = None
-                    final_execution_text = None # Store final text
+                    final_execution_text = None
 
-                    # --- Run the agent (NO tool_config) ---
                     async for event in runner.run_async(
                         user_id=user_id, session_id=session_id, new_message=execution_trigger
                     ):
-                        # --- REPLACED with helper function ---
+                        # Assuming print_event_details adds its own padding/prefix
                         print_event_details(event, "P4b", console, logger)
-                        # ---
-                        # Capture final text
                         if event.is_final_response() and event.content and event.content.parts:
                              part = event.content.parts[0]
                              if hasattr(part, 'text'):
                                  final_execution_text = part.text
+                                 # --- MODIFIED: Print full final text before parsing ---
+                                 console.print(Padding("[bold]Final Execution Output (Raw):[/bold]", (1, 0, 0, 4)))
+                                 console.print(Padding(final_execution_text, (0, 0, 1, 4)))
+                                 # ---
 
-                    # --- Parse the final text AFTER the loop ---
                     parsed_execution_results = parse_json_output(
                         final_execution_text, "P4b", world_execution_agent.name, console, logger
                     )
 
-                    # --- Store Narratives and Apply State Updates ---
                     execution_narratives = {}
                     max_duration = 0
                     if parsed_execution_results:
+                        console.print(Padding("Processing execution results...", (0, 0, 0, 4)))
                         for sim_id, result_data in parsed_execution_results.items():
                             if isinstance(result_data, dict):
                                 narrative = result_data.get("narrative")
-                                new_location = result_data.get("new_location") # Gets the SPECIFIC location from agent
-                                duration = result_data.get("duration_seconds", 0) # Gets the REALISTIC duration from agent
+                                new_location = result_data.get("new_location")
+                                duration = result_data.get("duration_seconds", 0)
 
                                 if narrative:
-                                    execution_narratives[sim_id] = narrative # Store narrative for Phase 5
+                                    execution_narratives[sim_id] = narrative
                                     logger.info(f"Stored execution narrative for {sim_id}.")
 
-                                # Apply state updates manually
-                                if new_location: # Check if new_location is provided
+                                if new_location:
                                     location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
-                                    session.state[location_key] = new_location # Updates state with SPECIFIC location
+                                    session.state[location_key] = new_location
                                     logger.info(f"Updated location for {sim_id} to '{new_location}'.")
+                                    console.print(Padding(f"Updated location for {sim_id} -> '{new_location}'", (0, 0, 0, 6)))
                                 else:
                                     logger.warning(f"No 'new_location' provided by agent for move action of {sim_id}.")
 
@@ -378,77 +345,49 @@ async def run_phased_simulation(
                             else:
                                 logger.warning(f"Invalid result format for {sim_id} in execution JSON: {result_data}")
 
-                        # Update world time using the agent's calculated max_duration
                         if max_duration > 0:
                             try:
                                 world_state = session.state.get(WORLD_STATE_KEY, {})
-                                current_time_iso = world_state.get("world_time") # Get ISO time
+                                current_time_iso = world_state.get("world_time")
                                 if current_time_iso:
                                     current_dt = datetime.fromisoformat(current_time_iso)
                                     new_dt = current_dt + timedelta(seconds=max_duration)
-                                    # Store time in ISO format
                                     if WORLD_STATE_KEY not in session.state:
                                         session.state[WORLD_STATE_KEY] = {}
                                     session.state[WORLD_STATE_KEY]["world_time"] = new_dt.isoformat()
-                                    # Log using formatted time
                                     formatted_new_time = format_iso_timestamp(new_dt.isoformat())
-                                    logger.info(f"Advanced world time by {max_duration} seconds to {formatted_new_time}.") # Log formatted time
+                                    logger.info(f"Advanced world time by {max_duration} seconds to {formatted_new_time}.")
+                                    console.print(Padding(f"Advanced world time by {max_duration}s -> {formatted_new_time}", (0, 0, 0, 6)))
                                 else:
                                     logger.warning("Could not find world_time in state to advance.")
                             except Exception as time_e:
                                 logger.exception(f"Error advancing world time: {time_e}")
+                        console.print(Padding("Execution results processed.", (0, 0, 0, 4)))
+                    else:
+                        console.print(Padding("[yellow]Could not parse execution results.[/yellow]", (0, 0, 0, 4)))
+
 
                     session.state[TURN_EXECUTION_NARRATIVES_KEY] = execution_narratives
-
-                    # --- WORKAROUND: Write current locations to temp file ---
-                    try:
-                        temp_location_file = "temp_sim_locations.json" # Define temp file name
-                        current_locations = {}
-                        active_sim_ids_for_write = session.state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
-                        for sim_id in active_sim_ids_for_write:
-                            loc_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
-                            # Read the location that *should* have just been updated in session.state
-                            loc = session.state.get(loc_key)
-                            if loc:
-                                current_locations[sim_id] = loc
-                            else:
-                                # Fallback if somehow missing after update
-                                current_locations[sim_id] = session.state.get(SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id), "Unknown - Error in Write")
-
-                        with open(temp_location_file, "w") as f:
-                            json.dump(current_locations, f)
-                        logger.info(f"WORKAROUND: Wrote current locations to {temp_location_file}: {current_locations}")
-                    except Exception as file_e:
-                        logger.error(f"WORKAROUND: Failed to write temp location file: {file_e}")
-                    # --- END WORKAROUND ---
-
-                    console.print("[green]Phase 4b Complete.[/green]")
-                    # --- End Store/Apply ---
+                    console.print(Padding("[green]Phase 4b Complete.[/green]", (0, 0, 1, 2)))
 
                 else:
-                    # --- Updated Console Message ---
-                    console.print("[yellow]Phase 4b: No approved 'move' actions found to execute.[/yellow]")
-                    # --- Ensure key exists but is empty ---
+                    console.print(Padding("[yellow]Phase 4b: No approved 'move' actions found to execute.[/yellow]", (0, 0, 1, 2)))
                     session.state[TURN_EXECUTION_NARRATIVES_KEY] = {}
-                    # ---
 
             except Exception as e:
                 logger.exception("Error during Physical Execution & Narration (Phase 4b).")
-                console.print(f"[bold red]Error in Phase 4b: {e}. Skipping phase.[/bold red]")
-                # --- Ensure key exists but is empty on error ---
+                console.print(Padding(f"[bold red]Error in Phase 4b: {e}. Skipping phase.[/bold red]", (0, 0, 1, 2)))
                 session.state[TURN_EXECUTION_NARRATIVES_KEY] = {}
-                # ---
                 await asyncio.sleep(1)
 
-        else: # If no validation results from Phase 3
-             console.print("[yellow]Phase 4b: Skipping due to missing validation results from Phase 3.[/yellow]")
+        else:
+             console.print(Padding("[yellow]Phase 4b: Skipping due to missing validation results from Phase 3.[/yellow]", (0, 0, 1, 2)))
              session.state[TURN_EXECUTION_NARRATIVES_KEY] = {}
 
         # --- Phase 5: Narration ---
         try:
-            console.print("[reverse yellow] Phase 5: Narration [/reverse yellow]")
+            console.print(Rule("Phase 5: Narration", style="yellow"))
             runner.agent = narration_agent
-            # Trigger needs context keys (adjust based on get_narration_context tool)
             narration_trigger_text = (
                 "Generate the final narrative summary for this turn. "
                 f"Use the 'get_narration_context' tool to gather necessary information "
@@ -458,50 +397,51 @@ async def run_phased_simulation(
                 f"and world state details from '{WORLD_STATE_KEY}' and 'location_details')."
             )
             narration_trigger = types.Content(parts=[types.Part(text=narration_trigger_text)])
-            console.print(f"[dim]Running NarrationAgent ({narration_agent.name}) to generate turn summary...[/dim]")
+            console.print(Padding(f"Running [bold]{narration_agent.name}[/bold] to generate turn summary...", (0, 0, 0, 2)))
+            console.print(Padding(f"[dim]Trigger: {narration_trigger_text}[/dim]", (0, 0, 0, 4)))
 
             parsed_narration_results = None
-            final_narration_text = None # Store final text
+            final_narration_text = None
 
             async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=narration_trigger):
-                 # --- REPLACED with helper function ---
+                 # Assuming print_event_details adds its own padding/prefix
                  print_event_details(event, "P5", console, logger)
-                 # ---
-                 # Capture final text
                  if event.is_final_response() and event.content and event.content.parts:
                       part = event.content.parts[0]
                       if hasattr(part, 'text'):
                           final_narration_text = part.text
+                          # --- MODIFIED: Print full final text before parsing ---
+                          console.print(Padding("[bold]Final Narration Output (Raw):[/bold]", (1, 0, 0, 4)))
+                          console.print(Padding(final_narration_text, (0, 0, 1, 4)))
+                          # ---
 
-            # --- Parse the final text AFTER the loop ---
-            # Assuming narration output is also JSON mapping sim_id to narration string
             parsed_narration_results = parse_json_output(
                 final_narration_text, "P5", narration_agent.name, console, logger
             )
 
-            # Store results (handle None case)
             if parsed_narration_results:
+                console.print(Padding("Storing and displaying final narratives...", (0, 0, 0, 4)))
                 for sim_id, narration_text in parsed_narration_results.items():
                     if isinstance(narration_text, str):
                         narration_key = SIMULACRA_NARRATION_KEY_FORMAT.format(sim_id)
                         session.state[narration_key] = narration_text
                         logger.info(f"Stored final narration for {sim_id} under key '{narration_key}'.")
                         # Print the final narration for this character
-                        console.print(Rule(f"Narrative for {sim_id}", style="dim"))
-                        console.print(f"{narration_text}\n")
+                        console.print(Rule(f"Narrative for {sim_id}", style="dim white"))
+                        console.print(Padding(f"{narration_text}", (0, 0, 1, 2))) # Add padding to narrative
                     else:
                         logger.warning(f"Invalid narration format for {sim_id}: Expected string, got {type(narration_text)}")
             else:
                 logger.warning("No valid narration results received/parsed from NarrationAgent.")
+                console.print(Padding("[yellow]Could not parse narration results.[/yellow]", (0, 0, 0, 4)))
 
-            console.print("[green]Phase 5 Complete.[/green]")
+            console.print(Padding("[green]Phase 5 Complete.[/green]", (0, 0, 1, 2)))
         except Exception as e:
             logger.exception("Error during Narration (Phase 5).")
-            console.print(f"[bold red]Error in Phase 5: {e}.[/bold red]")
-            # Continue to end of turn
+            console.print(Padding(f"[bold red]Error in Phase 5: {e}.[/bold red]", (0, 0, 1, 2)))
 
         # Pause slightly between turns
-        console.print(f"--- End of Turn {turn + 1} ---")
-        await asyncio.sleep(1) # Adjust as needed
+        console.print(Padding(f"--- End of Turn {turn + 1} ---", (1, 0, 1, 0)))
+        await asyncio.sleep(1)
 
-    console.rule("[bold cyan]Simulation Finished[/bold cyan]", style="cyan")
+    console.rule("[bold cyan]Simulation Finished[/bold cyan]", style="bold cyan")

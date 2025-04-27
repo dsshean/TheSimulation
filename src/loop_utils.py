@@ -13,8 +13,8 @@ def print_event_details(
     phase_name: str,
     console: Console,
     logger: logging.Logger,
-    max_content_length: int = 200,
-    max_response_length: int = 150
+    max_content_length: int = 5000,
+    max_response_length: int = 5000
 ):
     """Prints details of an agent completion event to the console."""
     # --- ADDED: Log the actual type to help identify the correct import ---
@@ -53,6 +53,7 @@ def print_event_details(
             console.print(f"[dim green]  {phase_name} ({agent_id}) <- Tool Response: {getattr(tool_response, 'name', 'UnknownTool')} -> {response_display}[/dim green]")
         elif is_final and hasattr(part, 'text'):
             text_content = getattr(part, 'text', '')
+            # parse_json_output(text_content, phase_name, agent_id, console, logger)
             console.print(f"[dim cyan]  {phase_name} ({agent_id}) Final Output: {text_content if text_content else '[No text output]'}[/dim cyan]")
     elif is_final:
          # Handle cases where there might be a final response without typical content parts

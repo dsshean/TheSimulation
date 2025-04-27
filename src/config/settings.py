@@ -20,6 +20,8 @@ DEBUG_MODE = False
 APP_NAME = "world_simulation_app"
 USER_ID = "player_1"
 SESSION_ID = "sim_session_001"
+MAX_SIMULATION_TURNS = 10
+NUM_SIMULACRA = 2
 
 print(f"Settings loaded: Using MODEL_GEMINI_PRO={MODEL_GEMINI_PRO}, MODEL_GEMINI_FLASH={MODEL_GEMINI_FLASH}")
 

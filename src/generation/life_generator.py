@@ -10,8 +10,9 @@ import asyncio
 import json
 import calendar
 import os
-from datetime import date, timedelta, datetime
-from typing import Dict, Any, Optional, List, Tuple, Type, TypeVar, Union
+import re
+from datetime import date, timedelta, datetime, timezone
+from typing import Dict, Any, Optional, List, Tuple, Type, TypeVar, Union # Ensure Optional and Tuple are imported
 import time
 from pydantic import BaseModel, ValidationError
 from duckduckgo_search import DDGS
@@ -35,6 +36,11 @@ logger = logging.getLogger(__name__)
 # Rich console for user-facing status updates during generation
 console = Console()
 # --- End Logger Config ---
+
+# --- Constants ---
+# Define the directory relative to the project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+LIFE_SUMMARY_DIR = os.path.join(PROJECT_ROOT, "data", "life_summaries")
 
 T = TypeVar('T', bound='BaseModel')
 
@@ -93,6 +99,39 @@ async def _call_llm_and_get_validated_data(
         return response_dict
     except Exception as e:
         logger.error(f"Exception calling LLM or processing result for '{operation_description}': {e}", exc_info=True)
+        return None
+
+async def generate_random_persona(
+    llm_service: LLMService,
+    world_type: str,
+    world_description: str
+) -> Optional[Dict[str, Any]]:
+    """Generates a random plausible persona including age using the LLM, considering the world context."""
+    logger.info(f"Generating random persona for world type '{world_type}'...")
+
+    prompt = f"""
+Create a detailed and plausible random fictional persona profile suitable for the following world:
+World Type: {world_type}
+World Description: {world_description}
+
+**Instructions:**
+- Generate a persona that fits logically within this world setting.
+- Ensure the persona's details (occupation, background, location, etc.) are consistent with the provided world description.
+- Age should be an integer between 18 and 45.
+
+**Required Fields:** Name, Age (integer), Occupation, Current_location (City, State/Country appropriate for the world), Personality_Traits (list, 3-6 adjectives), Birthplace (City, State/Country appropriate for the world), Education, Physical_Appearance (brief description).
+
+Respond ONLY with valid JSON matching the required fields.
+"""
+
+    # Assuming PersonaDetailsResponse is the correct model for validation here
+    validated_data = await _call_llm_and_get_validated_data(llm_service, prompt, PersonaDetailsResponse, "random persona generation")
+    if validated_data:
+        logger.info(f"Successfully generated random persona: {validated_data.get('Name', 'Unknown')}, Age: {validated_data.get('Age', 'N/A')}")
+        # console.print(Panel(pretty_repr(validated_data), title="Validated Persona Data", border_style="green", expand=True))
+        return validated_data
+    else:
+        logger.error("Failed to generate or validate random persona.")
         return None
 
 async def generate_initial_relationships( llm_service: LLMService, persona_details_str: str ) -> Optional[Dict[str, List[Dict]]]:
@@ -470,82 +509,75 @@ Context: Year="{yearly_summary}", Month="{monthly_summary}", Day="{daily_summary
         logger.error(f"Failed validated hourly activities for {year}-{month:02d}-{day:02d}.")
         return None
 
-async def generate_random_persona(llm_service: LLMService) -> Optional[Dict[str, Any]]:
-    """Generates a random plausible persona including age using the LLM."""
-    logger.info("Generating random persona...")
-    prompt = f"""
-Create a detailed and plausible random fictional persona profile.
-**Required Fields:** Name, Age (18-45 integer), Occupation, Current_location (City, State/Country), Personality_Traits (list, 3-6 adjectives), Birthplace (City, State/Country), Education, Physical_Appearance (brief description).
-Respond ONLY with valid JSON matching the required fields.
-
-"""
-    validated_data = await _call_llm_and_get_validated_data(llm_service, prompt, PersonaDetailsResponse, "random persona generation")
-    if validated_data:
-        logger.info(f"Successfully generated random persona: {validated_data.get('Name', 'Unknown')}, Age: {validated_data.get('Age', 'N/A')}")
-        # console.print(Panel(pretty_repr(validated_data), title="Validated Persona Data", border_style="green", expand=True))
-        return validated_data
-    else:
-        logger.error("Failed to generate or validate random persona.")
-        return None
-
+# <<< IMPORTANT: Define generate_life_summary_sequentially BEFORE generate_new_simulacra_background >>>
 async def generate_life_summary_sequentially(
     llm_service: LLMService,
     persona_details: Dict[str, Any],
-    age: int  # Keep age for initial calculation/display
+    age: int
 ) -> Optional[Dict[str, Any]]:
     """
     Orchestrates generation with simplified loop logic, calling the original generator functions.
     Updates the summary_tree only after life_summary is fully generated.
     """
-    # --- Setup: Date/Time and Persona Info (Same as before) ---
-    now = datetime.now()
+    # --- Setup: Date/Time and Persona Info ---
+    now = datetime.now(timezone.utc) # Use timezone aware datetime
     today = now.date()
     current_year = now.year
     current_month = now.month
     current_day = now.day
     current_hour = now.hour
-    console.print(f"Generation started: [cyan]{now.strftime('%Y-%m-%d %H:%M:%S')}[/cyan]")
+    console.print(f"Generation started: [cyan]{now.strftime('%Y-%m-%d %H:%M:%S %Z')}[/cyan]")
 
-    # --- Birthdate Handling (Same as before) ---
+    # --- Birthdate Handling ---
     birthdate_str = persona_details.get("Birthdate")
-    if not birthdate_str:
-        birth_year_approx = current_year - age
-        birthdate = date(birth_year_approx, 1, 1)
-        logger.warning(f"Birthdate missing from persona. Using estimated: {birthdate.strftime('%Y-%m-%d')}")
-        persona_details["Birthdate"] = birthdate.strftime("%Y-%m-%d")
-    else:
+    birthdate = None
+    if birthdate_str:
         try:
             birthdate = datetime.strptime(birthdate_str, "%Y-%m-%d").date()
         except ValueError:
-            logger.error(f"Invalid Birthdate format '{birthdate_str}'. Needs YYYY-MM-DD. Cannot proceed.")
-            return None
+            logger.warning(f"Invalid Birthdate format '{birthdate_str}'. Estimating.")
+            birthdate_str = None # Clear invalid string to trigger estimation
+
+    if not birthdate_str:
+        # Estimate if missing or invalid
+        birth_year_approx = current_year - persona_details.get("Age", age) # Use Age from persona first
+        # Simple estimation, consider refining (e.g., random month/day)
+        birthdate = date(birth_year_approx, 7, 1) # Default to mid-year
+        logger.warning(f"Birthdate missing or invalid. Using estimated: {birthdate.strftime('%Y-%m-%d')}")
+        persona_details["Birthdate"] = birthdate.strftime("%Y-%m-%d") # Update persona details
+    elif birthdate is None: # Should not happen if logic above is correct, but safety check
+         logger.error("Failed to determine birthdate. Cannot proceed.")
+         return None
+
+
     birth_year = birthdate.year
     birth_month = birthdate.month
     birth_day = birthdate.day
     actual_age = today.year - birth_year - ((today.month, today.day) < (birth_month, birth_day))
     logger.info(f"Persona: {persona_details.get('Name', 'N/A')}, Birthdate: {birthdate}, Actual Age: {actual_age}")
+    persona_details["Age"] = actual_age # Ensure Age field matches calculated age
 
-    # --- Initialize main data structure (Same as before) ---
+    # --- Initialize main data structure ---
     life_summary = {
         "persona_details": persona_details,
-        "generation_info": {  # Meta info about the generation run
+        "generation_info": {
             "generated_at": now.isoformat(),
             "current_year": current_year,
             "current_month": current_month,
             "current_day": current_day,
             "current_hour": current_hour,
         },
-        "birth_year": birth_year,  # Store determined birth info
+        "birth_year": birth_year,
         "birth_month": birth_month,
         "birth_day": birth_day,
         "initial_relationships": None,
-        "yearly_summaries": {},    # Format: { year: {"summary": str, "location": str|None, "news": str|None} }
-        "monthly_summaries": {},   # Format: { year: { month: {"summary": str, "location": str|None, "news": str|None} } }
-        "daily_summaries": {},     # Format: { year: { month: { day: {"summary": str, "location": str|None, "news": str|None} } } }
-        "hourly_breakdowns": {}    # Format: { year: { month: { day: { hour: {"activity": str, "location": str|None, "news": str|None} } } } }
+        "yearly_summaries": {},
+        "monthly_summaries": {},
+        "daily_summaries": {},
+        "hourly_breakdowns": {}
     }
 
-    # --- Persona Details String & DDGS Init (Same as before) ---
+    # --- Persona Details String & DDGS Init ---
     details_list = [f"{k}: {v}" for k, v in persona_details.items()]
     persona_details_str = ", ".join(details_list)
     ddgs_search_tool = DDGS()
@@ -565,11 +597,17 @@ async def generate_life_summary_sequentially(
         yearly_result = await generate_yearly_summaries(
             llm_service, persona_details_str,
             json.dumps(life_summary["initial_relationships"] or {}),
-            birth_year, current_year, current_year,
+            birth_year, current_year, current_year, # Generate up to current year
             ddgs_instance=ddgs_search_tool
         )
         if yearly_result:
             yearly_summaries_tuples, bm_returned, bd_returned = yearly_result
+            # Update birth month/day if LLM provided them for the birth year
+            if bm_returned and bd_returned and not (life_summary["birth_month"] and life_summary["birth_day"]):
+                 life_summary["birth_month"] = bm_returned
+                 life_summary["birth_day"] = bd_returned
+                 logger.info(f"Updated birth month/day from yearly summary: {bm_returned}/{bd_returned}")
+
             for year, (summary, location, news) in yearly_summaries_tuples.items():
                 life_summary["yearly_summaries"][year] = {
                     "summary": summary, "location": location, "news": news
@@ -580,24 +618,36 @@ async def generate_life_summary_sequentially(
     # --- Step 2: Generate Monthly Summaries ---
     console.print(Rule("Generating Monthly Summaries (Current & Previous Month)", style="bold yellow"))
     try:
-        months_to_generate = [
-            (current_year, current_month),
-            (current_year, current_month - 1) if current_month > 1 else (current_year - 1, 12)
-        ]
+        # Determine the months to generate (current and previous)
+        months_to_generate = []
+        current_date = date(current_year, current_month, 1)
+        months_to_generate.append((current_date.year, current_date.month))
+        # Previous month calculation
+        if current_date.month == 1:
+            prev_month_date = date(current_date.year - 1, 12, 1)
+        else:
+            prev_month_date = date(current_date.year, current_date.month - 1, 1)
+        # Only generate previous month if it's after birth year
+        if prev_month_date.year >= birth_year:
+             months_to_generate.append((prev_month_date.year, prev_month_date.month))
+
         for year, month in months_to_generate:
             yearly_context = life_summary["yearly_summaries"].get(year, {})
-        monthly_result = await generate_monthly_summaries_for_year(
-            llm_service, persona_details_str, year,
-            yearly_context.get("summary", ""),
-            yearly_context.get("location"),
-            current_year, current_month,
-            ddgs_instance=ddgs_search_tool
-        )
-        if monthly_result:
-            life_summary["monthly_summaries"].setdefault(year, {}).update({
-                month: {"summary": summary, "location": location, "news": news}
-                for month, (summary, location, news) in monthly_result.items()
-            })
+            # <<< FIX: Added await >>>
+            monthly_result = await generate_monthly_summaries_for_year(
+                llm_service, persona_details_str, year,
+                yearly_context.get("summary", "No yearly summary available."),
+                yearly_context.get("location"),
+                current_year, current_month,
+                ddgs_instance=ddgs_search_tool
+            )
+            if monthly_result:
+                life_summary["monthly_summaries"].setdefault(year, {}).update({
+                    m: {"summary": summary, "location": location, "news": news}
+                    for m, (summary, location, news) in monthly_result.items()
+                    # Only add if the month 'm' is one we intended to generate
+                    if (year, m) in months_to_generate
+                })
     except Exception as e:
         logger.error(f"Error generating monthly summaries: {e}", exc_info=True)
 
@@ -605,129 +655,143 @@ async def generate_life_summary_sequentially(
     console.print(Rule("Generating Daily Summaries (Last 7 Days)", style="bold yellow"))
     try:
         days_to_generate = [(today - timedelta(days=i)) for i in range(7)]
-        for day in days_to_generate:
-            year, month, day_num = day.year, day.month, day.day
+        # Filter days to be on or after birthdate
+        days_to_generate = [d for d in days_to_generate if d >= birthdate]
+
+        for day_date in days_to_generate:
+            year, month, day_num = day_date.year, day_date.month, day_date.day
             monthly_context = life_summary["monthly_summaries"].get(year, {}).get(month, {})
-        daily_result = await generate_daily_summaries_for_month(
-            llm_service, persona_details_str, year, month,
-            monthly_context.get("summary", ""),
-            life_summary["yearly_summaries"].get(year, {}).get("summary", ""),
-            monthly_context.get("location"),
-            current_year, current_month, current_day,
-            ddgs_instance=ddgs_search_tool
-        )
-        if daily_result:
-            life_summary["daily_summaries"].setdefault(year, {}).setdefault(month, {}).update({
-                day: {"summary": summary, "location": location, "news": news}
-                for day, (summary, location, news) in daily_result.items()
-            })
+            yearly_context_summary = life_summary["yearly_summaries"].get(year, {}).get("summary", "No yearly summary.")
+            # <<< FIX: Added await >>>
+            daily_result = await generate_daily_summaries_for_month(
+                llm_service, persona_details_str, year, month,
+                monthly_context.get("summary", "No monthly summary available."),
+                yearly_context_summary,
+                monthly_context.get("location"), # Use month's location as context
+                current_year, current_month, current_day,
+                ddgs_instance=ddgs_search_tool
+            )
+            if daily_result:
+                 # daily_result is Dict[int, Tuple[str, Optional[str], Optional[str]]]
+                life_summary["daily_summaries"].setdefault(year, {}).setdefault(month, {}).update({
+                    d: {"summary": summary, "location": location, "news": news}
+                    for d, (summary, location, news) in daily_result.items()
+                    # Only add if the day 'd' is one we intended to generate
+                    if date(year, month, d) in days_to_generate
+                })
     except Exception as e:
         logger.error(f"Error generating daily summaries: {e}", exc_info=True)
 
     # --- Step 4: Generate Hourly Breakdowns ---
     console.print(Rule("Generating Hourly Breakdowns (Today & Yesterday)", style="bold yellow"))
     try:
-        for day in [today, today - timedelta(days=1)]:
-            year, month, day_num = day.year, day.month, day.day
+        days_for_hourly = [today, today - timedelta(days=1)]
+        # Filter days to be on or after birthdate
+        days_for_hourly = [d for d in days_for_hourly if d >= birthdate]
+
+        for day_date in days_for_hourly:
+            year, month, day_num = day_date.year, day_date.month, day_date.day
             daily_context = life_summary["daily_summaries"].get(year, {}).get(month, {}).get(day_num, {})
+            monthly_context_summary = life_summary["monthly_summaries"].get(year, {}).get(month, {}).get("summary", "No monthly summary.")
+            yearly_context_summary = life_summary["yearly_summaries"].get(year, {}).get("summary", "No yearly summary.")
+            # <<< FIX: Added await >>>
             hourly_result = await generate_hourly_breakdown_for_day(
                 llm_service, persona_details_str, year, month, day_num,
-                daily_context.get("summary", ""),
-                life_summary["monthly_summaries"].get(year, {}).get(month, {}).get("summary", ""),
-                life_summary["yearly_summaries"].get(year, {}).get("summary", ""),
-                daily_context.get("location"),
+                daily_context.get("summary", "No daily summary available."),
+                monthly_context_summary,
+                yearly_context_summary,
+                daily_context.get("location"), # Use day's location as context
                 current_year, current_month, current_day, current_hour,
                 ddgs_instance=ddgs_search_tool
             )
             if hourly_result:
-                life_summary["hourly_breakdowns"].setdefault(year, {}).setdefault(month, {}).setdefault(day_num, {}).update(hourly_result)
+                # hourly_result is {"activities": Dict[int, Tuple[str, Optional[str]]], "news": str}
+                # Ensure structure matches expected format
+                hourly_data_to_store = {
+                     "activities": hourly_result.get("activities", {}),
+                     "news": hourly_result.get("news")
+                }
+                life_summary["hourly_breakdowns"].setdefault(year, {}).setdefault(month, {}).setdefault(day_num, hourly_data_to_store)
+
     except Exception as e:
         logger.error(f"Error generating hourly breakdowns: {e}", exc_info=True)
 
     # --- Final Output: Build and Print Summary Tree ---
     summary_tree = Tree(f"[bold blue]Life Summary for {persona_details.get('Name', 'Unknown')}[/bold blue]")
-
-    # Add Persona Details
-    persona_node = summary_tree.add("[green]Persona Details[/green]")
-    for key, value in life_summary["persona_details"].items():
-        persona_node.add(f"[cyan]{key}[/cyan]: {value}")
-
-    # Add Initial Relationships
-    relationships_node = summary_tree.add("[green]Initial Relationships[/green]")
+    # --- Persona Details ---
+    persona_node = summary_tree.add(f"[bold green]Persona Details[/bold green]")
+    for key, value in persona_details.items():
+        persona_node.add(f"{key}: {value}")
+    # --- Birth Information ---
+    birth_info_node = summary_tree.add(f"[bold green]Birth Information[/bold green]")
+    birth_info_node.add(f"Year: {birth_year}")
+    birth_info_node.add(f"Month: {birth_month}")
+    birth_info_node.add(f"Day: {birth_day}")
+    # --- Relationships ---
+    relationships_node = summary_tree.add(f"[bold green]Initial Relationships[/bold green]")
     if life_summary["initial_relationships"]:
-        for rel_type, rel_list in life_summary["initial_relationships"].items():
-            rel_node = relationships_node.add(f"[cyan]{rel_type.capitalize()}[/cyan]")
-            for rel in rel_list:
-                rel_node.add(pretty_repr(rel))
-    else:
-        relationships_node.add("[yellow]No relationships generated.[/yellow]")
-
-    # Add Yearly Summaries
-    yearly_node = summary_tree.add("[green]Yearly Summaries[/green]")
-    if life_summary["yearly_summaries"]:
-        for year, summary in life_summary["yearly_summaries"].items():
-            year_node = yearly_node.add(f"[cyan]{year}[/cyan]")
-            year_node.add(f"[bold]Summary:[/bold] {summary['summary']}")
-            year_node.add(f"[bold]Location:[/bold] {summary.get('location', 'N/A')}")
-            year_node.add(f"[bold]News:[/bold] {summary.get('news', 'N/A')}")
-    else:
-        yearly_node.add("[yellow]No yearly summaries generated.[/yellow]")
-
-    # Add Monthly Summaries
-    monthly_node = summary_tree.add("[green]Monthly Summaries[/green]")
-    if life_summary["monthly_summaries"]:
-        for year, months in life_summary["monthly_summaries"].items():
-            year_month_node = monthly_node.add(f"[cyan]{year}[/cyan]")
-            for month, summary in months.items():
-                month_node = year_month_node.add(f"[cyan]{calendar.month_name[month]}[/cyan]")
-                month_node.add(f"[bold]Summary:[/bold] {summary['summary']}")
-                month_node.add(f"[bold]Location:[/bold] {summary.get('location', 'N/A')}")
-                month_node.add(f"[bold]News:[/bold] {summary.get('news', 'N/A')}")
-    else:
-        monthly_node.add("[yellow]No monthly summaries generated.[/yellow]")
-
-    # Add Daily Summaries
-    daily_node = summary_tree.add("[green]Daily Summaries[/green]")
-    if life_summary["daily_summaries"]:
-        for year, months in life_summary["daily_summaries"].items():
-            year_daily_node = daily_node.add(f"[cyan]{year}[/cyan]")
-            for month, days in months.items():
-                month_daily_node = year_daily_node.add(f"[cyan]{calendar.month_name[month]}[/cyan]")
-                for day, summary in days.items():
-                    day_node = month_daily_node.add(f"[cyan]Day {day}[/cyan]")
-                    day_node.add(f"[bold]Summary:[/bold] {summary['summary']}")
-                    day_node.add(f"[bold]Location:[/bold] {summary.get('location', 'N/A')}")
-                    day_node.add(f"[bold]News:[/bold] {summary.get('news', 'N/A')}")
-    else:
-        daily_node.add("[yellow]No daily summaries generated.[/yellow]")
-
-    # Add Hourly Breakdowns
-    hourly_node = summary_tree.add("[green]Hourly Breakdowns[/green]")
-    if life_summary["hourly_breakdowns"]:
-        for year, months in life_summary["hourly_breakdowns"].items():
-            year_hourly_node = hourly_node.add(f"[cyan]{year}[/cyan]")
-            for month, days in months.items():
-                month_hourly_node = year_hourly_node.add(f"[cyan]{calendar.month_name[month]}[/cyan]")
-                for day, hours in days.items():
-                    day_hourly_node = month_hourly_node.add(f"[cyan]Day {day}[/cyan]")
-                    for hour, activity in hours["activities"].items():
-                        hour_node = day_hourly_node.add(f"[cyan]{hour}:00[/cyan]")
-                        hour_node.add(f"[bold]Activity:[/bold] {activity[0]}")
-                        hour_node.add(f"[bold]Location:[/bold] {activity[1]}")
-    else:
-        hourly_node.add("[yellow]No hourly breakdowns generated.[/yellow]")
-
-    # Print the summary_tree
+        parents = life_summary["initial_relationships"].get("parents", [])
+        siblings = life_summary["initial_relationships"].get("siblings", [])
+        for parent in parents:
+            relationships_node.add(f"Parent: {parent.get('name', 'Unknown')}")
+        for sibling in siblings:
+            relationships_node.add(f"Sibling: {sibling.get('name', 'Unknown')}")
+    # --- Yearly Summaries ---
+    yearly_summaries_node = summary_tree.add(f"[bold green]Yearly Summaries[/bold green]")
+    for year, data in life_summary["yearly_summaries"].items():
+        yearly_summaries_node.add(f"[bold yellow]{year}[/bold yellow]: {data.get('summary', 'No summary')}")
+    # --- Monthly Summaries ---
+    monthly_summaries_node = summary_tree.add(f"[bold green]Monthly Summaries[/bold green]")
+    for year, months in life_summary["monthly_summaries"].items():
+        year_node = monthly_summaries_node.add(f"[bold yellow]{year}[/bold yellow]")
+        for month, data in months.items():
+            year_node.add(f"[bold yellow]{month}[/bold yellow]: {data.get('summary', 'No summary')}")
+    # --- Daily Summaries ---
+    daily_summaries_node = summary_tree.add(f"[bold green]Daily Summaries[/bold green]")
+    for year, months in life_summary["daily_summaries"].items():
+        year_node = daily_summaries_node.add(f"[bold yellow]{year}[/bold yellow]")
+        for month, days in months.items():
+            month_node = year_node.add(f"[bold yellow]{month}[/bold yellow]")
+            for day, data in days.items():
+                month_node.add(f"[bold yellow]{day}[/bold yellow]: {data.get('summary', 'No summary')}")
+    # --- Hourly Breakdowns ---
+    hourly_breakdowns_node = summary_tree.add(f"[bold green]Hourly Breakdowns[/bold green]")
+    for year, months in life_summary["hourly_breakdowns"].items():
+        year_node = hourly_breakdowns_node.add(f"[bold yellow]{year}[/bold yellow]")
+        for month, days in months.items():
+            month_node = year_node.add(f"[bold yellow]{month}[/bold yellow]")
+            for day, data in days.items():
+                day_node = month_node.add(f"[bold yellow]{day}[/bold yellow]")
+                for hour, activity in data.get("activities", {}).items():
+                    day_node.add(f"[bold yellow]{hour}:00[/bold yellow] - {activity[0]} at {activity[1]}")
     console.print(Rule("Generation Complete", style="bold green"))
     console.print(summary_tree)
 
     return life_summary
 
-async def generate_new_simulacra_background(age_range: Tuple[int, int] = (18, 45)) -> Optional[Dict[str, Any]]:
+# <<< This function definition MUST come AFTER all the functions it calls >>>
+async def generate_new_simulacra_background(
+    sim_id: str,
+    world_instance_uuid: Optional[str],
+    world_type: str,
+    world_description: str,
+    age_range: Tuple[int, int] = (18, 45) # age_range is used by generate_random_persona implicitly via prompt
+) -> Optional[Dict[str, Any]]:
     """Generates a new persona and their life summary using the simplified structure."""
-    # ... (LLM Init, Persona Gen, Call generate_life_summary_sequentially, Save Results) ...
-    # [This code block is identical to the previous version]
-    logger.info("Starting new Simulacra background generation...")
+
+    # Check for required IDs
+    if not world_instance_uuid:
+        logger.error("World instance UUID is required for generating background. Aborting.")
+        console.print("[bold red]Error: World instance UUID missing, cannot generate persona.[/bold red]")
+        return None
+    if not sim_id:
+        logger.error("Simulacra ID is required for generating background. Aborting.")
+        console.print("[bold red]Error: Simulacra ID missing, cannot generate persona.[/bold red]")
+        return None
+
+    logger.info(f"Starting new Simulacra background generation for sim: {sim_id} (UUID: {world_instance_uuid})...")
+    logger.info(f"World Context: Type='{world_type}', Description='{world_description[:100]}...'")
+
     # --- LLM Initialization ---
     api_key = os.getenv("GOOGLE_API_KEY")
     llm_service = None
@@ -739,15 +803,22 @@ async def generate_new_simulacra_background(age_range: Tuple[int, int] = (18, 45
         console.print(Panel(f"[bold red]Fatal Error:[/bold red] Could not initialize LLM Service: {e}", title="Initialization Failed", border_style="red"))
         return None
 
-    # --- Generate Random Persona (Ensure Birthdate is included/estimated) ---
-    console.print(Rule("Generating Random Persona", style="bold yellow"))
-    generated_persona = await generate_random_persona(llm_service)
+    # --- Generate Random Persona ---
+    console.print(Rule(f"Generating Random Persona for '{world_type}' world", style="bold yellow"))
+    generated_persona = await generate_random_persona(
+        llm_service=llm_service,
+        world_type=world_type,
+        world_description=world_description
+        # age_range is implicitly handled by the prompt inside generate_random_persona
+    )
 
+    # --- Fallback and Birthdate Handling ---
     if not generated_persona:
-        logger.error("Could not generate persona. Using fallback.")
-        fallback_birth_year = datetime.now().year - 30
+        logger.error("Could not generate persona via LLM. Using fallback.")
+        fallback_age = 30 # Example fallback age
+        fallback_birth_year = datetime.now().year - fallback_age
         generated_persona = {
-            "Name": "Alex Default", "Age": 30, "Occupation": "Archivist",
+            "Name": "Alex Default", "Age": fallback_age, "Occupation": "Archivist",
             "Current_location": "Default City, Default State", "Personality_Traits": ["Methodical", "Calm", "Inquisitive"],
             "Birthplace": "Old Town, Default State", "Education": "Degree in History",
             "Birthdate": f"{fallback_birth_year}-07-15", # Example fixed birthdate
@@ -755,43 +826,76 @@ async def generate_new_simulacra_background(age_range: Tuple[int, int] = (18, 45
         }
         console.print(Panel(pretty_repr(generated_persona), title="Using Fallback Persona", border_style="red", expand=False))
     else:
-        # Ensure birthdate exists, generate if missing
-        if "Birthdate" not in generated_persona or not re.match(r"\d{4}-\d{2}-\d{2}", str(generated_persona.get("Birthdate"))):
+         # Ensure birthdate exists and is valid, estimate if missing/invalid
+        birthdate_str = generated_persona.get("Birthdate")
+        valid_birthdate = False
+        if birthdate_str and re.match(r"\d{4}-\d{2}-\d{2}", str(birthdate_str)):
+            try:
+                datetime.strptime(str(birthdate_str), "%Y-%m-%d")
+                valid_birthdate = True
+            except ValueError:
+                logger.warning(f"Generated persona has invalid date format '{birthdate_str}'. Estimating.")
+
+        if not valid_birthdate:
              logger.warning("Generated persona missing valid 'Birthdate'. Estimating.")
-             age_from_persona = generated_persona.get("Age", 30)
+             age_from_persona = generated_persona.get("Age", 30) # Use LLM age if available
              birth_year_est = datetime.now().year - age_from_persona
+             # Consider a more robust default/estimation (e.g., random month/day)
              generated_persona["Birthdate"] = f"{birth_year_est}-07-15"
 
         console.print(Panel(pretty_repr(generated_persona), title="Generated Persona", border_style="blue", expand=False))
 
-    current_age = generated_persona.get("Age", 30) # Get age for display/initial info
+    # Use age from persona (potentially updated/calculated)
+    current_age = generated_persona.get("Age", 30)
 
     # --- Run Life Summary Generation ---
     console.print(Rule(f"Generating Life Summary (Birthdate: {generated_persona.get('Birthdate')})", style="bold yellow"))
+    # <<< This call MUST happen AFTER generate_life_summary_sequentially is defined >>>
     life_data = await generate_life_summary_sequentially(
         llm_service=llm_service,
-        persona_details=generated_persona,
-        age=current_age # Pass age, although birthdate from persona is primary
+        persona_details=generated_persona, # Pass the potentially updated persona
+        age=current_age # Pass age, primarily for initial estimation if birthdate fails
     )
 
     if not life_data:
         logger.error("Life summary generation failed critically.")
         console.print(Panel("[bold red]Error:[/bold red] Life summary generation failed.", title="Generation Failed", border_style="red"))
-        return None
+        return None # Return None if the core generation fails
 
-    # --- Save Results (using determined birthdate) ---
-    final_birthdate_str = life_data["persona_details"].get("Birthdate", "UnknownDate")
-    persona_name_safe = re.sub(r'[^\w\-]+', '_', generated_persona.get('Name', 'Unknown'))
-    output_filename = f"life_summary_{persona_name_safe}_{final_birthdate_str}.json"
+    # --- Add Metadata and Save Results ---
+    life_data["simulacra_id"] = sim_id
+    life_data["world_instance_uuid"] = world_instance_uuid
+    if "generation_info" in life_data:
+        life_data["generation_info"]["generated_at"] = datetime.now(timezone.utc).isoformat()
+    else:
+        logger.warning("life_data missing 'generation_info', cannot update timestamp.")
 
-    console.print(Rule(f"Saving results to [green]{output_filename}[/green]", style="bold green"))
+
+    # --- Save Results ---
+    persona_details_final = life_data.get("persona_details", {})
+    persona_name_safe = re.sub(r'[^\w\-]+', '_', persona_details_final.get('Name', 'Unknown'))
+    persona_name_safe = persona_name_safe[:30] # Limit length for filename safety
+    # Use the world_instance_uuid for uniqueness per instance
+    output_filename = f"life_summary_{persona_name_safe}_{world_instance_uuid}.json"
+    output_path = os.path.join(LIFE_SUMMARY_DIR, output_filename)
+
+    console.print(Rule(f"Saving results to [green]{output_path}[/green]", style="bold green"))
     try:
-        with open(output_filename, 'w', encoding='utf-8') as f:
+        os.makedirs(LIFE_SUMMARY_DIR, exist_ok=True) # Ensure directory exists
+        with open(output_path, 'w', encoding='utf-8') as f:
+            # Use default=str for any non-serializable types like datetime objects if they sneak in
             json.dump(life_data, f, indent=2, ensure_ascii=False, default=str)
-        logger.info("Results saved successfully.")
-        console.print(f"[bold green]✔ Results saved successfully to {output_filename}[/bold green]")
+        logger.info(f"Results saved successfully to {output_path}.")
+        console.print(f"[bold green]✔ Results saved successfully to {output_path}[/bold green]")
     except Exception as e:
-        logger.error(f"Error saving results to {output_filename}: {e}", exc_info=True)
+        logger.error(f"Error saving results to {output_path}: {e}", exc_info=True)
         console.print(Panel(f"[bold red]Error saving results:[/bold red] {e}", title="Save Failed", border_style="red"))
+        # Decide if returning data despite save failure is okay (current code does)
+
+    # Final check if persona_details key exists before returning
+    if "persona_details" not in life_data:
+        logger.error("Generated life_data is missing the 'persona_details' key before returning.")
+        # Consider returning None here if this is critical
+        # return None
 
     return life_data
