@@ -135,7 +135,7 @@ async def run_phased_simulation(
 
             async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=phase1_trigger):
                 print_event_details(event, "P1", console, logger) # Log event details first
-                # console.print(event) # Or console.log(event)
+                console.print(event) # Or console.log(event)
 
                 # --- CORRECTED State Update Logic using state_delta ---
                 if hasattr(event, 'actions') and event.actions:
