@@ -9,7 +9,7 @@ from typing import Dict, Optional, Any # Add necessary types
 
 console = Console()
 
-def create_agent(sim_id: str, persona: Dict, world_config: Dict, session: Session) -> Optional[BaseAgent]:
+def create_agent(sim_id: str, persona: Dict, session: Session) -> Optional[BaseAgent]:
     """Factory function to create a specific Simulacra agent instance."""
     try:
         persona_details = persona.get("persona_details", persona)

@@ -14,19 +14,15 @@ from src.generation.llm_service import LLMService
 
 console = Console()
 
-# --- MODIFIED: State key formats expect base ID (e.g., 'eleanor_vance') ---
+# --- State key formats ---
 SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
 SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
-SIMULACRA_GOAL_KEY_FORMAT = "simulacra_{}_goal"
+SIMULACRA_GOAL_KEY_FORMAT = "simulacra_{}_goal" # Dedicated key for goal
 SIMULACRA_PERSONA_KEY_FORMAT = "simulacra_{}_persona"
-SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent" # Used by intent tools
-SIMULACRA_MONOLOGUE_KEY_FORMAT = "last_simulacra_{}_monologue" # Keep 'last_' prefix
-# --- END MODIFIED ---
+SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
+SIMULACRA_MONOLOGUE_KEY_FORMAT = "last_simulacra_{}_monologue"
 WORLD_STATE_KEY = "current_world_state"
-
-# --- WORKAROUND: Define temp file path ---
-TEMP_LOCATION_FILE = "temp_sim_locations.json"
-# ---
+# ... other keys ...
 
 # --- Tools ---
 
@@ -35,22 +31,15 @@ def update_self_goal(
     new_goal: str,
     tool_context: ToolContext # Keep using ToolContext
 ) -> Dict[str, str]:
-    """Updates the simulacra's primary short-term goal within their status dictionary."""
+    """Updates the simulacra's primary short-term goal using the dedicated state key."""
     logger.info(f"Tool 'update_self_goal' called for simulacra_id: {simulacra_id} with new goal: '{new_goal}'")
-    status_key = SIMULACRA_STATUS_KEY_FORMAT.format(simulacra_id) # Use the status key
+    goal_key = SIMULACRA_GOAL_KEY_FORMAT.format(simulacra_id) # Use the dedicated goal key
     try:
-        current_status = tool_context.state.get(status_key)
-        if not current_status:
-            logger.error(f"Cannot update goal: Current status not found for {simulacra_id} (key: {status_key}).")
-            return {"status": "error", "message": f"Status not found for {simulacra_id}. Cannot update goal."}
-        if not isinstance(current_status, dict):
-             logger.error(f"Cannot update goal: Status for {simulacra_id} is not a dictionary (type: {type(current_status)}).")
-             return {"status": "error", "message": f"Invalid status format for {simulacra_id}. Cannot update goal."}
-
-        old_goal = current_status.get("goal", "Not set")
-        current_status["goal"] = new_goal # Update the goal within the status dict
-        tool_context.state[status_key] = current_status # Save the entire updated status dict back
-        logger.info(f"Successfully updated goal for {simulacra_id} from '{old_goal}' to '{new_goal}' within status key '{status_key}'.")
+        old_goal = tool_context.state.get(goal_key, "Not set")
+        # --- MODIFICATION: Update the dedicated goal key ---
+        tool_context.state[goal_key] = new_goal # Update the goal directly in tool_context.state
+        # --- END MODIFICATION ---
+        logger.info(f"Successfully updated goal for {simulacra_id} from '{old_goal}' to '{new_goal}' using state key '{goal_key}'.")
         console.print(f"[dim blue]--- Tool ({simulacra_id}): Goal updated to '[italic]{new_goal}[/italic]' ---[/dim blue]")
         return {"status": "success", "message": f"Goal updated to: {new_goal}"}
     except Exception as e:

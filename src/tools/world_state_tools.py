@@ -2,27 +2,156 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
 
+import requests
+from dotenv import load_dotenv
 from google.adk.tools.tool_context import ToolContext
+from GoogleNews import GoogleNews
 from rich.console import Console
 
-# --- ADD/VERIFY Constants Definitions HERE ---
+from src.generation.llm_service import LLMService
+from src.tools.python_weather.client import Client  # Import the Client class
+from src.tools.python_weather.constants import IMPERIAL
+
 WORLD_STATE_KEY = "current_world_state" # Make sure this line exists and is spelled correctly
 SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
 SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
 SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
 ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result" # Ensure this matches simulation_loop.py
-# --- END Constants Definitions ---
 
+googlenews = GoogleNews()
 console = Console()
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIME_INCREMENT_SECONDS = 60 * 5 # 5 minutes
 
-# --- Function: update_and_get_world_state ---
+def get_setting_details(location: str, tool_context: ToolContext) -> str:
+    """
+    Provides descriptive details about the specified location based on world state.
+    Uses the LLMService to generate location details synchronously.
+    Fetches real-time weather and news. Uses CURRENT REAL-WORLD time for context.
+    """
+    console.print(f"[dim green]--- Tool: World Engine providing setting details for [i]{location}[/i] ---[/dim green]")
+
+    # Step 1: Get a base description of the location using LLMService
+    try:
+        llm_service = LLMService()
+        prompt = f"Provide a brief (4 to 5 sentences max) description of the location '{location}'. Include historical, cultural, or notable features."
+        base_description = llm_service.generate_content_text(
+            prompt=prompt
+        )
+
+    except Exception as e:
+        console.print(f"[bold red]Error querying LLMService for location details:[/bold red] {e}")
+        base_description = f"You are at {location}. There's nothing particularly notable right now."
+
+    # Step 2: Fetch high-level details using tools
+    weather = get_weather(f"{location}")
+    local_news = get_news(f"local news in {location}")
+    regional_news = get_news(f"regional news near {location}")
+    world_news = get_news("world news")
+
+    # Step 3: Combine all details into a full description
+    # --- MODIFIED: Use current real-world time ---
+    real_time_now_str = datetime.now().isoformat()
+    # current_time = tool_context.state.get("world_time", "an unknown time") # Old way
+    # ---
+    full_description = (
+        f"Location: {location}. Current Real Time: {real_time_now_str}. " # Use real time
+        f"Description: {base_description} "
+        f"Weather: {weather}. "
+        f"Local News: {local_news}. "
+        f"Regional News: {regional_news}. "
+        f"World News: {world_news}."
+    )
+
+    # Ensure "location_details" exists in the state
+    if "location_details" not in tool_context.state:
+        tool_context.state["location_details"] = {}
+
+    # Store the generated description in the session state
+    tool_context.state["location_details"][location] = full_description
+    console.print("[dim green]--- Tool: Setting details generated ---[/dim green]")
+
+    # Return the description as well (optional, but can be useful)
+    return full_description # Changed to return the string
+
+def get_weather(location: str) -> str:
+    """
+    Fetches the current weather, daily, and hourly forecasts for the specified location.
+    Filters daily forecasts to include only the current date.
+    """
+    try:
+        # Use the Client with imperial units (Fahrenheit)
+        with Client(unit=IMPERIAL) as client:
+            # Fetch the weather for the specified location
+            forecast = client.get(location)
+
+            # Extract the current weather details
+            current_temp = forecast.temperature  # Current temperature
+            description = forecast.description  # Current weather description
+            humidity = forecast.humidity  # Current humidity
+            precipitation = forecast.precipitation  # Current precipitation
+
+            # Get the current date
+            current_date = date.today()
+
+            # Filter daily forecasts for the current date
+            daily_forecasts = [
+                f"Date: {daily.date}, Max Temp: {daily.highest_temperature}°F, Min Temp: {daily.lowest_temperature}°F, sunrise: {daily.sunrise} sunset: {daily.sunset}"
+                for daily in forecast.daily_forecasts
+                if daily.date == current_date
+            ]
+
+            # Extract hourly forecasts for the current date
+            hourly_forecasts = [
+                f"Time: {hourly.time}, Temp: {hourly.temperature}°F, Description: {hourly.description}"
+                for daily in forecast.daily_forecasts
+                if daily.date == current_date
+                for hourly in daily.hourly_forecasts
+            ]
+
+            # Format the output
+            daily_summary = "\n".join(daily_forecasts)
+            hourly_summary = "\n".join(hourly_forecasts[:5])  # Limit to the first 5 hours for brevity
+
+            return (
+                f"Current Weather: {description}, Temperature: {current_temp}°F, Humidity: {humidity}%, Precipitation: {precipitation}%\n\n"
+                f"Daily Forecast:\n{daily_summary}\n\n"
+                f"Hourly Forecast:\n{hourly_summary}"
+            )
+    except Exception as e:
+        return f"Error fetching weather for {location}: {e}"
+
+def get_news(query: str) -> str:
+    """
+    Fetches news articles for the specified query using the GoogleNews library.
+    Dynamically fetches news from today and the previous day.
+    """
+    try:
+        # Calculate today's and yesterday's dates
+        today = datetime.now().strftime('%Y-%m-%d')
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        googlenews.clear()
+        # Set up GoogleNews instance
+        googlenews.set_lang('en')  # Set language to English
+        # googlenews.set_time_range(yesterday, today)  # Set the date range dynamically
+        googlenews.set_period('1d')
+        googlenews.search(query)  # Perform the search with the query
+
+        # Fetch the results
+        results = googlenews.result()  # Get the search results
+        if results:
+            # Combine the top 3 results into a single string
+            return " | ".join(f"{result['title']} - {result['desc']}" for result in results[:3])
+        return "No relevant information found."
+    except Exception as e:
+        console.print(f"[bold red]Error fetching data for query '{query}':[/bold red] {e}")
+        return "Data unavailable."
+
 def update_and_get_world_state(tool_context: ToolContext) -> Dict[str, Any]:
     """
     Updates the world state (time, potentially other dynamics) and returns the complete current state.
@@ -58,86 +187,3 @@ def update_and_get_world_state(tool_context: ToolContext) -> Dict[str, Any]:
     state[WORLD_STATE_KEY] = world_state
     console.print("[dim blue]--- Tool (WorldState): Finished updating world state. ---[/dim blue]")
     return world_state
-# --- End function ---
-
-
-# --- OBSOLETE Function: execute_physical_actions_batch ---
-# This function is no longer needed as Phase 4b is handled by world_execution_agent without tools.
-# def execute_physical_actions_batch(
-#     actions_batch: List[Dict[str, Any]],
-#     tool_context: ToolContext
-# ) -> Dict[str, Any]:
-#     """
-#     (OBSOLETE) Executes a batch of approved physical actions, updating the relevant state.
-#     """
-#     console.print("[dim yellow]--- Tool (WorldState - OBSOLETE): execute_physical_actions_batch called. ---[/dim yellow]")
-#     state = tool_context.state
-#     results = {"executed_actions": 0, "failed_actions": 0, "details": []}
-#
-#     if not isinstance(actions_batch, list):
-#         logger.error(f"execute_physical_actions_batch received invalid input type: {type(actions_batch)}. Expected list.")
-#         results["error"] = "Invalid input type for actions_batch."
-#         return results
-#
-#     for action_detail in actions_batch:
-#         sim_id = action_detail.get("sim_id")
-#         action_type = action_detail.get("action_type")
-#         details = action_detail.get("details", {}) # Original intent details
-#
-#         if not sim_id or not action_type:
-#             logger.warning(f"Skipping invalid action in batch: {action_detail}")
-#             results["failed_actions"] += 1
-#             results["details"].append({"sim_id": sim_id, "status": "failed", "reason": "Missing sim_id or action_type"})
-#             continue
-#
-#         try:
-#             if action_type == "move":
-#                 destination = details.get("destination")
-#                 origin = details.get("origin", "Unknown") # Get origin from intent if available
-#                 location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
-#
-#                 if destination:
-#                     # Update the simulacra's location in the state
-#                     state[location_key] = destination
-#                     logger.info(f"Executed move for {sim_id}: {origin} -> {destination}")
-#                     results["executed_actions"] += 1
-#                     results["details"].append({"sim_id": sim_id, "action": "move", "status": "success", "destination": destination})
-#                     # --- Clear intent after execution ---
-#                     intent_key = SIMULACRA_INTENT_KEY_FORMAT.format(sim_id)
-#                     if intent_key in state: del state[intent_key]
-#                     # --- End Clear ---
-#                 else:
-#                     logger.warning(f"Move action for {sim_id} missing destination in details: {details}")
-#                     results["failed_actions"] += 1
-#                     results["details"].append({"sim_id": sim_id, "action": "move", "status": "failed", "reason": "Missing destination"})
-#
-#             elif action_type == "interact":
-#                 # --- Placeholder for interaction execution ---
-#                 target = details.get("target") # e.g., object ID or NPC ID
-#                 interaction_type = details.get("interaction_type") # e.g., 'pickup', 'use', 'open'
-#                 logger.info(f"Executing interaction for {sim_id}: Type={interaction_type}, Target={target}")
-#                 # Add logic here to modify world state based on interaction
-#                 # e.g., change object state, update NPC relationship, add item to inventory
-#                 # Example: if target in state.get(WORLD_STATE_KEY, {}).get("objects", {}):
-#                 #             state[WORLD_STATE_KEY]["objects"][target]["state"] = "used"
-#                 results["executed_actions"] += 1
-#                 results["details"].append({"sim_id": sim_id, "action": "interact", "status": "success", "target": target})
-#                 # --- Clear intent after execution ---
-#                 intent_key = SIMULACRA_INTENT_KEY_FORMAT.format(sim_id)
-#                 if intent_key in state: del state[intent_key]
-#                 # --- End Clear ---
-#                 # --- End Placeholder ---
-#
-#             else:
-#                 logger.warning(f"Unsupported physical action type '{action_type}' for {sim_id}")
-#                 results["failed_actions"] += 1
-#                 results["details"].append({"sim_id": sim_id, "action": action_type, "status": "failed", "reason": "Unsupported action type"})
-#
-#         except Exception as exec_e:
-#             logger.exception(f"Error executing action for {sim_id}: {action_detail}")
-#             results["failed_actions"] += 1
-#             results["details"].append({"sim_id": sim_id, "action": action_type, "status": "failed", "reason": str(exec_e)})
-#
-#     console.print(f"[dim blue]--- Tool (WorldState): Finished executing batch. Success: {results['executed_actions']}, Failed: {results['failed_actions']} ---[/dim blue]")
-#     return results
-# --- End function ---

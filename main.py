@@ -4,52 +4,48 @@ import asyncio
 import glob
 import logging
 import os
+import re  # Keep re if sanitize_name_for_id is used (though less likely now with UUIDs)
 import sys
-import re # Keep re if sanitize_name_for_id is used (though less likely now with UUIDs)
 import uuid
-from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # ADK Imports
-from google.adk.agents import BaseAgent # Use BaseAgent for type hints
+from google.adk.agents import BaseAgent  # Use BaseAgent for type hints
 # from google.adk.agents import Agent # If needed directly
 from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService, BaseSessionService, Session
-
+from google.adk.sessions import (BaseSessionService, InMemorySessionService,
+                                 Session)
 # Rich Imports
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
 
+from src.agents.narration import narration_agent
+from src.agents.npc import npc_agent
+from src.agents.simulacra import \
+    create_agent as create_simulacra_agent  # Factory
+from src.agents.world_engine import create_world_engine_validator
+from src.agents.world_execution_agent import world_execution_agent
 # --- Agent Imports ---
 # Import agent INSTANCES or factory functions
 from src.agents.world_state_agent import world_state_agent
-from src.agents.world_engine import world_engine_agent
-from src.agents.npc import npc_agent
-from src.agents.narration import narration_agent
-from src.agents.world_execution_agent import world_execution_agent
-from src.agents.simulacra import create_agent as create_simulacra_agent # Factory
-
-# --- Config, State, Generation, Initialization ---
-from src.config import settings # Use for API Key, Model, potentially MAX_TURNS/NUM_SIMULACRA
+from src.config import \
+    settings  # Use for API Key, Model, potentially MAX_TURNS/NUM_SIMULACRA
 from src.generation.life_generator import generate_new_simulacra_background
-from src.tools.world_state_tools import ( # Import state keys if used directly
-    WORLD_STATE_KEY,
-    ACTIVE_SIMULACRA_IDS_KEY,
-    # Add other keys if main.py manipulates them directly
-)
-from src.initialization import (
-    load_world_template,
-    load_or_create_simulation_instance,
-    load_json_file,
-    save_json_file,
-    generate_unique_id # Assuming this is now defined in initialization.py
-)
-
+from src.initialization import \
+    generate_unique_id  # Assuming this is now defined in initialization.py
+from src.initialization import (load_json_file,
+                                load_or_create_simulation_instance,
+                                load_world_template, save_json_file)
 # --- Simulation Loop ---
 from src.simulation_loop import run_phased_simulation
+from src.tools.world_state_tools import (  # Import state keys if used directly; Add other keys if main.py manipulates them directly
+    ACTIVE_SIMULACRA_IDS_KEY, WORLD_STATE_KEY)
 
 # Setup console
 console = Console()
@@ -273,13 +269,13 @@ async def main():
     # 5. Instantiate Agents
     console.rule("[cyan]Instantiating Agents[/cyan]")
     core_agents_list: List[BaseAgent] = []
-    simulacra_agents_dict: Dict[str, BaseAgent] = {} # Use dict for easier lookup in loop if needed
+    simulacra_agents_dict: Dict[str, BaseAgent] = {} # Use dict for easier lookup
+    validator_agents_dict: Dict[str, BaseAgent] = {} # <<< ADD: Initialize validator dict
 
     try:
         # Instantiate or reference core agents
         core_agents_map = {
             "World State": world_state_agent,
-            "World Engine": world_engine_agent,
             "NPC Interaction": npc_agent,
             "World Execution": world_execution_agent,
             "Narration": narration_agent
@@ -296,9 +292,32 @@ async def main():
         console.print(f"[bold red]Error loading core agents:[/bold red] {e}")
         sys.exit(1)
 
-    # Instantiate Simulacra Agents
-    world_config_for_agents = simulation_state.get("world_template_details", {}) # Pass world config to factory
+    # <<< ADD: Instantiate Validator Agents >>>
+    console.print("Instantiating Validator Agents...")
+    for sim_id in active_sim_ids: # Iterate through the same active IDs
+        try:
+            validator_instance = create_world_engine_validator(sim_id=sim_id)
+            if validator_instance and isinstance(validator_instance, BaseAgent):
+                validator_agents_dict[sim_id] = validator_instance
+                logger.info(f"Created and added validator agent instance for {sim_id} ({validator_instance.name})")
+                console.print(f"  - Instantiated Validator: {validator_instance.name}")
+            else:
+                logger.error(f"Factory failed to create a valid BaseAgent validator instance for {sim_id}. Skipping.")
+                console.print(f"[red]  - Failed to instantiate Validator: {sim_id}[/red]")
+        except Exception as create_val_e:
+            logger.error(f"Error calling create_world_engine_validator for {sim_id}: {create_val_e}", exc_info=True)
+            console.print(f"[red]  - Error instantiating Validator {sim_id}: {create_val_e}[/red]")
 
+    # Check if enough validators were created
+    if len(validator_agents_dict) != len(active_sim_ids):
+         logger.warning(f"Mismatch between active IDs ({len(active_sim_ids)}) and successfully created validator agents ({len(validator_agents_dict)}).")
+         # Decide if this is critical, maybe exit if none were created
+         if not validator_agents_dict:
+              console.print("[bold red]No validator agents were successfully instantiated. Exiting.[/bold red]")
+              sys.exit(1)
+
+    # Instantiate Simulacra Agents
+    console.print("Instantiating Simulacra Agents...")
     for sim_id in active_sim_ids:
         persona = simulation_state.get(f"simulacra_{sim_id}_persona")
 
@@ -336,12 +355,14 @@ async def main():
 
         # Create agent using the factory
         try:
+            # --- MODIFIED: Remove world_config argument ---
             agent_instance = create_simulacra_agent(
                 sim_id=sim_id,
                 persona=persona,
-                world_config=world_config_for_agents,
+                # world_config=world_config_for_agents, # Removed
                 session=session # Pass the ADK session object
             )
+            # --- END MODIFICATION ---
             if agent_instance and isinstance(agent_instance, BaseAgent):
                 simulacra_agents_dict[sim_id] = agent_instance # Store in dict
                 logger.info(f"Created and added simulacra agent instance for {sim_id} ({agent_instance.name})")
@@ -387,7 +408,7 @@ async def main():
             # Pass agent instances individually as expected by run_phased_simulation
             world_state_agent=world_state_agent,
             simulacra_agents=simulacra_agents_dict, # Pass the dict
-            world_engine_agent=world_engine_agent,
+            validator_agents=validator_agents_dict, # <<< ADD: Pass the validator dict
             npc_agent=npc_agent,
             world_execution_agent=world_execution_agent,
             narration_agent=narration_agent,

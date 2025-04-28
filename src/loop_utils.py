@@ -46,6 +46,9 @@ def print_event_details(
         elif is_final and hasattr(part, 'text'):
             text_content = getattr(part, 'text', '')
             console.print(f"[dim cyan]  {phase_name} ({agent_id}) Final Output: {text_content if text_content else '[No text output]'}[/dim cyan]")
+        elif hasattr(part, 'text'):
+            text_content = getattr(part, 'text', '')
+            console.print(f"[dim cyan]  {phase_name} ({agent_id}) Text Output: {text_content if text_content else '[No text output]'}[/dim cyan]")
     elif is_final:
          logger.debug(f"{phase_name} ({agent_id}) Final event with no standard parts. Event: {event}")
 

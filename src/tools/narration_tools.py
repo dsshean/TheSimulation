@@ -1,5 +1,3 @@
-# src/tools/narration_tools.py (Narrator Context Tool - Modified for Individual Narration)
-
 from google.adk.tools.tool_context import ToolContext
 from rich.console import Console
 import json
@@ -19,8 +17,8 @@ SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
 SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
 SIMULACRA_MONOLOGUE_KEY_FORMAT = "last_simulacra_{}_monologue"
 ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result"
+SIMULACRA_NARRATION_KEY_FORMAT = "simulacra_{}_last_narration"
 
-# --- MODIFIED Tool ---
 def get_narration_context(
     tool_context: ToolContext,
     target_simulacra_id: str # <<< Expect the target ID
@@ -106,4 +104,48 @@ def get_narration_context(
 
     logger.debug(f"Returning narration context for {target_simulacra_id}.")
     return context
-# --- END MODIFIED Tool ---
+
+def save_narration(
+    narratives: Dict[str, str],
+    tool_context: ToolContext
+) -> Dict[str, str]:
+    """
+    Saves the provided dictionary of final turn narratives for each simulacra
+    into the session state under keys formatted like 'simulacra_<sim_id>_last_narration'.
+
+    Args:
+        narratives: A dictionary where keys are simulacra IDs and values
+                    are the final narrative strings for that simulacrum.
+        tool_context: The context object providing access to session state.
+
+    Returns:
+        A dictionary confirming the success or failure of the operation.
+    """
+    if not isinstance(narratives, dict):
+        logger.error(f"Tool 'save_narration' received non-dict input: {type(narratives)}")
+        return {"status": "error", "message": "Input must be a dictionary."}
+
+    state_changes = {}
+    saved_count = 0
+    try:
+        for sim_id, narrative_text in narratives.items():
+            if isinstance(narrative_text, str):
+                narration_key = SIMULACRA_NARRATION_KEY_FORMAT.format(sim_id)
+                state_changes[narration_key] = narrative_text
+                saved_count += 1
+            else:
+                logger.warning(f"Tool 'save_narration': Skipping non-string narrative for {sim_id}")
+
+        if state_changes:
+            logger.info(f"Tool 'save_narration': Saving narratives for keys: {list(state_changes.keys())}")
+            # Directly update the state via tool_context
+            tool_context.state.update(state_changes)
+            console.print(f"[dim green]--- Tool: Saved narratives for {saved_count} simulacra ---[/dim green]")
+            return {"status": "success", "message": f"Saved narratives for {saved_count} simulacra."}
+        else:
+            logger.warning("Tool 'save_narration': No valid narratives provided to save.")
+            return {"status": "warning", "message": "No valid narratives provided to save."}
+
+    except Exception as e:
+        logger.exception(f"Tool 'save_narration': Error saving state: {e}")
+        return {"status": "error", "message": f"Failed to save narratives: {e}"}

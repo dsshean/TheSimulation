@@ -19,7 +19,7 @@ try:
         ),
         instruction=world_state_instructions.WORLD_STATE_INSTRUCTION, # Phase 1 instructions
         tools=[
-            FunctionTool(world_engine_tools.get_setting_details), # Moved from world_engine_agent
+            FunctionTool(world_state_tools.get_setting_details), # Moved from world_engine_agent
             FunctionTool(world_state_tools.update_and_get_world_state),
         ],
         output_key="world_state_agent_confirmation", # Captures the confirmation text
