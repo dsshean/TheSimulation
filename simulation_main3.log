@@ -1,0 +1,1099 @@
+2025-04-28 20:51:45,342 - __main__ - INFO - --- Application Start (main3.py) --- Logging configured to file: simulation_main3.log
+2025-04-28 20:51:46,432 - __main__ - INFO - Starting main execution (main3.py).
+2025-04-28 20:51:46,432 - __main__ - INFO - No instance UUID specified, attempting to load the latest state file.
+2025-04-28 20:51:46,435 - src.initialization - INFO - Found latest simulation state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 20:51:46,435 - __main__ - INFO - Found latest state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json (UUID from filename: 05e07dad-f24b-420b-822c-1ae7862220f6)
+2025-04-28 20:51:46,437 - __main__ - INFO - Attempting to load state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 20:51:46,438 - __main__ - INFO - Successfully loaded and verified simulation state for UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
+2025-04-28 20:51:46,439 - __main__ - INFO - Attempting to load world config file: data\world_config_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 20:51:46,440 - __main__ - WARNING - World config file 'data\world_config_05e07dad-f24b-420b-822c-1ae7862220f6.json' not found for instance 05e07dad-f24b-420b-822c-1ae7862220f6. Proceeding using world details from state file.
+2025-04-28 20:51:46,444 - __main__ - INFO - Checking for life summaries matching pattern: data/life_summaries\life_summary_*_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 20:51:46,445 - __main__ - INFO - Found 2 valid life summaries for instance 05e07dad-f24b-420b-822c-1ae7862220f6: {'sim_3e912d', 'sim_662862'}
+2025-04-28 20:51:46,445 - __main__ - INFO - Simulation instance 05e07dad-f24b-420b-822c-1ae7862220f6 will run with 2 verified simulacra: ['sim_662862', 'sim_3e912d']
+2025-04-28 20:51:46,450 - __main__ - INFO - ADK Session created: adk_session_05e07dad-f24b-420b-822c-1ae7862220f6_20250428_205146 with initial state.
+2025-04-28 20:51:46,452 - __main__ - INFO - Using core agents: ['World State', 'World Execution', 'Narration']
+2025-04-28 20:51:46,456 - __main__ - INFO - Created validator agent for sim_662862 (WorldEngineValidator_sim_662862)
+2025-04-28 20:51:46,457 - __main__ - INFO - Created validator agent for sim_3e912d (WorldEngineValidator_sim_3e912d)
+2025-04-28 20:51:46,461 - src.agents.simulacra_v3 - INFO - Created V3 SequentialAgent 'Simulacra_sim_662862_ThinkingProcess' for sim_662862
+2025-04-28 20:51:46,461 - __main__ - INFO - Created V3 simulacra agent for sim_662862 (Simulacra_sim_662862_ThinkingProcess)
+2025-04-28 20:51:46,463 - src.agents.simulacra_v3 - INFO - Created V3 SequentialAgent 'Simulacra_sim_3e912d_ThinkingProcess' for sim_3e912d
+2025-04-28 20:51:46,463 - __main__ - INFO - Created V3 simulacra agent for sim_3e912d (Simulacra_sim_3e912d_ThinkingProcess)
+2025-04-28 20:51:46,466 - __main__ - INFO - Runner initialized for app 'TheSimulationV3'.
+2025-04-28 20:51:46,468 - src.agents.interaction_resolver_v3 - INFO - Created V3 LlmAgent 'InteractionResolverAgent_V3'
+2025-04-28 20:51:46,468 - src.simulation_loop_v3 - INFO - Instantiated Interaction Resolver Agent: InteractionResolverAgent_V3
+2025-04-28 20:51:46,470 - src.simulation_loop_v3 - INFO - --- Starting Turn 1 ---
+2025-04-28 20:51:46,472 - src.simulation_loop_v3 - INFO - Phase 1: Running World State Agent.
+2025-04-28 20:51:46,620 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:46,620 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Handle the requests as specified in the System Instruction."}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:51:46,621 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:51:47,545 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:51:47,549 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-28 20:51:47,550 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.
+
+-----------------------------------------------------------
+Function calls:
+name: get_setting_details, args: {'location': 'Asheville, NC'}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.023716907841818673}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":70,"candidates_tokens_details":[{"modality":"TEXT","token_count":70}],"prompt_token_count":532,"prompt_tokens_details":[{"modality":"TEXT","token_count":532}],"total_token_count":602},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:51:57,883 - src.tools.world_state_tools - INFO - Assigned payload to tool_context.state_delta for location: Asheville, NC
+2025-04-28 20:51:57,894 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:57,894 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"get_setting_details","response":{}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:51:57,894 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:51:58,456 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:51:58,459 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-28 20:51:58,459 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+None
+-----------------------------------------------------------
+Function calls:
+name: update_and_get_world_state, args: {}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"function_call":{"args":{},"name":"update_and_get_world_state"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.00003979994087583489}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":9,"candidates_tokens_details":[{"modality":"TEXT","token_count":9}],"prompt_token_count":597,"prompt_tokens_details":[{"modality":"TEXT","token_count":597}],"total_token_count":606},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:51:58,462 - src.tools.world_state_tools - INFO - Calculated time advancement from 2025-04-27T01:51:33.433591+00:00 to 2025-04-27T01:56:33.433591+00:00
+2025-04-28 20:51:58,462 - src.tools.world_state_tools - INFO - Signaled world state update via state_delta for key 'current_world_state'.
+2025-04-28 20:51:58,474 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:58,474 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"get_setting_details","response":{}}}],"role":"user"}
+{"parts":[{"function_call":{"args":{},"name":"update_and_get_world_state"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"update_and_get_world_state","response":{}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:51:58,474 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:51:58,976 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:51:58,979 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+World state synced and time updated.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"World state synced and time updated.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.00022540657664649189}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":8,"candidates_tokens_details":[{"modality":"TEXT","token_count":8}],"prompt_token_count":615,"prompt_tokens_details":[{"modality":"TEXT","token_count":615}],"total_token_count":623},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:51:58,981 - src.simulation_loop_v3 - INFO - World Time updated to: 2025-04-27T01:51:33.433591+00:00
+2025-04-28 20:51:58,986 - src.simulation_loop_v3 - INFO - Phase 2: Running Simulacra Planning Agents.
+2025-04-28 20:51:58,988 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: qfpQnciv
+2025-04-28 20:51:58,988 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: vAsQQHgA
+2025-04-28 20:51:58,988 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: bW3l6r8r
+2025-04-28 20:51:58,988 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: v1bLTf4d
+2025-04-28 20:51:58,988 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: 2HpqF0NI
+2025-04-28 20:51:58,998 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:58,998 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+You are Eleanor Vance (sim_662862). Your task is to observe your immediate surroundings and internal state.
+Consider the current time, location, nearby entities/objects, and your own status.
+Current World State: {'world_time': '2025-04-27T01:51:33.433591+00:00', 'location_details': {'Asheville, NC': {'city': 'Asheville', 'state': 'NC', 'country': 'United States', 'coordinates': {'latitude': 35.5951, 'longitude': -82.5515}}}, 'global_events': [], 'setting_description': 'A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply.', 'world_rules': {'allow_teleportation': False, 'time_progression_rate': 1.0, 'weather_effects_travel': True, 'historical_date': None}}
+Your Status: {'condition': 'Normal', 'mood': 'Neutral'}
+Your Location: Asheville, NC
+
+Output ONLY a brief, factual observation (1-2 sentences) based on this information. Example: "It's morning. I am in the kitchen. Bob is nearby. I feel rested."
+
+
+You are an agent. Your internal name is "Sim_sim_662862_Observe".
+
+ The description about you is "Observes the current state for Eleanor Vance."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-28 20:51:58,998 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:51:59,012 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:59,012 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+You are Eleanor Hayes (sim_3e912d). Your task is to observe your immediate surroundings and internal state.
+Consider the current time, location, nearby entities/objects, and your own status.
+Current World State: {'world_time': '2025-04-27T01:51:33.433591+00:00', 'location_details': {'Asheville, NC': {'city': 'Asheville', 'state': 'NC', 'country': 'United States', 'coordinates': {'latitude': 35.5951, 'longitude': -82.5515}}}, 'global_events': [], 'setting_description': 'A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply.', 'world_rules': {'allow_teleportation': False, 'time_progression_rate': 1.0, 'weather_effects_travel': True, 'historical_date': None}}
+Your Status: {'condition': 'Normal', 'mood': 'Neutral'}
+Your Location: Asheville, NC
+
+Output ONLY a brief, factual observation (1-2 sentences) based on this information. Example: "It's morning. I am in the kitchen. Bob is nearby. I feel rested."
+
+
+You are an agent. Your internal name is "Sim_sim_3e912d_Observe".
+
+ The description about you is "Observes the current state for Eleanor Hayes."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-28 20:51:59,012 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:51:59,539 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:51:59,542 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.13738636537031693}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":22,"candidates_tokens_details":[{"modality":"TEXT","token_count":22}],"prompt_token_count":518,"prompt_tokens_details":[{"modality":"TEXT","token_count":518}],"total_token_count":540},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:51:59,542 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_3e912d_Observe: {'sim_sim_3e912d_step1_observation': 'It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.\n'}
+2025-04-28 20:51:59,552 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:59,552 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+You are Eleanor Hayes (sim_3e912d). You just made an observation about your situation. Now, reflect on it considering your personality and goals.
+Your Persona: {'Name': 'Eleanor Hayes', 'Age': 29, 'Occupation': 'Brewery Tour Guide', 'Current_location': 'Asheville, NC', 'Personality_Traits': ['Enthusiastic', 'Outgoing', 'Knowledgeable', 'Patient', 'Adaptable'], 'Birthplace': 'Charlotte, NC', 'Birthdate': '1995-07-15', 'Birthtime': '14:30', 'Education': 'Bachelor of Arts in History', 'Physical_Appearance': '5\'6", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.', 'Hobbies': 'Hiking, trying new craft beers, reading local history, volunteering at the animal shelter', 'Skills': 'Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville', 'Languages': 'English', 'Health_Status': 'Generally healthy, occasional allergies', 'Family_Background': 'Middle-class family, parents still living in Charlotte, one younger brother.', 'Life_Goals': 'To become a local history expert and potentially open a small historical tour business.', 'Notable_Achievements': 'Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.', 'Fears': 'Heights, public speaking failures, not being able to achieve her goals', 'Strengths': 'Strong communication skills, historical knowledge, adaptability', 'Weaknesses': 'Can be overly critical of herself, sometimes struggles to say no.', 'Ethnicity': 'Caucasian', 'Religion': None, 'Political_Views': 'Liberal', 'Favorite_Foods': 'Anything from local Asheville restaurants, especially farm-to-table cuisine.', 'Favorite_Music': 'Indie rock, bluegrass, local Asheville bands', 'Favorite_Books': 'Local history books, historical fiction', 'Favorite_Movies': 'Documentaries, comedies', 'Pet_Peeves': 'Rude tourists, littering, traffic congestion', 'Dreams': 'To share her love of history with others and create a successful business.', 'Past_Traumas': None}
+Your Current Goal: Explore the world.
+Your Observation: It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.
+
+
+Think step-by-step: What does this observation mean to you? How does it relate to your goal? What potential actions come to mind? What are the pros/cons?
+Output ONLY your internal reflection or thought process (2-4 sentences). Example: "Breakfast sounds good. Bob's here; maybe I should chat? Or check the news first? Checking news seems quick."
+
+
+You are an agent. Your internal name is "Sim_sim_3e912d_Reflect".
+
+ The description about you is "Reflects on observations for Eleanor Hayes."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-28 20:51:59,552 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:51:59,602 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:51:59,603 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.14349105244591123}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":21,"candidates_tokens_details":[{"modality":"TEXT","token_count":21}],"prompt_token_count":518,"prompt_tokens_details":[{"modality":"TEXT","token_count":518}],"total_token_count":539},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:51:59,604 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_662862_Observe: {'sim_sim_662862_step1_observation': 'It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.\n'}
+2025-04-28 20:51:59,613 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:51:59,613 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+You are Eleanor Vance (sim_662862). You just made an observation about your situation. Now, reflect on it considering your personality and goals.
+Your Persona: {'Name': 'Eleanor Vance', 'Age': 33, 'Occupation': 'Brewery Tour Guide', 'Current_location': 'Asheville, NC', 'Personality_Traits': ['Outgoing', 'Friendly', 'Knowledgeable', 'Patient', 'Enthusiastic'], 'Birthplace': 'Charlotte, NC', 'Birthdate': '1991-07-15', 'Birthtime': '08:30', 'Education': 'Bachelor of Arts in History, UNC Asheville', 'Physical_Appearance': 'Average height, with curly auburn hair, green eyes, and a smattering of freckles. Often seen wearing comfortable, casual clothing suitable for walking tours.', 'Hobbies': 'Hiking, reading historical fiction, exploring local breweries, volunteering at the animal shelter.', 'Skills': 'Public speaking, historical knowledge, beer tasting, first aid, excellent customer service.', 'Languages': 'English', 'Health_Status': 'Generally healthy, occasional seasonal allergies.', 'Family_Background': 'Grew up in a middle-class family in Charlotte. Her parents are retired teachers. She has one younger brother who lives in Raleigh.', 'Life_Goals': 'To become a certified Cicerone, travel to Europe to explore beer cultures, and eventually start her own brewery or pub.', 'Notable_Achievements': "Graduated cum laude from UNC Asheville, won 'Employee of the Month' at the brewery twice.", 'Fears': 'Public speaking failures, disappointing her parents, not achieving her career goals.', 'Strengths': 'Enthusiasm, strong communication skills, historical knowledge, adaptability.', 'Weaknesses': 'Can be overly critical of herself, tends to overcommit, struggles with saying no.', 'Ethnicity': 'Caucasian', 'Religion': None, 'Political_Views': 'Left-leaning, advocates for environmental protection and social justice.', 'Favorite_Foods': 'Craft burgers, gourmet cheese plates, anything with avocados.', 'Favorite_Music': 'Indie folk, Americana, bluegrass.', 'Favorite_Books': 'Historical fiction, biographies, books about beer and brewing.', 'Favorite_Movies': 'Documentaries, comedies, classic films.', 'Pet_Peeves': 'People being rude to service staff, littering, close-mindedness.', 'Dreams': 'To own a successful brewery that is known for its innovative beers and sustainable practices.', 'Past_Traumas': None}
+Your Current Goal: Explore the world.
+Your Observation: It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.
+
+
+Think step-by-step: What does this observation mean to you? How does it relate to your goal? What potential actions come to mind? What are the pros/cons?
+Output ONLY your internal reflection or thought process (2-4 sentences). Example: "Breakfast sounds good. Bob's here; maybe I should chat? Or check the news first? Checking news seems quick."
+
+
+You are an agent. Your internal name is "Sim_sim_662862_Reflect".
+
+ The description about you is "Reflects on observations for Eleanor Vance."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-28 20:51:59,613 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:00,368 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:00,371 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.8452834505023379}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":66,"candidates_tokens_details":[{"modality":"TEXT","token_count":66}],"prompt_token_count":814,"prompt_tokens_details":[{"modality":"TEXT","token_count":814}],"total_token_count":880},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:00,371 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_3e912d_Reflect: {'sim_sim_3e912d_step2_reflection': "Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.\n"}
+2025-04-28 20:52:00,384 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:00,384 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+You are Eleanor Hayes (sim_3e912d). You have observed your surroundings and reflected on your goals and situation. Now, decide on your single, primary action/intent for this turn.
+Your Reflection/Thoughts: Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.
+
+Your Observation: It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.
+
+Current World State (for context): {'world_time': '2025-04-27T01:51:33.433591+00:00', 'location_details': {'Asheville, NC': {'city': 'Asheville', 'state': 'NC', 'country': 'United States', 'coordinates': {'latitude': 35.5951, 'longitude': -82.5515}}}, 'global_events': [], 'setting_description': 'A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply.', 'world_rules': {'allow_teleportation': False, 'time_progression_rate': 1.0, 'weather_effects_travel': True, 'historical_date': None}}
+Your Location: Asheville, NC
+
+Choose ONE action from possibilities like 'talk', 'move', 'use' (object), 'wait', 'think' (if no external action).
+Format your chosen intent clearly as a JSON object containing 'action_type' and necessary details (e.g., 'target', 'content', 'destination').
+Examples:
+{ "action_type": "talk", "target": "npc_bob", "content": "Good morning, Bob!" }
+{ "action_type": "move", "destination": "Living Room" }
+{ "action_type": "use", "target": "object_computer_kitchen", "details": "check email" }
+{ "action_type": "wait", "duration_seconds": 60 }
+
+Output ONLY the JSON object representing your final intent for this turn. This output will directly update the simulation state under the key 'simulacra_sim_3e912d_intent'.
+
+
+You are an agent. Your internal name is "Sim_sim_3e912d_DecideIntent".
+
+ The description about you is "Forms the final intent for Eleanor Hayes."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-28 20:52:00,384 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:00,390 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:00,392 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.3223829102097896}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":57,"candidates_tokens_details":[{"modality":"TEXT","token_count":57}],"prompt_token_count":877,"prompt_tokens_details":[{"modality":"TEXT","token_count":877}],"total_token_count":934},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:00,393 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_662862_Reflect: {'sim_sim_662862_step2_reflection': "Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.\n"}
+2025-04-28 20:52:00,401 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:00,402 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+You are Eleanor Vance (sim_662862). You have observed your surroundings and reflected on your goals and situation. Now, decide on your single, primary action/intent for this turn.
+Your Reflection/Thoughts: Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.
+
+Your Observation: It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.
+
+Current World State (for context): {'world_time': '2025-04-27T01:51:33.433591+00:00', 'location_details': {'Asheville, NC': {'city': 'Asheville', 'state': 'NC', 'country': 'United States', 'coordinates': {'latitude': 35.5951, 'longitude': -82.5515}}}, 'global_events': [], 'setting_description': 'A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply.', 'world_rules': {'allow_teleportation': False, 'time_progression_rate': 1.0, 'weather_effects_travel': True, 'historical_date': None}}
+Your Location: Asheville, NC
+
+Choose ONE action from possibilities like 'talk', 'move', 'use' (object), 'wait', 'think' (if no external action).
+Format your chosen intent clearly as a JSON object containing 'action_type' and necessary details (e.g., 'target', 'content', 'destination').
+Examples:
+{ "action_type": "talk", "target": "npc_bob", "content": "Good morning, Bob!" }
+{ "action_type": "move", "destination": "Living Room" }
+{ "action_type": "use", "target": "object_computer_kitchen", "details": "check email" }
+{ "action_type": "wait", "duration_seconds": 60 }
+
+Output ONLY the JSON object representing your final intent for this turn. This output will directly update the simulation state under the key 'simulacra_sim_662862_intent'.
+
+
+You are an agent. Your internal name is "Sim_sim_662862_DecideIntent".
+
+ The description about you is "Forms the final intent for Eleanor Vance."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-28 20:52:00,402 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:00,983 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:00,985 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+```json
+{
+  "action_type": "think",
+  "details": "Plan a trip. Research potential destinations."
+}
+```
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"action_type\": \"think\",\n  \"details\": \"Plan a trip. Research potential destinations.\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.21603435277938843}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":32,"candidates_tokens_details":[{"modality":"TEXT","token_count":32}],"prompt_token_count":749,"prompt_tokens_details":[{"modality":"TEXT","token_count":749}],"total_token_count":781},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:00,985 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_662862_DecideIntent: {'simulacra_sim_662862_intent': '```json\n{\n  "action_type": "think",\n  "details": "Plan a trip. Research potential destinations."\n}\n```'}
+2025-04-28 20:52:01,038 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:01,040 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+```json
+{
+  "action_type": "use",
+  "target": "object_computer",
+  "details": "research cheap flights"
+}
+```
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"action_type\": \"use\",\n  \"target\": \"object_computer\",\n  \"details\": \"research cheap flights\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.06187623425533897}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":38,"candidates_tokens_details":[{"modality":"TEXT","token_count":38}],"prompt_token_count":759,"prompt_tokens_details":[{"modality":"TEXT","token_count":759}],"total_token_count":797},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,041 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_3e912d_DecideIntent: {'simulacra_sim_3e912d_intent': '```json\n{\n  "action_type": "use",\n  "target": "object_computer",\n  "details": "research cheap flights"\n}\n```'}
+2025-04-28 20:52:01,044 - src.simulation_loop_v3 - INFO - Simulacra planning phase complete.
+2025-04-28 20:52:01,061 - src.simulation_loop_v3 - INFO - Phase 3: Running Validation Agents.
+2025-04-28 20:52:01,067 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_DecideIntent, event id: tUmGMpRS
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_DecideIntent, event id: 3IQaTzxI
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_Reflect, event id: 9xJ0NpCo
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_Reflect, event id: 5iY8lp9n
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_Observe, event id: FsvVh1PD
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_Observe, event id: pcpYA8kf
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: qfpQnciv
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: vAsQQHgA
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: bW3l6r8r
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: v1bLTf4d
+2025-04-28 20:52:01,068 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: 2HpqF0NI
+2025-04-28 20:52:01,077 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:01,078 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are an objective Arbiter of Reality for **one specific character**: `sim_662862`.
+**Your ONLY task is to validate their proposed action intent and save the result using the `save_single_validation_result` tool.**
+
+**Follow these steps EXACTLY:**
+
+1.  **Identify Your Target:** Your assigned character ID is `sim_662862`.
+2.  **Define Intent Key:** The specific key for your target's intent in the context state is `simulacra_sim_662862_intent`.
+3.  **Read Context State:** Access the context state provided to you.
+4.  **Check for Intent:** Look for the key `simulacra_sim_662862_intent` within the context state.
+    *   **IF** the key `simulacra_sim_662862_intent` exists in the context state AND its value is a non-empty dictionary:
+        *   Store this dictionary as the `proposed_intent`.
+        *   Proceed to Step 5.
+    *   **ELSE** (the key is missing, or the value is empty/null/not a dictionary):
+        *   Create the 'no_intent_found' result: `{ "validation_status": "no_intent_found", "reasoning": "No action intent provided for this simulacrum.", "estimated_duration_seconds": 0 }`.
+        *   Proceed directly to Step 7 (Save Result).
+5.  **Analyze World State (If Intent Found):** Read the current world state dictionary using the key `current_world_state` from the context state. Analyze world rules and conditions relevant to the `proposed_intent`.
+6.  **Evaluate Action (If Intent Found):** Based *only* on the world state, rules, and the `proposed_intent`, determine if the action is physically possible. Decide if the status is "approved", "rejected", or "modified". Create a result dictionary including: `validation_status` (string), `reasoning` (string), `estimated_duration_seconds` (integer, 0 if rejected), `adjusted_outcome` (optional string), `original_intent` (the `proposed_intent` dictionary from Step 4).
+7.  **CRITICAL: Save Result:** Call the `save_single_validation_result` tool **ONCE**.
+    *   Pass `sim_662862` as the `simulacra_id` argument.
+    *   Pass the result dictionary (either from Step 4 or Step 6) as the `validation_result` argument.
+    *   **Do NOT output anything else before this tool call.**
+8.  **Confirm:** After the tool call succeeds, your final response MUST be ONLY: `Validation result saved for sim_662862.`
+
+**Constraints:**
+*   Do NOT validate any character other than `sim_662862`.
+*   Do NOT use any tools other than `save_single_validation_result`.
+*   Rely *only* on the context state provided. Do not guess or assume.
+*   Do NOT output the result dictionary directly in your response text.
+
+
+You are an agent. Your internal name is "WorldEngineValidator_sim_662862".
+
+ The description about you is "World Engine Validator for sim_662862."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+save_single_validation_result: {'simulacra_id': {'type': <Type.STRING: 'STRING'>}, 'validation_result': {'type': <Type.OBJECT: 'OBJECT'>}} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,078 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:01,091 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:01,091 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are an objective Arbiter of Reality for **one specific character**: `sim_3e912d`.
+**Your ONLY task is to validate their proposed action intent and save the result using the `save_single_validation_result` tool.**
+
+**Follow these steps EXACTLY:**
+
+1.  **Identify Your Target:** Your assigned character ID is `sim_3e912d`.
+2.  **Define Intent Key:** The specific key for your target's intent in the context state is `simulacra_sim_3e912d_intent`.
+3.  **Read Context State:** Access the context state provided to you.
+4.  **Check for Intent:** Look for the key `simulacra_sim_3e912d_intent` within the context state.
+    *   **IF** the key `simulacra_sim_3e912d_intent` exists in the context state AND its value is a non-empty dictionary:
+        *   Store this dictionary as the `proposed_intent`.
+        *   Proceed to Step 5.
+    *   **ELSE** (the key is missing, or the value is empty/null/not a dictionary):
+        *   Create the 'no_intent_found' result: `{ "validation_status": "no_intent_found", "reasoning": "No action intent provided for this simulacrum.", "estimated_duration_seconds": 0 }`.
+        *   Proceed directly to Step 7 (Save Result).
+5.  **Analyze World State (If Intent Found):** Read the current world state dictionary using the key `current_world_state` from the context state. Analyze world rules and conditions relevant to the `proposed_intent`.
+6.  **Evaluate Action (If Intent Found):** Based *only* on the world state, rules, and the `proposed_intent`, determine if the action is physically possible. Decide if the status is "approved", "rejected", or "modified". Create a result dictionary including: `validation_status` (string), `reasoning` (string), `estimated_duration_seconds` (integer, 0 if rejected), `adjusted_outcome` (optional string), `original_intent` (the `proposed_intent` dictionary from Step 4).
+7.  **CRITICAL: Save Result:** Call the `save_single_validation_result` tool **ONCE**.
+    *   Pass `sim_3e912d` as the `simulacra_id` argument.
+    *   Pass the result dictionary (either from Step 4 or Step 6) as the `validation_result` argument.
+    *   **Do NOT output anything else before this tool call.**
+8.  **Confirm:** After the tool call succeeds, your final response MUST be ONLY: `Validation result saved for sim_3e912d.`
+
+**Constraints:**
+*   Do NOT validate any character other than `sim_3e912d`.
+*   Do NOT use any tools other than `save_single_validation_result`.
+*   Rely *only* on the context state provided. Do not guess or assume.
+*   Do NOT output the result dictionary directly in your response text.
+
+
+You are an agent. Your internal name is "WorldEngineValidator_sim_3e912d".
+
+ The description about you is "World Engine Validator for sim_3e912d."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+save_single_validation_result: {'simulacra_id': {'type': <Type.STRING: 'STRING'>}, 'validation_result': {'type': <Type.OBJECT: 'OBJECT'>}} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,091 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:01,865 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:01,867 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-28 20:52:01,867 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+None
+-----------------------------------------------------------
+Function calls:
+name: save_single_validation_result, args: {'validation_result': {'reasoning': 'No action intent provided for this simulacrum.', 'estimated_duration_seconds': 0, 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_662862'}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"function_call":{"args":{"validation_result":{"reasoning":"No action intent provided for this simulacrum.","estimated_duration_seconds":0,"validation_status":"no_intent_found"},"simulacra_id":"sim_662862"},"name":"save_single_validation_result"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.0006707835321625074}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":48,"candidates_tokens_details":[{"modality":"TEXT","token_count":48}],"prompt_token_count":1094,"prompt_tokens_details":[{"modality":"TEXT","token_count":1094}],"total_token_count":1142},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,868 - src.tools.world_engine_tools - INFO - Tool 'save_single_validation_result': Signaling update for sim_662862
+2025-04-28 20:52:01,881 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:01,881 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are an objective Arbiter of Reality for **one specific character**: `sim_662862`.
+**Your ONLY task is to validate their proposed action intent and save the result using the `save_single_validation_result` tool.**
+
+**Follow these steps EXACTLY:**
+
+1.  **Identify Your Target:** Your assigned character ID is `sim_662862`.
+2.  **Define Intent Key:** The specific key for your target's intent in the context state is `simulacra_sim_662862_intent`.
+3.  **Read Context State:** Access the context state provided to you.
+4.  **Check for Intent:** Look for the key `simulacra_sim_662862_intent` within the context state.
+    *   **IF** the key `simulacra_sim_662862_intent` exists in the context state AND its value is a non-empty dictionary:
+        *   Store this dictionary as the `proposed_intent`.
+        *   Proceed to Step 5.
+    *   **ELSE** (the key is missing, or the value is empty/null/not a dictionary):
+        *   Create the 'no_intent_found' result: `{ "validation_status": "no_intent_found", "reasoning": "No action intent provided for this simulacrum.", "estimated_duration_seconds": 0 }`.
+        *   Proceed directly to Step 7 (Save Result).
+5.  **Analyze World State (If Intent Found):** Read the current world state dictionary using the key `current_world_state` from the context state. Analyze world rules and conditions relevant to the `proposed_intent`.
+6.  **Evaluate Action (If Intent Found):** Based *only* on the world state, rules, and the `proposed_intent`, determine if the action is physically possible. Decide if the status is "approved", "rejected", or "modified". Create a result dictionary including: `validation_status` (string), `reasoning` (string), `estimated_duration_seconds` (integer, 0 if rejected), `adjusted_outcome` (optional string), `original_intent` (the `proposed_intent` dictionary from Step 4).
+7.  **CRITICAL: Save Result:** Call the `save_single_validation_result` tool **ONCE**.
+    *   Pass `sim_662862` as the `simulacra_id` argument.
+    *   Pass the result dictionary (either from Step 4 or Step 6) as the `validation_result` argument.
+    *   **Do NOT output anything else before this tool call.**
+8.  **Confirm:** After the tool call succeeds, your final response MUST be ONLY: `Validation result saved for sim_662862.`
+
+**Constraints:**
+*   Do NOT validate any character other than `sim_662862`.
+*   Do NOT use any tools other than `save_single_validation_result`.
+*   Rely *only* on the context state provided. Do not guess or assume.
+*   Do NOT output the result dictionary directly in your response text.
+
+
+You are an agent. Your internal name is "WorldEngineValidator_sim_662862".
+
+ The description about you is "World Engine Validator for sim_662862."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+{"parts":[{"function_call":{"args":{"validation_result":{"reasoning":"No action intent provided for this simulacrum.","estimated_duration_seconds":0,"validation_status":"no_intent_found"},"simulacra_id":"sim_662862"},"name":"save_single_validation_result"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"save_single_validation_result","response":{}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+save_single_validation_result: {'simulacra_id': {'type': <Type.STRING: 'STRING'>}, 'validation_result': {'type': <Type.OBJECT: 'OBJECT'>}} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,881 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:01,942 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:01,944 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-28 20:52:01,944 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+None
+-----------------------------------------------------------
+Function calls:
+name: save_single_validation_result, args: {'validation_result': {'estimated_duration_seconds': 0, 'reasoning': 'No action intent provided for this simulacrum.', 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_3e912d'}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"function_call":{"args":{"validation_result":{"estimated_duration_seconds":0,"reasoning":"No action intent provided for this simulacrum.","validation_status":"no_intent_found"},"simulacra_id":"sim_3e912d"},"name":"save_single_validation_result"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.0037998436018824577}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":48,"candidates_tokens_details":[{"modality":"TEXT","token_count":48}],"prompt_token_count":1094,"prompt_tokens_details":[{"modality":"TEXT","token_count":1094}],"total_token_count":1142},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,945 - src.tools.world_engine_tools - INFO - Tool 'save_single_validation_result': Signaling update for sim_3e912d
+2025-04-28 20:52:01,957 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:01,957 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are an objective Arbiter of Reality for **one specific character**: `sim_3e912d`.
+**Your ONLY task is to validate their proposed action intent and save the result using the `save_single_validation_result` tool.**
+
+**Follow these steps EXACTLY:**
+
+1.  **Identify Your Target:** Your assigned character ID is `sim_3e912d`.
+2.  **Define Intent Key:** The specific key for your target's intent in the context state is `simulacra_sim_3e912d_intent`.
+3.  **Read Context State:** Access the context state provided to you.
+4.  **Check for Intent:** Look for the key `simulacra_sim_3e912d_intent` within the context state.
+    *   **IF** the key `simulacra_sim_3e912d_intent` exists in the context state AND its value is a non-empty dictionary:
+        *   Store this dictionary as the `proposed_intent`.
+        *   Proceed to Step 5.
+    *   **ELSE** (the key is missing, or the value is empty/null/not a dictionary):
+        *   Create the 'no_intent_found' result: `{ "validation_status": "no_intent_found", "reasoning": "No action intent provided for this simulacrum.", "estimated_duration_seconds": 0 }`.
+        *   Proceed directly to Step 7 (Save Result).
+5.  **Analyze World State (If Intent Found):** Read the current world state dictionary using the key `current_world_state` from the context state. Analyze world rules and conditions relevant to the `proposed_intent`.
+6.  **Evaluate Action (If Intent Found):** Based *only* on the world state, rules, and the `proposed_intent`, determine if the action is physically possible. Decide if the status is "approved", "rejected", or "modified". Create a result dictionary including: `validation_status` (string), `reasoning` (string), `estimated_duration_seconds` (integer, 0 if rejected), `adjusted_outcome` (optional string), `original_intent` (the `proposed_intent` dictionary from Step 4).
+7.  **CRITICAL: Save Result:** Call the `save_single_validation_result` tool **ONCE**.
+    *   Pass `sim_3e912d` as the `simulacra_id` argument.
+    *   Pass the result dictionary (either from Step 4 or Step 6) as the `validation_result` argument.
+    *   **Do NOT output anything else before this tool call.**
+8.  **Confirm:** After the tool call succeeds, your final response MUST be ONLY: `Validation result saved for sim_3e912d.`
+
+**Constraints:**
+*   Do NOT validate any character other than `sim_3e912d`.
+*   Do NOT use any tools other than `save_single_validation_result`.
+*   Rely *only* on the context state provided. Do not guess or assume.
+*   Do NOT output the result dictionary directly in your response text.
+
+
+You are an agent. Your internal name is "WorldEngineValidator_sim_3e912d".
+
+ The description about you is "World Engine Validator for sim_3e912d."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+{"parts":[{"function_call":{"args":{"validation_result":{"estimated_duration_seconds":0,"reasoning":"No action intent provided for this simulacrum.","validation_status":"no_intent_found"},"simulacra_id":"sim_3e912d"},"name":"save_single_validation_result"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"save_single_validation_result","response":{}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+save_single_validation_result: {'simulacra_id': {'type': <Type.STRING: 'STRING'>}, 'validation_result': {'type': <Type.OBJECT: 'OBJECT'>}} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:01,957 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:02,435 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:02,437 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Validation result saved for sim_662862.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Validation result saved for sim_662862.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.0025592164269515444}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":14,"candidates_tokens_details":[{"modality":"TEXT","token_count":14}],"prompt_token_count":1148,"prompt_tokens_details":[{"modality":"TEXT","token_count":1148}],"total_token_count":1162},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:02,459 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:02,461 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Validation result saved for sim_3e912d.
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Validation result saved for sim_3e912d."}],"role":"model"},"finish_reason":"STOP","avg_logprobs":4.436587914824486e-7}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":13,"candidates_tokens_details":[{"modality":"TEXT","token_count":13}],"prompt_token_count":1148,"prompt_tokens_details":[{"modality":"TEXT","token_count":1148}],"total_token_count":1161},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:02,466 - src.simulation_loop_v3 - INFO - Validation phase complete.
+2025-04-28 20:52:02,473 - src.simulation_loop_v3 - INFO - Phase 4: Running Interaction Resolution.
+2025-04-28 20:52:02,473 - src.simulation_loop_v3 - INFO - No valid 'talk' or 'use' intents found for this turn.
+2025-04-28 20:52:02,477 - src.simulation_loop_v3 - INFO - Phase 5: Running World Execution Agent.
+2025-04-28 20:52:02,477 - src.simulation_loop_v3 - INFO - No valid move intents found for this turn.
+2025-04-28 20:52:02,481 - src.simulation_loop_v3 - INFO - Phase 6: Running Narration Agent.
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_3e912d, event id: Lvgj1mpY
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_662862, event id: itKhLF1H
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_3e912d, event id: buECXA2K
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_3e912d, event id: xnpJF4lA
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_662862, event id: E5cLdjUR
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_662862, event id: kp5Rujbr
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_DecideIntent, event id: tUmGMpRS
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_DecideIntent, event id: 3IQaTzxI
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_Reflect, event id: 9xJ0NpCo
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_Reflect, event id: 5iY8lp9n
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_Observe, event id: FsvVh1PD
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_Observe, event id: pcpYA8kf
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: qfpQnciv
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: vAsQQHgA
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: bW3l6r8r
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: v1bLTf4d
+2025-04-28 20:52:02,486 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: 2HpqF0NI
+2025-04-28 20:52:02,505 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:02,506 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the Master Narrator of the simulation. Your crucial role is to weave together the events of the turn into **vivid, immersive, and emotionally resonant** narrative summaries FOR EACH ACTIVE CHARACTER. Paint a picture with words. **You MUST use the `save_narration` tool to store the final results.**
+
+1.  **Identify Active Characters:** First, determine which characters (simulacra) were active this turn. Their IDs are stored in the session state under the key `active_simulacra_ids`. Get this list of IDs (e.g., ["sim1", "sim2"]). You might need a tool like `get_session_data` to retrieve this list.
+
+2.  **Gather Rich Context for Each Character:** For EACH `simulacra_id` in the active list:
+    *   Call the `get_narration_context` tool, passing the current `simulacra_id` as the `target_simulacra_id` argument.
+    *   This tool returns a rich context including:
+        *   `simulacra_context`: Location, goal, persona, status, last monologue, intent this turn, validation result, interaction result, execution narrative (for moves).
+        *   `world_state`: Current world time, primary location details (description, weather, news).
+    *   **Internalize this context fully before writing.** Keep track of the context gathered for each simulacra.
+
+3.  **Synthesize Detailed Individual Narrative Strings:** Initialize an empty internal collection (like a dictionary) to store the generated narratives. Then, for EACH character, use the FULL context gathered in Step 2 to write a compelling and descriptive narrative paragraph covering their key events during the turn.
+    *   **Style:** Use third-person past tense (e.g., "Eleanor walked...", "He thought..."). Maintain a consistent, engaging narrative voice appropriate for the simulation's tone. Vary sentence structure for better flow. **Ensure the narrative logically follows from the end of the previous turn's description.**
+    *   **Focus:** Ensure the narrative focuses ONLY on that specific character's experience, perspective, and actions this turn.
+    *   **Content - Weave Together ALL Elements Seamlessly:**
+        *   **Character Identity & Presence:** Mention the character's name (from `simulacra_context.persona.Name`). Describe their presence in the scene – how do they carry themselves based on their mood or goal?
+        *   **Setting the Scene Vividly:** Ground the narrative in their specific `simulacra_context.location`. **Don't just state the location, describe it.** Use details from `world_state` (time, weather, location_details) to bring it alive. Is it raining? How does the light look at this time? What sounds are present? Is the air cold, warm, humid? (e.g., "Rain slicked the cobblestones of the narrow alley...", "Sunlight streamed through the library's tall windows...").
+        *   **Inner Thoughts & Feelings:** Start with or incorporate their `simulacra_context.last_monologue`. **Show their emotional state** through their actions, observations, or brief internal reflections woven into the narrative. How does the environment or the turn's events make them *feel*? **If their monologue suggests conflict or mixed feelings about their chosen action, reflect that subtly.** (e.g., "Despite wanting to head home, Eleanor found herself walking towards the park...")
+        *   **Action & Outcome - Show, Don't Just Tell:** Describe what they attempted (`simulacra_context.intent_this_turn`). Crucially, narrate the *outcome* based on `simulacra_context.validation_result` (approved, failed, modified) and `simulacra_context.interaction_result` (dialogue, observations, effects). **Ensure the described outcome matches the validation/interaction results precisely.**
+            *   **Movement:** If they moved, use the `execution_narrative` as a strong foundation. **Expand on it.** Describe the journey vividly, focusing on **sensory experience**. What did they see passing by? What sounds filled the air (traffic, birdsong, silence)? How did the weather feel on their skin? Did they notice any particular smells? Describe the feeling of arriving at the `new_location`. If movement failed, describe the *experience* of the failure based on the validation reasoning (e.g., "Eleanor reached the gallery door only to find it locked, the 'Closed' sign mocking her urgency. She rattled the handle futilely...").
+            *   **Interaction:** If they talked or interacted, **bring the interaction to life**. Summarize key dialogue from `interaction_result`, but also describe the *manner* of speaking, body language (if inferable), and the atmosphere of the exchange. How did the other party react visually or emotionally? (e.g., "The shopkeeper barely looked up, his reply clipped, 'Closing time.' Eleanor felt a prickle of annoyance.").
+            *   **Other Actions:** Describe the attempt and outcome with physical and sensory details. What did the action look like? What sounds or tactile sensations were involved? (e.g., "He carefully picked the lock, the tumblers clicking softly under his ministrations until a final *thunk* signaled success.").
+        *   **Heightened Sensory Details:** Throughout the narrative, actively include plausible sensory details – specific sights (colors, light, shadow), sounds (loud, soft, distinct, ambient), smells (pleasant, foul, faint), textures, and feelings (temperature, wind, dampness).
+        *   **Figurative Language (Use Sparingly):** Occasionally use a simile or metaphor if it enhances the description naturally (e.g., "The silence in the archive felt heavy as velvet.").
+    *   **Collect Narrative:** Add the generated narrative string to your internal collection, associating it with the current `simulacra_id`.
+
+4.  **Save Narratives Using Tool:** After generating narratives for ALL active simulacra, you will have a complete dictionary mapping every active `simulacra_id` to its narrative string. **Call the `save_narration` tool ONCE**, passing this entire dictionary as the `narratives` argument.
+
+5.  **Respond:** Respond ONLY with a brief confirmation message like "Narratives generated and saved." Do not include any other text or explanations.
+
+**Do NOT:**
+*   Stop after processing only one character. Process ALL active simulacra.
+*   Output the narrative JSON directly in your response. **You MUST use the `save_narration` tool.**
+*   Engage in conversation or express opinions.
+*   Fetch new real-time data. Use only the context provided or retrieved via tools.
+
+
+You are an agent. Your internal name is "NarrationAgent".
+
+ The description about you is "Describes the events of the simulation turn based on the final state and interaction results, outputting structured JSON."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_Observe] said: It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_Observe] said: It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_Reflect] said: Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_Reflect] said: Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_DecideIntent] said: ```json\n{\n  \"action_type\": \"think\",\n  \"details\": \"Plan a trip. Research potential destinations.\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_DecideIntent] said: ```json\n{\n  \"action_type\": \"use\",\n  \"target\": \"object_computer\",\n  \"details\": \"research cheap flights\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] called tool `save_single_validation_result` with parameters: {'validation_result': {'reasoning': 'No action intent provided for this simulacrum.', 'estimated_duration_seconds': 0, 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_662862'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] `save_single_validation_result` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] called tool `save_single_validation_result` with parameters: {'validation_result': {'estimated_duration_seconds': 0, 'reasoning': 'No action intent provided for this simulacrum.', 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_3e912d'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] `save_single_validation_result` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] said: Validation result saved for sim_662862.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] said: Validation result saved for sim_3e912d."}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_narration_context: {'target_simulacra_id': {'type': <Type.STRING: 'STRING'>}} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:02,506 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:03,293 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:03,295 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call', 'function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-28 20:52:03,296 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+None
+-----------------------------------------------------------
+Function calls:
+name: get_narration_context, args: {'target_simulacra_id': 'sim_3e912d'}
+name: get_narration_context, args: {'target_simulacra_id': 'sim_662862'}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"function_call":{"args":{"target_simulacra_id":"sim_3e912d"},"name":"get_narration_context"}},{"function_call":{"args":{"target_simulacra_id":"sim_662862"},"name":"get_narration_context"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.005778684147766658}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":42,"candidates_tokens_details":[{"modality":"TEXT","token_count":42}],"prompt_token_count":2415,"prompt_tokens_details":[{"modality":"TEXT","token_count":2415}],"total_token_count":2457},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:03,299 - src.tools.narration_tools - INFO - Context gathered successfully for sim_3e912d
+2025-04-28 20:52:03,302 - src.tools.narration_tools - INFO - Context gathered successfully for sim_662862
+2025-04-28 20:52:03,316 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:03,316 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the Master Narrator of the simulation. Your crucial role is to weave together the events of the turn into **vivid, immersive, and emotionally resonant** narrative summaries FOR EACH ACTIVE CHARACTER. Paint a picture with words. **You MUST use the `save_narration` tool to store the final results.**
+
+1.  **Identify Active Characters:** First, determine which characters (simulacra) were active this turn. Their IDs are stored in the session state under the key `active_simulacra_ids`. Get this list of IDs (e.g., ["sim1", "sim2"]). You might need a tool like `get_session_data` to retrieve this list.
+
+2.  **Gather Rich Context for Each Character:** For EACH `simulacra_id` in the active list:
+    *   Call the `get_narration_context` tool, passing the current `simulacra_id` as the `target_simulacra_id` argument.
+    *   This tool returns a rich context including:
+        *   `simulacra_context`: Location, goal, persona, status, last monologue, intent this turn, validation result, interaction result, execution narrative (for moves).
+        *   `world_state`: Current world time, primary location details (description, weather, news).
+    *   **Internalize this context fully before writing.** Keep track of the context gathered for each simulacra.
+
+3.  **Synthesize Detailed Individual Narrative Strings:** Initialize an empty internal collection (like a dictionary) to store the generated narratives. Then, for EACH character, use the FULL context gathered in Step 2 to write a compelling and descriptive narrative paragraph covering their key events during the turn.
+    *   **Style:** Use third-person past tense (e.g., "Eleanor walked...", "He thought..."). Maintain a consistent, engaging narrative voice appropriate for the simulation's tone. Vary sentence structure for better flow. **Ensure the narrative logically follows from the end of the previous turn's description.**
+    *   **Focus:** Ensure the narrative focuses ONLY on that specific character's experience, perspective, and actions this turn.
+    *   **Content - Weave Together ALL Elements Seamlessly:**
+        *   **Character Identity & Presence:** Mention the character's name (from `simulacra_context.persona.Name`). Describe their presence in the scene – how do they carry themselves based on their mood or goal?
+        *   **Setting the Scene Vividly:** Ground the narrative in their specific `simulacra_context.location`. **Don't just state the location, describe it.** Use details from `world_state` (time, weather, location_details) to bring it alive. Is it raining? How does the light look at this time? What sounds are present? Is the air cold, warm, humid? (e.g., "Rain slicked the cobblestones of the narrow alley...", "Sunlight streamed through the library's tall windows...").
+        *   **Inner Thoughts & Feelings:** Start with or incorporate their `simulacra_context.last_monologue`. **Show their emotional state** through their actions, observations, or brief internal reflections woven into the narrative. How does the environment or the turn's events make them *feel*? **If their monologue suggests conflict or mixed feelings about their chosen action, reflect that subtly.** (e.g., "Despite wanting to head home, Eleanor found herself walking towards the park...")
+        *   **Action & Outcome - Show, Don't Just Tell:** Describe what they attempted (`simulacra_context.intent_this_turn`). Crucially, narrate the *outcome* based on `simulacra_context.validation_result` (approved, failed, modified) and `simulacra_context.interaction_result` (dialogue, observations, effects). **Ensure the described outcome matches the validation/interaction results precisely.**
+            *   **Movement:** If they moved, use the `execution_narrative` as a strong foundation. **Expand on it.** Describe the journey vividly, focusing on **sensory experience**. What did they see passing by? What sounds filled the air (traffic, birdsong, silence)? How did the weather feel on their skin? Did they notice any particular smells? Describe the feeling of arriving at the `new_location`. If movement failed, describe the *experience* of the failure based on the validation reasoning (e.g., "Eleanor reached the gallery door only to find it locked, the 'Closed' sign mocking her urgency. She rattled the handle futilely...").
+            *   **Interaction:** If they talked or interacted, **bring the interaction to life**. Summarize key dialogue from `interaction_result`, but also describe the *manner* of speaking, body language (if inferable), and the atmosphere of the exchange. How did the other party react visually or emotionally? (e.g., "The shopkeeper barely looked up, his reply clipped, 'Closing time.' Eleanor felt a prickle of annoyance.").
+            *   **Other Actions:** Describe the attempt and outcome with physical and sensory details. What did the action look like? What sounds or tactile sensations were involved? (e.g., "He carefully picked the lock, the tumblers clicking softly under his ministrations until a final *thunk* signaled success.").
+        *   **Heightened Sensory Details:** Throughout the narrative, actively include plausible sensory details – specific sights (colors, light, shadow), sounds (loud, soft, distinct, ambient), smells (pleasant, foul, faint), textures, and feelings (temperature, wind, dampness).
+        *   **Figurative Language (Use Sparingly):** Occasionally use a simile or metaphor if it enhances the description naturally (e.g., "The silence in the archive felt heavy as velvet.").
+    *   **Collect Narrative:** Add the generated narrative string to your internal collection, associating it with the current `simulacra_id`.
+
+4.  **Save Narratives Using Tool:** After generating narratives for ALL active simulacra, you will have a complete dictionary mapping every active `simulacra_id` to its narrative string. **Call the `save_narration` tool ONCE**, passing this entire dictionary as the `narratives` argument.
+
+5.  **Respond:** Respond ONLY with a brief confirmation message like "Narratives generated and saved." Do not include any other text or explanations.
+
+**Do NOT:**
+*   Stop after processing only one character. Process ALL active simulacra.
+*   Output the narrative JSON directly in your response. **You MUST use the `save_narration` tool.**
+*   Engage in conversation or express opinions.
+*   Fetch new real-time data. Use only the context provided or retrieved via tools.
+
+
+You are an agent. Your internal name is "NarrationAgent".
+
+ The description about you is "Describes the events of the simulation turn based on the final state and interaction results, outputting structured JSON."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_Observe] said: It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_Observe] said: It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_Reflect] said: Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_Reflect] said: Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_DecideIntent] said: ```json\n{\n  \"action_type\": \"think\",\n  \"details\": \"Plan a trip. Research potential destinations.\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_DecideIntent] said: ```json\n{\n  \"action_type\": \"use\",\n  \"target\": \"object_computer\",\n  \"details\": \"research cheap flights\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] called tool `save_single_validation_result` with parameters: {'validation_result': {'reasoning': 'No action intent provided for this simulacrum.', 'estimated_duration_seconds': 0, 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_662862'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] `save_single_validation_result` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] called tool `save_single_validation_result` with parameters: {'validation_result': {'estimated_duration_seconds': 0, 'reasoning': 'No action intent provided for this simulacrum.', 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_3e912d'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] `save_single_validation_result` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] said: Validation result saved for sim_662862.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] said: Validation result saved for sim_3e912d."}],"role":"user"}
+{"parts":[{"function_call":{"args":{"target_simulacra_id":"sim_3e912d"},"name":"get_narration_context"}},{"function_call":{"args":{"target_simulacra_id":"sim_662862"},"name":"get_narration_context"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"get_narration_context","response":{"status":"success","target_simulacra_id":"sim_3e912d","world_state":{"world_time":"2025-04-27T01:51:33.433591+00:00","location_details":{"Asheville, NC":{"city":"Asheville","state":"NC","country":"United States","coordinates":{"latitude":35.5951,"longitude":-82.5515}}}},"simulacra_context":{"location":"Asheville, NC","goal":"Explore the world.","persona":{"Name":"Eleanor Hayes","Age":29,"Occupation":"Brewery Tour Guide","Current_location":"Asheville, NC","Personality_Traits":["Enthusiastic","Outgoing","Knowledgeable","Patient","Adaptable"],"Birthplace":"Charlotte, NC","Birthdate":"1995-07-15","Birthtime":"14:30","Education":"Bachelor of Arts in History","Physical_Appearance":"5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.","Hobbies":"Hiking, trying new craft beers, reading local history, volunteering at the animal shelter","Skills":"Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville","Languages":"English","Health_Status":"Generally healthy, occasional allergies","Family_Background":"Middle-class family, parents still living in Charlotte, one younger brother.","Life_Goals":"To become a local history expert and potentially open a small historical tour business.","Notable_Achievements":"Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.","Fears":"Heights, public speaking failures, not being able to achieve her goals","Strengths":"Strong communication skills, historical knowledge, adaptability","Weaknesses":"Can be overly critical of herself, sometimes struggles to say no.","Ethnicity":"Caucasian","Religion":null,"Political_Views":"Liberal","Favorite_Foods":"Anything from local Asheville restaurants, especially farm-to-table cuisine.","Favorite_Music":"Indie rock, bluegrass, local Asheville bands","Favorite_Books":"Local history books, historical fiction","Favorite_Movies":"Documentaries, comedies","Pet_Peeves":"Rude tourists, littering, traffic congestion","Dreams":"To share her love of history with others and create a successful business.","Past_Traumas":null},"status":{"condition":"Normal","mood":"Neutral"},"last_monologue":"[No monologue recorded]","intent_this_turn":"```json\n{\n  \"action_type\": \"use\",\n  \"target\": \"object_computer\",\n  \"details\": \"research cheap flights\"\n}\n```","validation_result":null,"interaction_result":null}}}},{"function_response":{"name":"get_narration_context","response":{"status":"success","target_simulacra_id":"sim_662862","world_state":{"world_time":"2025-04-27T01:51:33.433591+00:00","location_details":{"Asheville, NC":{"city":"Asheville","state":"NC","country":"United States","coordinates":{"latitude":35.5951,"longitude":-82.5515}}}},"simulacra_context":{"location":"Asheville, NC","goal":"Explore the world.","persona":{"Name":"Eleanor Vance","Age":33,"Occupation":"Brewery Tour Guide","Current_location":"Asheville, NC","Personality_Traits":["Outgoing","Friendly","Knowledgeable","Patient","Enthusiastic"],"Birthplace":"Charlotte, NC","Birthdate":"1991-07-15","Birthtime":"08:30","Education":"Bachelor of Arts in History, UNC Asheville","Physical_Appearance":"Average height, with curly auburn hair, green eyes, and a smattering of freckles. Often seen wearing comfortable, casual clothing suitable for walking tours.","Hobbies":"Hiking, reading historical fiction, exploring local breweries, volunteering at the animal shelter.","Skills":"Public speaking, historical knowledge, beer tasting, first aid, excellent customer service.","Languages":"English","Health_Status":"Generally healthy, occasional seasonal allergies.","Family_Background":"Grew up in a middle-class family in Charlotte. Her parents are retired teachers. She has one younger brother who lives in Raleigh.","Life_Goals":"To become a certified Cicerone, travel to Europe to explore beer cultures, and eventually start her own brewery or pub.","Notable_Achievements":"Graduated cum laude from UNC Asheville, won 'Employee of the Month' at the brewery twice.","Fears":"Public speaking failures, disappointing her parents, not achieving her career goals.","Strengths":"Enthusiasm, strong communication skills, historical knowledge, adaptability.","Weaknesses":"Can be overly critical of herself, tends to overcommit, struggles with saying no.","Ethnicity":"Caucasian","Religion":null,"Political_Views":"Left-leaning, advocates for environmental protection and social justice.","Favorite_Foods":"Craft burgers, gourmet cheese plates, anything with avocados.","Favorite_Music":"Indie folk, Americana, bluegrass.","Favorite_Books":"Historical fiction, biographies, books about beer and brewing.","Favorite_Movies":"Documentaries, comedies, classic films.","Pet_Peeves":"People being rude to service staff, littering, close-mindedness.","Dreams":"To own a successful brewery that is known for its innovative beers and sustainable practices.","Past_Traumas":null},"status":{"condition":"Normal","mood":"Neutral"},"last_monologue":"[No monologue recorded]","intent_this_turn":"```json\n{\n  \"action_type\": \"think\",\n  \"details\": \"Plan a trip. Research potential destinations.\"\n}\n```","validation_result":null,"interaction_result":null}}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_narration_context: {'target_simulacra_id': {'type': <Type.STRING: 'STRING'>}} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:03,316 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:06,328 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:06,330 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+None
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{},"finish_reason":"MALFORMED_FUNCTION_CALL"}],"model_version":"gemini-2.0-flash","usage_metadata":{"prompt_token_count":3449,"prompt_tokens_details":[{"modality":"TEXT","token_count":3449}],"total_token_count":3449},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:06,336 - src.simulation_loop_v3 - INFO - --- End of Turn 1 ---
+2025-04-28 20:52:06,339 - src.simulation_loop_v3 - INFO - --- Starting Turn 2 ---
+2025-04-28 20:52:06,341 - src.simulation_loop_v3 - INFO - Phase 1: Running World State Agent.
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: NarrationAgent, event id: GM1SU6Hk
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: NarrationAgent, event id: PsHxJOLn
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: NarrationAgent, event id: SgMJvkkH
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_3e912d, event id: Lvgj1mpY
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_662862, event id: itKhLF1H
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_3e912d, event id: buECXA2K
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_3e912d, event id: xnpJF4lA
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_662862, event id: E5cLdjUR
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineValidator_sim_662862, event id: kp5Rujbr
+2025-04-28 20:52:06,347 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_DecideIntent, event id: tUmGMpRS
+2025-04-28 20:52:06,348 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_DecideIntent, event id: 3IQaTzxI
+2025-04-28 20:52:06,348 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_Reflect, event id: 9xJ0NpCo
+2025-04-28 20:52:06,348 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_Reflect, event id: 5iY8lp9n
+2025-04-28 20:52:06,348 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_662862_Observe, event id: FsvVh1PD
+2025-04-28 20:52:06,348 - google.adk.runners - WARNING - Event from an unknown agent: Sim_sim_3e912d_Observe, event id: pcpYA8kf
+2025-04-28 20:52:06,359 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 20:52:06,359 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Okay, I will perform the start-of-turn world state update. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"get_setting_details","response":{}}}],"role":"user"}
+{"parts":[{"function_call":{"args":{},"name":"update_and_get_world_state"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"update_and_get_world_state","response":{}}}],"role":"user"}
+{"parts":[{"text":"World state synced and time updated.\n"}],"role":"model"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_Observe] said: It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_Observe] said: It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_Reflect] said: Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_Reflect] said: Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_662862_DecideIntent] said: ```json\n{\n  \"action_type\": \"think\",\n  \"details\": \"Plan a trip. Research potential destinations.\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[Sim_sim_3e912d_DecideIntent] said: ```json\n{\n  \"action_type\": \"use\",\n  \"target\": \"object_computer\",\n  \"details\": \"research cheap flights\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] called tool `save_single_validation_result` with parameters: {'validation_result': {'reasoning': 'No action intent provided for this simulacrum.', 'estimated_duration_seconds': 0, 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_662862'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] `save_single_validation_result` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] called tool `save_single_validation_result` with parameters: {'validation_result': {'estimated_duration_seconds': 0, 'reasoning': 'No action intent provided for this simulacrum.', 'validation_status': 'no_intent_found'}, 'simulacra_id': 'sim_3e912d'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] `save_single_validation_result` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_662862] said: Validation result saved for sim_662862.\n"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineValidator_sim_3e912d] said: Validation result saved for sim_3e912d."}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[NarrationAgent] called tool `get_narration_context` with parameters: {'target_simulacra_id': 'sim_3e912d'}"},{"text":"[NarrationAgent] called tool `get_narration_context` with parameters: {'target_simulacra_id': 'sim_662862'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[NarrationAgent] `get_narration_context` tool returned result: {'status': 'success', 'target_simulacra_id': 'sim_3e912d', 'world_state': {'world_time': '2025-04-27T01:51:33.433591+00:00', 'location_details': {'Asheville, NC': {'city': 'Asheville', 'state': 'NC', 'country': 'United States', 'coordinates': {'latitude': 35.5951, 'longitude': -82.5515}}}}, 'simulacra_context': {'location': 'Asheville, NC', 'goal': 'Explore the world.', 'persona': {'Name': 'Eleanor Hayes', 'Age': 29, 'Occupation': 'Brewery Tour Guide', 'Current_location': 'Asheville, NC', 'Personality_Traits': ['Enthusiastic', 'Outgoing', 'Knowledgeable', 'Patient', 'Adaptable'], 'Birthplace': 'Charlotte, NC', 'Birthdate': '1995-07-15', 'Birthtime': '14:30', 'Education': 'Bachelor of Arts in History', 'Physical_Appearance': '5\\'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.', 'Hobbies': 'Hiking, trying new craft beers, reading local history, volunteering at the animal shelter', 'Skills': 'Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville', 'Languages': 'English', 'Health_Status': 'Generally healthy, occasional allergies', 'Family_Background': 'Middle-class family, parents still living in Charlotte, one younger brother.', 'Life_Goals': 'To become a local history expert and potentially open a small historical tour business.', 'Notable_Achievements': 'Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.', 'Fears': 'Heights, public speaking failures, not being able to achieve her goals', 'Strengths': 'Strong communication skills, historical knowledge, adaptability', 'Weaknesses': 'Can be overly critical of herself, sometimes struggles to say no.', 'Ethnicity': 'Caucasian', 'Religion': None, 'Political_Views': 'Liberal', 'Favorite_Foods': 'Anything from local Asheville restaurants, especially farm-to-table cuisine.', 'Favorite_Music': 'Indie rock, bluegrass, local Asheville bands', 'Favorite_Books': 'Local history books, historical fiction', 'Favorite_Movies': 'Documentaries, comedies', 'Pet_Peeves': 'Rude tourists, littering, traffic congestion', 'Dreams': 'To share her love of history with others and create a successful business.', 'Past_Traumas': None}, 'status': {'condition': 'Normal', 'mood': 'Neutral'}, 'last_monologue': '[No monologue recorded]', 'intent_this_turn': '```json\\n{\\n  \"action_type\": \"use\",\\n  \"target\": \"object_computer\",\\n  \"details\": \"research cheap flights\"\\n}\\n```', 'validation_result': None, 'interaction_result': None}}"},{"text":"[NarrationAgent] `get_narration_context` tool returned result: {'status': 'success', 'target_simulacra_id': 'sim_662862', 'world_state': {'world_time': '2025-04-27T01:51:33.433591+00:00', 'location_details': {'Asheville, NC': {'city': 'Asheville', 'state': 'NC', 'country': 'United States', 'coordinates': {'latitude': 35.5951, 'longitude': -82.5515}}}}, 'simulacra_context': {'location': 'Asheville, NC', 'goal': 'Explore the world.', 'persona': {'Name': 'Eleanor Vance', 'Age': 33, 'Occupation': 'Brewery Tour Guide', 'Current_location': 'Asheville, NC', 'Personality_Traits': ['Outgoing', 'Friendly', 'Knowledgeable', 'Patient', 'Enthusiastic'], 'Birthplace': 'Charlotte, NC', 'Birthdate': '1991-07-15', 'Birthtime': '08:30', 'Education': 'Bachelor of Arts in History, UNC Asheville', 'Physical_Appearance': 'Average height, with curly auburn hair, green eyes, and a smattering of freckles. Often seen wearing comfortable, casual clothing suitable for walking tours.', 'Hobbies': 'Hiking, reading historical fiction, exploring local breweries, volunteering at the animal shelter.', 'Skills': 'Public speaking, historical knowledge, beer tasting, first aid, excellent customer service.', 'Languages': 'English', 'Health_Status': 'Generally healthy, occasional seasonal allergies.', 'Family_Background': 'Grew up in a middle-class family in Charlotte. Her parents are retired teachers. She has one younger brother who lives in Raleigh.', 'Life_Goals': 'To become a certified Cicerone, travel to Europe to explore beer cultures, and eventually start her own brewery or pub.', 'Notable_Achievements': \"Graduated cum laude from UNC Asheville, won 'Employee of the Month' at the brewery twice.\", 'Fears': 'Public speaking failures, disappointing her parents, not achieving her career goals.', 'Strengths': 'Enthusiasm, strong communication skills, historical knowledge, adaptability.', 'Weaknesses': 'Can be overly critical of herself, tends to overcommit, struggles with saying no.', 'Ethnicity': 'Caucasian', 'Religion': None, 'Political_Views': 'Left-leaning, advocates for environmental protection and social justice.', 'Favorite_Foods': 'Craft burgers, gourmet cheese plates, anything with avocados.', 'Favorite_Music': 'Indie folk, Americana, bluegrass.', 'Favorite_Books': 'Historical fiction, biographies, books about beer and brewing.', 'Favorite_Movies': 'Documentaries, comedies, classic films.', 'Pet_Peeves': 'People being rude to service staff, littering, close-mindedness.', 'Dreams': 'To own a successful brewery that is known for its innovative beers and sustainable practices.', 'Past_Traumas': None}, 'status': {'condition': 'Normal', 'mood': 'Neutral'}, 'last_monologue': '[No monologue recorded]', 'intent_this_turn': '```json\\n{\\n  \"action_type\": \"think\",\\n  \"details\": \"Plan a trip. Research potential destinations.\"\\n}\\n```', 'validation_result': None, 'interaction_result': None}}"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-28 20:52:06,359 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 20:52:07,037 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 20:52:07,039 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.00003709508186707703}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":52,"candidates_tokens_details":[{"modality":"TEXT","token_count":52}],"prompt_token_count":2795,"prompt_tokens_details":[{"modality":"TEXT","token_count":2795}],"total_token_count":2847},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-28 20:52:07,046 - src.simulation_loop_v3 - INFO - World Time updated to: 2025-04-27T01:51:33.433591+00:00
+2025-04-28 20:52:07,050 - src.simulation_loop_v3 - INFO - Phase 2: Running Simulacra Planning Agents.
+2025-04-28 20:52:07,052 - src.simulation_loop_v3 - CRITICAL - Critical error during turn 2: 1 validation error for ParallelAgent
+  Value error, Agent `Simulacra_sim_662862_ThinkingProcess` already has a parent agent, current parent: `ParallelSimPlanning_Turn1`, trying to add: `ParallelSimPlanning_Turn2` [type=value_error, input_value={'name': 'ParallelSimPlan...imulacra concurrently.'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/value_error
+Traceback (most recent call last):
+  File "C:\Users\dshea\Desktop\TheSimulation\src\simulation_loop_v3.py", line 116, in run_phased_simulation
+    parallel_planning_agent = ParallelAgent(
+                              ^^^^^^^^^^^^^^
+  File "c:\Users\dshea\.conda\envs\simulation\Lib\site-packages\pydantic\main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ParallelAgent
+  Value error, Agent `Simulacra_sim_662862_ThinkingProcess` already has a parent agent, current parent: `ParallelSimPlanning_Turn1`, trying to add: `ParallelSimPlanning_Turn2` [type=value_error, input_value={'name': 'ParallelSimPlan...imulacra concurrently.'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/value_error
+2025-04-28 20:52:07,265 - __main__ - INFO - Phased simulation loop (V3) completed.
+2025-04-28 20:52:07,266 - __main__ - INFO - Saving final simulation state.
+2025-04-28 20:52:07,274 - src.initialization - INFO - Saved data to data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 20:52:07,274 - __main__ - INFO - Final simulation state saved to data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json

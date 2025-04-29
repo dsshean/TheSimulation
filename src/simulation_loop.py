@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional, Set
 from google.adk.agents import BaseAgent, ParallelAgent # LLMAgent no longer needed directly here
 from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, Session
+from google.adk.events import Event, EventActions # <<< ADD Event, EventActions import
 from google.genai import types
 from datetime import datetime, timedelta
 from src.loop_utils import print_event_details, parse_json_output, format_iso_timestamp
@@ -123,7 +124,7 @@ async def run_phased_simulation(
             phase1_trigger_text = (
                  f"Perform the start-of-turn world state update. "
                  f"First, use the 'get_setting_details' tool for the primary location '{primary_location_for_tool}'. "
-                 f"Then, use the 'update_and_get_world_state' tool to advance world time. "
+                #  f"Then, use the 'update_and_get_world_state' tool to advance world time. "
                  f"Respond ONLY with a brief confirmation message like 'World state synced and time updated.'"
             )
             phase1_trigger = types.Content(parts=[types.Part(text=phase1_trigger_text)])
@@ -221,7 +222,7 @@ async def run_phased_simulation(
 
                 async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=phase2_trigger):
                     print_event_details(event, "P2", console, logger) # Handles its own formatting
-
+                    console.print(event)
                     # --- ADDED: State Update Logic using state_delta ---
                     if hasattr(event, 'actions') and event.actions:
                         # Directly check state_delta on the event.actions object
@@ -329,7 +330,7 @@ async def run_phased_simulation(
                     ):
                     # --- END MODIFICATION ---
                         print_event_details(event, "P3", console, logger)
-
+                        console.print(event)
                         # --- State Update Logic for Merging Deltas ---
                         if hasattr(event, 'actions') and event.actions and hasattr(event.actions, 'state_delta') and isinstance(event.actions.state_delta, dict):
                             delta = event.actions.state_delta
@@ -404,7 +405,7 @@ async def run_phased_simulation(
 
                 async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=interaction_trigger):
                     print_event_details(event, "P4a", console, logger) # Handles its own formatting
-
+                    console.print(event)
                     # --- ADDED: State Update Logic using state_delta ---
                     if hasattr(event, 'actions') and event.actions:
                         # Directly check state_delta on the event.actions object
@@ -532,47 +533,64 @@ async def run_phased_simulation(
 
                     parsed_execution_results = None
                     final_execution_text = None
+                    state_updated_via_delta_phase4b = False # Flag for agent's own delta
 
                     async for event in runner.run_async(
                         user_id=user_id, session_id=session_id, new_message=execution_trigger
                     ):
-                        print_event_details(event, "P4b", console, logger) # Handles its own formatting
+                        print_event_details(event, "P4b", console, logger)
+                        console.print(event)
+                        # --- Process state_delta FROM THE AGENT/TOOL itself ---
+                        if hasattr(event, 'actions') and event.actions:
+                            if hasattr(event.actions, 'state_delta') and isinstance(event.actions.state_delta, dict):
+                                delta = event.actions.state_delta
+                                if delta:
+                                    logger.info(f"P4b Applying state_delta from agent: {list(delta.keys())}")
+                                    session.state.update(delta)
+                                    state_updated_via_delta_phase4b = True
+                                else:
+                                    logger.debug("P4b Received an event with an empty state_delta from agent.")
+                        # ---
+
                         # Capture final text
                         if event.is_final_response() and event.content and event.content.parts:
                              part = event.content.parts[0]
                              if hasattr(part, 'text'):
                                  final_execution_text = part.text
-                                 # --- REMOVED: Raw output print here ---
 
-                    # Parse the result
+                    # Parse the result from the agent's final text
                     parsed_execution_results = parse_json_output(
                         final_execution_text, "P4b", world_execution_agent.name, console, logger
                     )
 
                     execution_narratives = {}
                     max_duration = 0
+                    location_updates_delta = {} # <<< Initialize dict to collect location updates
+
                     console.print(Padding("[bold]Processing Execution Results:[/bold]", (1, 0, 0, 4)))
                     if parsed_execution_results:
                         for sim_id, result_data in parsed_execution_results.items():
                             if isinstance(result_data, dict):
                                 narrative = result_data.get("narrative")
                                 new_location = result_data.get("new_location")
-                                duration = result_data.get("duration_seconds", 0) # Agent's calculated duration
+                                duration = result_data.get("duration_seconds", 0)
 
                                 console.print(Padding(f"[bold]{sim_id}:[/bold]", (0, 0, 0, 6)))
                                 if narrative:
                                     execution_narratives[sim_id] = narrative
                                     logger.info(f"Stored execution narrative for {sim_id}.")
-                                    # console.print(Padding(f"  Narrative: {narrative}", (0, 0, 0, 6))) # Optional: Print narrative here too? Maybe too verbose.
                                 else:
                                      console.print(Padding(f"  Narrative: [yellow][Missing][/yellow]", (0, 0, 0, 6)))
 
-
                                 if new_location:
                                     location_key = SIMULACRA_LOCATION_KEY_FORMAT.format(sim_id)
-                                    session.state[location_key] = new_location
-                                    logger.info(f"Updated location for {sim_id} to '{new_location}'.")
-                                    console.print(Padding(f"  New Location: '{new_location}'", (0, 0, 0, 6)))
+                                    # --- REMOVED Direct Update ---
+                                    # session.state[location_key] = new_location
+                                    # --- ADDED Collection for Delta ---
+                                    location_updates_delta[location_key] = new_location
+                                    # ---
+                                    logger.info(f"Collected location update for {sim_id} to '{new_location}'.")
+                                    console.print(Padding(f"  New Location: '{new_location}' (pending state update)", (0, 0, 0, 6))) # Indicate pending
                                 else:
                                     logger.warning(f"No 'new_location' provided by agent for move action of {sim_id}.")
                                     console.print(Padding(f"  New Location: [yellow][Missing][/yellow]", (0, 0, 0, 6)))
@@ -589,7 +607,29 @@ async def run_phased_simulation(
                                 logger.warning(f"Invalid result format for {sim_id} in execution JSON: {result_data}")
                                 console.print(Padding(f"[bold]{sim_id}:[/bold] [red]Invalid result format[/red]", (0, 0, 1, 6)))
 
-                        # Advance world time after processing all moves
+                        # --- ADDED: Apply collected location updates via a new event ---
+                        if location_updates_delta:
+                            logger.info(f"Applying collected location updates via separate event: {list(location_updates_delta.keys())}")
+                            location_update_event = Event(
+                                # Generate a unique ID or use a consistent pattern
+                                invocation_id=f"inv_p4b_loc_update_{turn+1}",
+                                author="system_orchestrator", # Indicate it's from the loop logic
+                                actions=EventActions(state_delta=location_updates_delta),
+                                timestamp=datetime.now().timestamp() # Use current time
+                            )
+                            try:
+                                # Use the session service to append this event, which handles state update
+                                session_service.append_event(session, location_update_event)
+                                console.print(Padding("[green]Location updates applied via state_delta event.[/green]", (1, 0, 0, 4)))
+                            except Exception as append_e:
+                                logger.exception(f"Failed to append location update event: {append_e}")
+                                console.print(Padding(f"[bold red]Error applying location updates via event: {append_e}[/bold red]", (1, 0, 0, 4)))
+                                # Note: State might be inconsistent if this fails
+                        else:
+                            logger.info("No location updates collected to apply.")
+                        # --- END ADDED ---
+
+                        # --- World time update remains direct (necessary orchestration step) ---
                         if max_duration > 0:
                             try:
                                 world_state = session.state.get(WORLD_STATE_KEY, {})
@@ -597,10 +637,9 @@ async def run_phased_simulation(
                                 if current_time_iso:
                                     current_dt = datetime.fromisoformat(current_time_iso)
                                     new_dt = current_dt + timedelta(seconds=max_duration)
-                                    # Ensure WORLD_STATE_KEY exists before updating subkey
                                     if WORLD_STATE_KEY not in session.state:
-                                        session.state[WORLD_STATE_KEY] = {} # Should not happen if Phase 1 succeeded, but safe
-                                    session.state[WORLD_STATE_KEY]["world_time"] = new_dt.isoformat()
+                                        session.state[WORLD_STATE_KEY] = {}
+                                    session.state[WORLD_STATE_KEY]["world_time"] = new_dt.isoformat() # Direct update kept
                                     formatted_new_time = format_iso_timestamp(new_dt.isoformat())
                                     logger.info(f"Advanced world time by {max_duration} seconds to {formatted_new_time}.")
                                     console.print(Padding(f"[bold]World Time Advanced:[/bold] +{max_duration}s -> {formatted_new_time}", (1, 0, 0, 4)))
@@ -612,12 +651,13 @@ async def run_phased_simulation(
                                 console.print(Padding(f"[red]Error advancing world time: {time_e}[/red]", (1, 0, 0, 4)))
                         else:
                              console.print(Padding("[dim]No time advancement (max duration was 0).[/dim]", (1, 0, 0, 4)))
+                        # --- End World time update ---
 
                     else: # parsed_execution_results was None
                         console.print(Padding("[yellow]Could not parse execution results.[/yellow]", (0, 0, 0, 4)))
 
                     # Store the collected narratives (even if empty)
-                    session.state[TURN_EXECUTION_NARRATIVES_KEY] = execution_narratives
+                    session.state[TURN_EXECUTION_NARRATIVES_KEY] = execution_narratives # Direct update ok for intermediate results used later in same turn
                     console.print(Padding("[green]Phase 4b Complete.[/green]", (1, 0, 1, 2)))
 
                 else: # No approved moves
@@ -658,29 +698,29 @@ async def run_phased_simulation(
 
             # Run agent and process state delta
             async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=narration_trigger):
-                 print_event_details(event, "P5", console, logger) # Handles its own formatting
+                print_event_details(event, "P5", console, logger) # Handles its own formatting
+                console.print(event)
+                # --- ADDED: State Update Logic using state_delta ---
+                if hasattr(event, 'actions') and event.actions:
+                    # Directly check state_delta on the event.actions object
+                    if hasattr(event.actions, 'state_delta') and isinstance(event.actions.state_delta, dict):
+                        delta = event.actions.state_delta
+                        if delta: # Check if the delta dictionary is not empty
+                            logger.info(f"P5 Applying state_delta: {list(delta.keys())}")
+                            # Merge the delta into the main session state
+                            session.state.update(delta)
+                            state_updated_via_delta_phase5 = True
+                        else:
+                            logger.debug("P5 Received an event with an empty state_delta.")
+                    # else: logger.debug("P5 Event actions found, but no valid state_delta attribute.")
+                # --- END State Update Logic ---
 
-                 # --- ADDED: State Update Logic using state_delta ---
-                 if hasattr(event, 'actions') and event.actions:
-                     # Directly check state_delta on the event.actions object
-                     if hasattr(event.actions, 'state_delta') and isinstance(event.actions.state_delta, dict):
-                         delta = event.actions.state_delta
-                         if delta: # Check if the delta dictionary is not empty
-                             logger.info(f"P5 Applying state_delta: {list(delta.keys())}")
-                             # Merge the delta into the main session state
-                             session.state.update(delta)
-                             state_updated_via_delta_phase5 = True
-                         else:
-                             logger.debug("P5 Received an event with an empty state_delta.")
-                     # else: logger.debug("P5 Event actions found, but no valid state_delta attribute.")
-                 # --- END State Update Logic ---
-
-                 # Optional: Capture final text
-                 elif event.is_final_response() and event.content and event.content.parts:
-                      part = event.content.parts[0]
-                      if hasattr(part, 'text'):
-                          final_narration_summary_text = part.text
-                          logger.info(f"P5 Final summary text: {final_narration_summary_text}")
+                # Optional: Capture final text
+                elif event.is_final_response() and event.content and event.content.parts:
+                    part = event.content.parts[0]
+                    if hasattr(part, 'text'):
+                        final_narration_summary_text = part.text
+                        logger.info(f"P5 Final summary text: {final_narration_summary_text}")
                           # break # Optional break
 
             # --- REMOVED: Parsing final text for state update ---
@@ -708,7 +748,7 @@ async def run_phased_simulation(
                 # else: logger.debug(f"No narration found for {sim_id} under key {narration_key}") # Optional debug
 
             if not found_narratives:
-                 console.print(Padding("[yellow]No final narratives found in session state.[/yellow]", (1, 0, 1, 4)))
+                console.print(Padding("[yellow]No final narratives found in session state.[/yellow]", (1, 0, 1, 4)))
 
             console.print(Rule(style="magenta")) # Footer rule for the narrative block
             # ---

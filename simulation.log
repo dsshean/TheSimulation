@@ -1,35 +1,35 @@
-2025-04-28 10:35:26,194 - __main__ - INFO - --- Application Start --- Logging configured to file: simulation.log
-2025-04-28 10:35:26,199 - __main__ - INFO - Starting main execution.
-2025-04-28 10:35:26,199 - src.initialization - INFO - Loading world template from: world_config.json
-2025-04-28 10:35:26,200 - src.initialization - WARNING - Template file world_config.json contains a world_instance_uuid. This should ideally be null or absent in the template.
-2025-04-28 10:35:26,200 - src.initialization - INFO - World template loaded successfully.
-2025-04-28 10:35:26,200 - __main__ - INFO - Using World Template: world_config.json
-2025-04-28 10:35:26,202 - src.initialization - INFO - Found latest simulation state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-04-28 10:35:26,203 - src.initialization - INFO - Attempting to load latest instance state: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-04-28 10:35:26,203 - src.initialization - INFO - Successfully loaded latest instance state (UUID: 05e07dad-f24b-420b-822c-1ae7862220f6)
-2025-04-28 10:35:26,203 - src.initialization - INFO - Updated session ID to session_id_99925b72 in loaded state.
-2025-04-28 10:35:26,203 - src.initialization - INFO - Saving loaded state file due to updates (missing keys/session ID).
-2025-04-28 10:35:26,204 - src.initialization - INFO - Saved data to data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-04-28 10:35:26,204 - __main__ - INFO - Using Simulation Instance UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
-2025-04-28 10:35:26,204 - __main__ - INFO - Using State File Path: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-04-28 10:35:26,208 - __main__ - INFO - Confirmed 2 simulacra from state with existing summaries: ['sim_662862', 'sim_3e912d']
-2025-04-28 10:35:26,209 - __main__ - INFO - No state changes requiring save before agent creation.
-2025-04-28 10:35:26,209 - __main__ - INFO - Simulation instance 05e07dad-f24b-420b-822c-1ae7862220f6 will run with 2 simulacra: ['sim_662862', 'sim_3e912d']
-2025-04-28 10:35:26,210 - __main__ - INFO - ADK Session created/loaded: session_id_99925b72 with initial state.
-2025-04-28 10:35:26,212 - __main__ - INFO - Core agent 'World State' (world_state_agent) added.
-2025-04-28 10:35:26,212 - __main__ - INFO - Core agent 'NPC Interaction' (NpcInteractionAgent) added.
-2025-04-28 10:35:26,212 - __main__ - INFO - Core agent 'World Execution' (WorldExecutionAgent) added.
-2025-04-28 10:35:26,212 - __main__ - INFO - Core agent 'Narration' (NarrationAgent) added.
-2025-04-28 10:35:26,215 - __main__ - INFO - Created and added validator agent instance for sim_662862 (WorldEngineValidator_sim_662862)
-2025-04-28 10:35:26,216 - __main__ - INFO - Created and added validator agent instance for sim_3e912d (WorldEngineValidator_sim_3e912d)
-2025-04-28 10:35:26,219 - __main__ - INFO - Created and added simulacra agent instance for sim_662862 (sim_662862)
-2025-04-28 10:35:26,220 - __main__ - INFO - Created and added simulacra agent instance for sim_3e912d (sim_3e912d)
-2025-04-28 10:35:26,222 - __main__ - INFO - Runner initialized for app 'TheSimulation' with default agent 'world_state_agent'.
-2025-04-28 10:35:26,228 - src.simulation_loop - WARNING - Could not find 'simulation_primary_location' in session state. Falling back to default: New York City, NY
-2025-04-28 10:35:26,232 - src.simulation_loop - INFO - Unique locations to query details for: ['Asheville, NC']
-2025-04-28 10:35:37,253 - src.simulation_loop - INFO - Primary location for Phase 1 setting details: Asheville, NC
-2025-04-28 10:35:37,389 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
-2025-04-28 10:35:37,389 - google.adk.models.google_llm - INFO - 
+2025-04-28 12:50:26,351 - __main__ - INFO - --- Application Start --- Logging configured to file: simulation.log
+2025-04-28 12:50:26,356 - __main__ - INFO - Starting main execution.
+2025-04-28 12:50:26,356 - src.initialization - INFO - Loading world template from: world_config.json
+2025-04-28 12:50:26,357 - src.initialization - WARNING - Template file world_config.json contains a world_instance_uuid. This should ideally be null or absent in the template.
+2025-04-28 12:50:26,357 - src.initialization - INFO - World template loaded successfully.
+2025-04-28 12:50:26,357 - __main__ - INFO - Using World Template: world_config.json
+2025-04-28 12:50:26,360 - src.initialization - INFO - Found latest simulation state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 12:50:26,360 - src.initialization - INFO - Attempting to load latest instance state: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 12:50:26,360 - src.initialization - INFO - Successfully loaded latest instance state (UUID: 05e07dad-f24b-420b-822c-1ae7862220f6)
+2025-04-28 12:50:26,360 - src.initialization - INFO - Updated session ID to session_id_7170b3f2 in loaded state.
+2025-04-28 12:50:26,360 - src.initialization - INFO - Saving loaded state file due to updates (missing keys/session ID).
+2025-04-28 12:50:26,362 - src.initialization - INFO - Saved data to data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 12:50:26,362 - __main__ - INFO - Using Simulation Instance UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
+2025-04-28 12:50:26,362 - __main__ - INFO - Using State File Path: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-28 12:50:26,365 - __main__ - INFO - Confirmed 2 simulacra from state with existing summaries: ['sim_662862', 'sim_3e912d']
+2025-04-28 12:50:26,367 - __main__ - INFO - No state changes requiring save before agent creation.
+2025-04-28 12:50:26,367 - __main__ - INFO - Simulation instance 05e07dad-f24b-420b-822c-1ae7862220f6 will run with 2 simulacra: ['sim_662862', 'sim_3e912d']
+2025-04-28 12:50:26,368 - __main__ - INFO - ADK Session created/loaded: session_id_7170b3f2 with initial state.
+2025-04-28 12:50:26,370 - __main__ - INFO - Core agent 'World State' (world_state_agent) added.
+2025-04-28 12:50:26,370 - __main__ - INFO - Core agent 'NPC Interaction' (NpcInteractionAgent) added.
+2025-04-28 12:50:26,370 - __main__ - INFO - Core agent 'World Execution' (WorldExecutionAgent) added.
+2025-04-28 12:50:26,370 - __main__ - INFO - Core agent 'Narration' (NarrationAgent) added.
+2025-04-28 12:50:26,372 - __main__ - INFO - Created and added validator agent instance for sim_662862 (WorldEngineValidator_sim_662862)
+2025-04-28 12:50:26,374 - __main__ - INFO - Created and added validator agent instance for sim_3e912d (WorldEngineValidator_sim_3e912d)
+2025-04-28 12:50:26,376 - __main__ - INFO - Created and added simulacra agent instance for sim_662862 (sim_662862)
+2025-04-28 12:50:26,377 - __main__ - INFO - Created and added simulacra agent instance for sim_3e912d (sim_3e912d)
+2025-04-28 12:50:26,380 - __main__ - INFO - Runner initialized for app 'TheSimulation' with default agent 'world_state_agent'.
+2025-04-28 12:50:26,386 - src.simulation_loop - WARNING - Could not find 'simulation_primary_location' in session state. Falling back to default: New York City, NY
+2025-04-28 12:50:26,390 - src.simulation_loop - INFO - Unique locations to query details for: ['Asheville, NC']
+2025-04-28 12:50:26,394 - src.simulation_loop - INFO - Primary location for Phase 1 setting details: Asheville, NC
+2025-04-28 12:50:26,524 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-28 12:50:26,524 - google.adk.models.google_llm - INFO - 
 LLM Request:
 -----------------------------------------------------------
 System Instruction:
@@ -65,20 +65,21 @@ get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
 update_and_get_world_state: {} -> None
 -----------------------------------------------------------
 
-2025-04-28 10:35:37,389 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
-2025-04-28 10:35:38,368 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
-2025-04-28 10:35:38,371 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
-2025-04-28 10:35:38,371 - google.adk.models.google_llm - INFO - 
+2025-04-28 12:50:26,524 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-28 12:50:27,602 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-28 12:50:27,604 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-28 12:50:27,604 - google.adk.models.google_llm - INFO - 
 LLM Response:
 -----------------------------------------------------------
 Text:
-Okay, I will perform the start-of-turn world state update. First, I'll use the `get_setting_details` tool for 'Asheville, NC'. Then, I'll use the `update_and_get_world_state` tool to advance world time.
+Okay, I understand. I will perform the start-of-turn world state update as requested. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.
 
 -----------------------------------------------------------
 Function calls:
 name: get_setting_details, args: {'location': 'Asheville, NC'}
 -----------------------------------------------------------
 Raw response:
-{"candidates":[{"content":{"parts":[{"text":"Okay, I will perform the start-of-turn world state update. First, I'll use the `get_setting_details` tool for 'Asheville, NC'. Then, I'll use the `update_and_get_world_state` tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.03416195511817932}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":72,"candidates_tokens_details":[{"modality":"TEXT","token_count":72}],"prompt_token_count":517,"prompt_tokens_details":[{"modality":"TEXT","token_count":517}],"total_token_count":589},"automatic_function_calling_history":[]}
+{"candidates":[{"content":{"parts":[{"text":"Okay, I understand. I will perform the start-of-turn world state update as requested. First, I will use the `get_setting_details` tool for 'Asheville, NC'. Then, I will use the `update_and_get_world_state` tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.034626153310139976}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":75,"candidates_tokens_details":[{"modality":"TEXT","token_count":75}],"prompt_token_count":532,"prompt_tokens_details":[{"modality":"TEXT","token_count":532}],"total_token_count":607},"automatic_function_calling_history":[]}
 -----------------------------------------------------------
 
+2025-04-28 12:50:45,333 - src.tools.world_state_tools - INFO - Assigned payload to tool_context.state_delta for location: Asheville, NC

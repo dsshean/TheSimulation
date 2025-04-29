@@ -1,6 +1,6 @@
 {
   "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6",
-  "session_id": "adk_session_05e07dad-f24b-420b-822c-1ae7862220f6_20250428_205146",
+  "session_id": "adk_session_05e07dad-f24b-420b-822c-1ae7862220f6_20250428_202432",
   "world_template_details": {
     "world_type": "real",
     "sub_genre": "realtime",
@@ -136,12 +136,5 @@
     "condition": "Normal",
     "mood": "Neutral"
   },
-  "simulacra_sim_3e912d_validation_result": null,
-  "world_state_agent_confirmation": "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n",
-  "sim_sim_3e912d_step1_observation": "It is late at night in Asheville, NC, and I am feeling neutral. My condition is normal.\n",
-  "sim_sim_662862_step1_observation": "It is nighttime in Asheville, North Carolina, and I am feeling neutral. My condition is normal.\n",
-  "sim_sim_662862_step2_reflection": "Okay, it's nighttime and I'm in Asheville, feeling neutral. If I want to explore the world, staying put isn't going to cut it. Maybe I should start planning a trip, researching potential destinations, or even just looking at travel blogs for inspiration.\n",
-  "sim_sim_3e912d_step2_reflection": "Being neutral late at night in Asheville isn't the most exciting thing when my goal is to explore the world. I should probably be using this time to plan a future adventure or research potential destinations. Maybe I can look up some cheap flights online or read a travel blog to spark some inspiration, rather than just passively existing.\n",
-  "simulacra_sim_3e912d_intent": "```json\n{\n  \"action_type\": \"use\",\n  \"target\": \"object_computer\",\n  \"details\": \"research cheap flights\"\n}\n```",
-  "simulacra_sim_662862_intent": "```json\n{\n  \"action_type\": \"think\",\n  \"details\": \"Plan a trip. Research potential destinations.\"\n}\n```"
+  "simulacra_sim_3e912d_validation_result": null
 }

@@ -2,12 +2,10 @@
 
 import json
 import logging
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 
-import requests
-from dotenv import load_dotenv
-from google.adk.tools.tool_context import ToolContext
+from google.adk.tools import ToolContext
 from GoogleNews import GoogleNews
 from rich.console import Console
 
@@ -15,69 +13,78 @@ from src.generation.llm_service import LLMService
 from src.tools.python_weather.client import Client  # Import the Client class
 from src.tools.python_weather.constants import IMPERIAL
 
-WORLD_STATE_KEY = "current_world_state" # Make sure this line exists and is spelled correctly
+googlenews = GoogleNews()
+console = Console()
+logger = logging.getLogger(__name__)
+DEFAULT_TIME_INCREMENT_SECONDS = 60 * 5 # 5 minutes
+WORLD_STATE_KEY = "current_world_state"
 SIMULACRA_INTENT_KEY_FORMAT = "simulacra_{}_intent"
 SIMULACRA_LOCATION_KEY_FORMAT = "simulacra_{}_location"
 SIMULACRA_STATUS_KEY_FORMAT = "simulacra_{}_status"
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
 ACTION_VALIDATION_KEY_FORMAT = "simulacra_{}_validation_result" # Ensure this matches simulation_loop.py
 
-googlenews = GoogleNews()
-console = Console()
-logger = logging.getLogger(__name__)
-
-DEFAULT_TIME_INCREMENT_SECONDS = 60 * 5 # 5 minutes
-
-def get_setting_details(location: str, tool_context: ToolContext) -> str:
+def get_setting_details(location: str, tool_context: ToolContext) -> None:
     """
-    Provides descriptive details about the specified location based on world state.
-    Uses the LLMService to generate location details synchronously.
-    Fetches real-time weather and news. Uses CURRENT REAL-WORLD time for context.
+    Provides descriptive details about the specified location as a dictionary
+    and signals the update via tool_context.state_delta under 'location_details'.
+    Uses external services/functions for weather and news.
+    Uses CURRENT REAL-WORLD time for context.
     """
     console.print(f"[dim green]--- Tool: World Engine providing setting details for [i]{location}[/i] ---[/dim green]")
+    details_dict = {} # Initialize dictionary to hold details
 
-    # Step 1: Get a base description of the location using LLMService
     try:
-        llm_service = LLMService()
-        prompt = f"Provide a brief (4 to 5 sentences max) description of the location '{location}'. Include historical, cultural, or notable features."
-        base_description = llm_service.generate_content_text(
-            prompt=prompt
-        )
+        # Step 1: Get base description
+        base_description = f"A placeholder description for {location}." # Placeholder
+        details_dict["description"] = base_description
+
+        # Step 2: Get Weather & News
+        weather_info = get_weather(location)
+        local_news_info = get_news(f"local news in {location}")
+        regional_news_info = get_news(f"regional news near {location}")
+        world_news_info = get_news("world news")
+
+        details_dict["weather"] = weather_info
+        details_dict["local_news"] = local_news_info
+        details_dict["regional_news"] = regional_news_info
+        details_dict["world_news"] = world_news_info
+
+        # Step 3: Add Real Time
+        real_time_now_str = datetime.now().isoformat()
+        details_dict["current_real_time"] = real_time_now_str
+        details_dict["location_name"] = location
+
+        # --- REMOVE Direct State Modification ---
+
+        console.print("[dim green]--- Tool: Setting details dictionary generated ---[/dim green]")
+
+        # --- MODIFIED: Assign payload to tool_context.state_delta ---
+        state_update_payload = {
+            "location_details": {
+                location: details_dict # The dictionary containing all details
+            }
+        }
+        # Assign the dictionary to the state_delta attribute of the context
+        # tool_context.state_delta = state_update_payload
+        tool_context.state_delta = 'test'
+        logger.info(f"Assigned payload to tool_context.state_delta for location: {location}")
+        # --- END MODIFICATION ---
+
+        # <<< Return None (or a status string) instead of the state payload >>>
+        return None
 
     except Exception as e:
-        console.print(f"[bold red]Error querying LLMService for location details:[/bold red] {e}")
-        base_description = f"You are at {location}. There's nothing particularly notable right now."
-
-    # Step 2: Fetch high-level details using tools
-    weather = get_weather(f"{location}")
-    local_news = get_news(f"local news in {location}")
-    regional_news = get_news(f"regional news near {location}")
-    world_news = get_news("world news")
-
-    # Step 3: Combine all details into a full description
-    # --- MODIFIED: Use current real-world time ---
-    real_time_now_str = datetime.now().isoformat()
-    # current_time = tool_context.state.get("world_time", "an unknown time") # Old way
-    # ---
-    full_description = (
-        f"Location: {location}. Current Real Time: {real_time_now_str}. " # Use real time
-        f"Description: {base_description} "
-        f"Weather: {weather}. "
-        f"Local News: {local_news}. "
-        f"Regional News: {regional_news}. "
-        f"World News: {world_news}."
-    )
-
-    # Ensure "location_details" exists in the state
-    if "location_details" not in tool_context.state:
-        tool_context.state["location_details"] = {}
-
-    # Store the generated description in the session state
-    tool_context.state["location_details"][location] = full_description
-    console.print("[dim green]--- Tool: Setting details generated ---[/dim green]")
-
-    # Return the description as well (optional, but can be useful)
-    return full_description # Changed to return the string
+        logger.error(f"Error in get_setting_details for {location}: {e}", exc_info=True)
+        console.print(f"[bold red]Error generating setting details for {location}: {e}[/bold red]")
+        # Signal error state update via state_delta
+        tool_context.state_delta = {
+            "location_details": {
+                location: {"error": f"Failed to retrieve details: {e}"}
+            }
+        }
+        # <<< Return None (or an error status string) >>>
+        return None
 
 def get_weather(location: str) -> str:
     """
@@ -97,7 +104,7 @@ def get_weather(location: str) -> str:
             precipitation = forecast.precipitation  # Current precipitation
 
             # Get the current date
-            current_date = date.today()
+            current_date = datetime.now().date()
 
             # Filter daily forecasts for the current date
             daily_forecasts = [
@@ -152,18 +159,20 @@ def get_news(query: str) -> str:
         console.print(f"[bold red]Error fetching data for query '{query}':[/bold red] {e}")
         return "Data unavailable."
 
-def update_and_get_world_state(tool_context: ToolContext) -> Dict[str, Any]:
+# --- Tool: Update World State ---
+def update_and_get_world_state(tool_context: ToolContext) -> None:
     """
-    Updates the world state (time, potentially other dynamics) and returns the complete current state.
+    Updates the world state (time, potentially other dynamics) and signals
+    the update via tool_context.state_delta.
     """
-    console.print("[dim blue]--- Tool (WorldState): Updating and getting full world state... ---[/dim blue]")
-    state = tool_context.state
+    console.print("[dim blue]--- Tool (WorldState): Updating world state... ---[/dim blue]")
+    state = tool_context.state # Read current state
 
     # --- Time Advancement ---
-    # Uses WORLD_STATE_KEY defined above
-    world_state = state.get(WORLD_STATE_KEY, {})
+    world_state = state.get(WORLD_STATE_KEY, {}) # Get a copy or default
     current_time_str = world_state.get("world_time", None)
     new_time_str = current_time_str # Default to original if parsing fails
+    time_advanced = False
 
     if current_time_str:
         try:
@@ -171,19 +180,37 @@ def update_and_get_world_state(tool_context: ToolContext) -> Dict[str, Any]:
             time_increment = timedelta(seconds=DEFAULT_TIME_INCREMENT_SECONDS)
             new_time_dt = current_time_dt + time_increment
             new_time_str = new_time_dt.isoformat()
-            world_state["world_time"] = new_time_str
-            logger.info(f"Advanced world time from {current_time_str} to {new_time_str}")
+            # Prepare the update for the delta, don't modify world_state directly here yet
+            time_advanced = True
+            logger.info(f"Calculated time advancement from {current_time_str} to {new_time_str}")
         except (ValueError, TypeError) as e:
-            logger.error(f"Error parsing/advancing time tick '{current_time_str}': {e}. Returning original.")
+            logger.error(f"Error parsing/advancing time tick '{current_time_str}': {e}. Time not advanced.")
         except Exception as e:
              logger.exception(f"Unexpected error during time advancement for '{current_time_str}': {e}")
     else:
         logger.warning("World time not found in state. Cannot advance time.")
 
-    # --- Other State Updates (Optional) ---
-    # world_state["weather"] = "Slightly cloudy" # Example
+    # --- Prepare the state delta ---
+    # Start with the existing world state to preserve other keys
+    updated_world_state_payload = world_state.copy()
+    if time_advanced:
+        updated_world_state_payload["world_time"] = new_time_str
 
-    # Uses WORLD_STATE_KEY defined above
-    state[WORLD_STATE_KEY] = world_state
-    console.print("[dim blue]--- Tool (WorldState): Finished updating world state. ---[/dim blue]")
-    return world_state
+    # --- Other State Updates (Optional) ---
+    # updated_world_state_payload["weather"] = "Slightly cloudy" # Example
+
+    # --- Assign to state_delta ---
+    # The key is WORLD_STATE_KEY, the value is the entire updated world state dictionary
+    tool_context.state_delta = {
+        WORLD_STATE_KEY: updated_world_state_payload
+    }
+    logger.info(f"Signaled world state update via state_delta for key '{WORLD_STATE_KEY}'.")
+    # ---
+
+    # --- REMOVE Direct State Modification ---
+    # state[WORLD_STATE_KEY] = world_state
+    # ---
+
+    console.print("[dim blue]--- Tool (WorldState): Finished signaling world state update. ---[/dim blue]")
+    # <<< Return None (or a status string) instead of the state dict >>>
+    return None

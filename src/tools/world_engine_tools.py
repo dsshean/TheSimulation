@@ -23,38 +23,68 @@ console = Console()
 ############ Probably not needed most moved to world state tools ############
 
 def process_movement(origin: str, destination: str, tool_context: ToolContext) -> dict:
-    """Calculates travel time, updates world time, and updates the Simulacra's location in the state. Returns a result dictionary."""
+    """Calculates travel time, signals world time and location updates via state_delta. Returns a result dictionary."""
     console.print(f"[dim green]--- Tool: World Engine processing move from [i]{origin}[/i] to [i]{destination}[/i] ---[/dim green]")
     # !! Placeholder Logic !!
     travel_time_minutes = 30
-    current_time_str = tool_context.state.get("world_time", "Day 1, 09:00")
+    current_time_str = tool_context.state.get("world_time", "Day 1, 09:00") # Read current time
     new_time_str = f"{current_time_str} (+{travel_time_minutes}m)" # Simple placeholder
 
-    tool_context.state["world_time"] = new_time_str
-    tool_context.state["simulacra_location"] = destination
-
-    result = {
+    # --- Prepare state delta ---
+    state_changes = {
+        "world_time": new_time_str,
+        "simulacra_location": destination # Assuming this key is correct for the agent using this tool
+    }
+    # Add last update info to the delta as well
+    result_message = f"Travel from {origin} to {destination} took {travel_time_minutes} minutes. You arrived at {destination} at {new_time_str}."
+    state_changes["last_world_engine_update"] = {
         "status": "success",
         "duration": travel_time_minutes,
         "new_location": destination,
         "new_time": new_time_str,
-        "message": f"Travel from {origin} to {destination} took {travel_time_minutes} minutes. You arrived at {destination} at {new_time_str}."
+        "message": result_message
     }
-    tool_context.state["last_world_engine_update"] = result # Store result in state
-    console.print(f"[dim green]--- Tool: World Engine updated state: Time=[b]{new_time_str}[/b], Location=[b]{destination}[/b] ---[/dim green]")
-    return result
+
+    # --- Assign to state_delta ---
+    try:
+        tool_context.state_delta = state_changes
+        logger.info(f"Signaled state_delta for movement: {list(state_changes.keys())}")
+    except Exception as e:
+        logger.exception(f"Error assigning state_delta in process_movement: {e}")
+        # Return error if assignment fails
+        return {
+            "status": "error",
+            "message": f"Internal error signaling state update: {e}"
+        }
+
+    console.print(f"[dim green]--- Tool: World Engine signaled state update: Time=[b]{new_time_str}[/b], Location=[b]{destination}[/b] ---[/dim green]")
+    # Return the result information (not the state delta)
+    return None
 
 def advance_time(minutes: int, tool_context: ToolContext) -> str:
-    """Advances the world clock by a specified number of minutes (e.g., for waiting). Called ONLY by Narration."""
+    """Advances the world clock by a specified number of minutes, signaling update via state_delta. Called ONLY by Narration."""
     console.print(f"[dim green]--- Tool: World Engine advancing time by {minutes} minutes ---[/dim green]")
-    current_time_str = tool_context.state.get("world_time", "Day 1, 09:00")
+    current_time_str = tool_context.state.get("world_time", "Day 1, 09:00") # Read current time
     # !! Placeholder Logic !!
     new_time_str = f"{current_time_str} (+{minutes}m)"
-    tool_context.state["world_time"] = new_time_str
     result_msg = f"Time advanced by {minutes} minutes. Current time is {new_time_str}."
-    tool_context.state["last_world_engine_update"] = {"status": "success", "message": result_msg} # Store result
-    console.print(f"[dim green]--- Tool: World Engine updated state: Time=[b]{new_time_str}[/b] ---[/dim green]")
-    return result_msg
+
+    # --- Prepare state delta ---
+    state_changes = {
+        "world_time": new_time_str,
+        "last_world_engine_update": {"status": "success", "message": result_msg}
+    }
+
+    # --- Assign to state_delta ---
+    try:
+        tool_context.state_delta = state_changes
+        logger.info(f"Signaled state_delta for time advance: {list(state_changes.keys())}")
+    except Exception as e:
+        logger.exception(f"Error assigning state_delta in advance_time: {e}")
+        return f"Error signaling state update: {e}" # Return error message
+
+    console.print(f"[dim green]--- Tool: World Engine signaled state update: Time=[b]{new_time_str}[/b] ---[/dim green]")
+    return None # Return the status message
 
 def save_validation_results(
     validation_results: Dict[str, Any],
@@ -62,13 +92,14 @@ def save_validation_results(
 ) -> Dict[str, str]:
     """
     Saves the provided dictionary of validation results for the current turn
-    into the session state under the 'turn_validation_results' key.
+    into the session state under the 'turn_validation_results' key,
+    signaling the update via state_delta.
 
     Args:
         validation_results: A dictionary where keys are simulacra IDs and
                             values are their validation result objects
                             (e.g., {'validation_status': 'approved', ...}).
-        tool_context: The context object providing access to session state.
+        tool_context: The context object providing access to session state actions.
 
     Returns:
         A dictionary confirming the success or failure of the operation.
@@ -78,14 +109,21 @@ def save_validation_results(
         return {"status": "error", "message": "Input must be a dictionary."}
 
     try:
-        logger.info(f"Tool 'save_validation_results': Saving results for keys: {list(validation_results.keys())}")
-        # Directly update the state via tool_context
-        tool_context.state[TURN_VALIDATION_RESULTS_KEY] = validation_results
-        console.print(f"[dim green]--- Tool: Saved validation results for {len(validation_results)} simulacra ---[/dim green]")
-        return {"status": "success", "message": f"Saved validation results for {len(validation_results)} simulacra."}
+        logger.info(f"Tool 'save_validation_results': Signaling update for keys: {list(validation_results.keys())}")
+
+        delta_update = {
+            TURN_VALIDATION_RESULTS_KEY: validation_results
+        }
+
+        # --- Assign to state_delta ---
+        tool_context.state_delta = delta_update
+        logger.info(f"Signaled state_delta for key '{TURN_VALIDATION_RESULTS_KEY}'.")
+
+        console.print(f"[dim green]--- Tool: Signaled save validation results for {len(validation_results)} simulacra ---[/dim green]")
+        return None
     except Exception as e:
-        logger.exception(f"Tool 'save_validation_results': Error saving state: {e}")
-        return {"status": "error", "message": f"Failed to save validation results: {e}"}
+        logger.exception(f"Tool 'save_validation_results': Error signaling state update: {e}")
+        return None
     
 def save_single_validation_result(
     simulacra_id: str,
@@ -116,20 +154,16 @@ def save_single_validation_result(
     try:
         logger.info(f"Tool 'save_single_validation_result': Signaling update for {simulacra_id}")
 
-        # --- Signal update via state_delta ---
-        # The key is the main results key.
-        # The value is a dictionary containing ONLY the update for this specific sim_id.
-        # The loop will need logic to merge this into the existing dict.
         delta_update = {
             TURN_VALIDATION_RESULTS_KEY: {
                 simulacra_id: validation_result
             }
         }
-        tool_context.actions.state_delta = delta_update
+        tool_context.state_delta = delta_update
         # ---
 
         console.print(f"[dim green]--- Tool: Signaled validation result save for {simulacra_id} ---[/dim green]")
-        return {"status": "success", "message": f"Signaled validation result save for {simulacra_id}."}
+        return None
     except Exception as e:
         logger.exception(f"Tool 'save_single_validation_result': Error signaling state update for {simulacra_id}: {e}")
-        return {"status": "error", "message": f"Failed to signal validation result save: {e}"}
+        return None
