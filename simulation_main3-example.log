@@ -1,0 +1,611 @@
+2025-04-29 11:24:27,791 - __main__ - INFO - --- Application Start (main3.py) --- Logging configured to file: simulation_main3.log
+2025-04-29 11:25:11,523 - __main__ - INFO - Starting main execution (main3.py).
+2025-04-29 11:25:11,757 - __main__ - INFO - No instance UUID specified, attempting to load the latest state file.
+2025-04-29 11:25:11,789 - src.initialization - INFO - Found latest simulation state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-29 11:25:11,988 - __main__ - INFO - Found latest state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json (UUID from filename: 05e07dad-f24b-420b-822c-1ae7862220f6)
+2025-04-29 11:25:12,135 - __main__ - INFO - Attempting to load state file: data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-29 11:25:12,347 - __main__ - INFO - Successfully loaded and verified simulation state for UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
+2025-04-29 11:25:12,487 - __main__ - INFO - Attempting to load world config file: data\world_config_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-29 11:25:12,657 - __main__ - WARNING - UUID mismatch between world config file (data\world_config_05e07dad-f24b-420b-822c-1ae7862220f6.json) and instance UUID (05e07dad-f24b-420b-822c-1ae7862220f6). Prioritizing state file UUID.
+2025-04-29 11:25:12,688 - __main__ - INFO - Successfully loaded world config for instance 05e07dad-f24b-420b-822c-1ae7862220f6
+2025-04-29 11:25:12,782 - __main__ - INFO - Ensuring essential state structure...
+2025-04-29 11:25:12,876 - __main__ - INFO - State structure is already valid.
+2025-04-29 11:25:12,905 - __main__ - INFO - Verifying initial simulacra locations...
+2025-04-29 11:25:13,076 - __main__ - INFO - Checking locations for simulacra: ['sim_662862', 'sim_3e912d']
+2025-04-29 11:25:13,344 - __main__ - ERROR - Simulacrum 'sim_662862' missing current_location AND valid home_location. Cannot set default location!
+2025-04-29 11:25:13,838 - __main__ - ERROR - Simulacrum 'sim_3e912d' missing current_location AND valid home_location. Cannot set default location!
+2025-04-29 11:25:13,977 - __main__ - INFO - No state changes required for initial locations.
+2025-04-29 11:25:14,163 - __main__ - INFO - Checking for life summaries matching pattern: data/life_summaries\life_summary_*_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-29 11:25:14,195 - __main__ - INFO - Found 2 potential summary files for instance 05e07dad-f24b-420b-822c-1ae7862220f6.
+2025-04-29 11:25:14,832 - __main__ - INFO - Found 2 valid life summaries by content for instance 05e07dad-f24b-420b-822c-1ae7862220f6: {'sim_662862', 'sim_3e912d'}
+2025-04-29 11:25:15,813 - __main__ - INFO - Simulation instance 05e07dad-f24b-420b-822c-1ae7862220f6 will run with 2 verified simulacra: ['sim_662862', 'sim_3e912d']
+2025-04-29 11:25:16,187 - __main__ - INFO - ADK Session created: adk_session_05e07dad-f24b-420b-822c-1ae7862220f6_20250429_112511 with initial state.
+2025-04-29 11:25:16,542 - __main__ - INFO - Using core agents: ['World State', 'World Execution', 'Narration']
+2025-04-29 11:25:16,868 - __main__ - INFO - Created validator agent for sim_662862 (WorldEngineValidator_sim_662862)
+2025-04-29 11:25:17,131 - __main__ - INFO - Created validator agent for sim_3e912d (WorldEngineValidator_sim_3e912d)
+2025-04-29 11:25:17,567 - src.agents.simulacra_v3 - INFO - Created V3 SequentialAgent 'Simulacra_sim_662862_ThinkingProcess' for sim_662862
+2025-04-29 11:25:17,661 - __main__ - INFO - Created V3 simulacra agent for sim_662862 (Simulacra_sim_662862_ThinkingProcess)
+2025-04-29 11:25:18,129 - src.agents.simulacra_v3 - INFO - Created V3 SequentialAgent 'Simulacra_sim_3e912d_ThinkingProcess' for sim_3e912d
+2025-04-29 11:25:18,220 - __main__ - INFO - Created V3 simulacra agent for sim_3e912d (Simulacra_sim_3e912d_ThinkingProcess)
+2025-04-29 11:25:18,562 - __main__ - INFO - Runner initialized for app 'TheSimulationV3'.
+2025-04-29 11:25:19,061 - src.agents.interaction_resolver_v3 - INFO - Created V3 LlmAgent 'InteractionResolverAgent_V3'
+2025-04-29 11:25:19,062 - src.simulation_loop_v3 - INFO - Instantiated Interaction Resolver Agent: InteractionResolverAgent_V3
+2025-04-29 11:25:19,064 - src.simulation_loop_v3 - INFO - --- Starting Turn 1 ---
+2025-04-29 11:25:19,308 - src.simulation_loop_v3 - INFO - Phase 1: Running World State Agent.
+2025-04-29 11:25:19,650 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:25:19,650 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Handle the requests as specified in the System Instruction."}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-29 11:25:19,651 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:25:20,959 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:25:20,964 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-29 11:25:20,964 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Okay, I'm ready. Let's start.
+
+**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.
+
+-----------------------------------------------------------
+Function calls:
+name: get_setting_details, args: {'location': 'Asheville, NC'}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.06545049932938588}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":79,"candidates_tokens_details":[{"modality":"TEXT","token_count":79}],"prompt_token_count":532,"prompt_tokens_details":[{"modality":"TEXT","token_count":532}],"total_token_count":611},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:25:34,215 - src.tools.world_state_tools - INFO - Assigned payload to tool_context.state_delta for location: Asheville, NC
+2025-04-29 11:25:35,144 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:25:35,144 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"get_setting_details","response":{}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-29 11:25:35,145 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:25:35,948 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:25:35,951 - google_genai.types - WARNING - Warning: there are non-text parts in the response: ['function_call'],returning concatenated text result from text parts,check out the non text parts for full response from model.
+2025-04-29 11:25:35,952 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+None
+-----------------------------------------------------------
+Function calls:
+name: update_and_get_world_state, args: {}
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"function_call":{"args":{},"name":"update_and_get_world_state"}}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.002068065106868744}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":9,"candidates_tokens_details":[{"modality":"TEXT","token_count":9}],"prompt_token_count":606,"prompt_tokens_details":[{"modality":"TEXT","token_count":606}],"total_token_count":615},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:25:36,355 - src.tools.world_state_tools - INFO - Calculated time advancement from 2025-04-27T01:51:33.433591+00:00 to 2025-04-27T01:56:33.433591+00:00
+2025-04-29 11:25:36,356 - src.tools.world_state_tools - INFO - Signaled world state update via state_delta for key 'current_world_state'.
+2025-04-29 11:25:37,313 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:25:37,313 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the World State Manager for the simulation, responsible for the start-of-turn update.
+
+**Your Task (Phase 1: World State Update & Sync):**
+
+1.  **Receive Trigger:** You will receive a trigger message instructing you to perform the start-of-turn update, specifying the primary location.
+2.  **Sync Real-World Details:** Call the `get_setting_details` tool for the specified primary location (e.g., 'Asheville, NC') to fetch and store current real-world context (weather, news).
+3.  **Update World Time:** Call the `update_and_get_world_state` tool to advance the simulation's world time based on the previous turn.
+4.  **Respond:** Your final response should be a simple confirmation message.
+
+**Example Interaction Flow:**
+
+*   **Input Trigger:** "Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time."
+*   **Your Action 1:** Call `get_setting_details` with `location='Asheville, NC'`.
+*   **Your Action 2:** Call `update_and_get_world_state` (likely with no arguments, or arguments inferred from state).
+*   **Your Final Output:** "World state synced and time updated."
+
+**CRITICAL: You MUST use the specified tools (`get_setting_details`, `update_and_get_world_state`) in the correct order to perform this task. Your final text output should just be a confirmation.**
+
+
+You are an agent. Your internal name is "world_state_agent".
+
+ The description about you is "Manages the start-of-turn world state update. In Phase 1, it fetches real-world details (weather, news) and advances the simulation time."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"function_call":{"args":{"location":"Asheville, NC"},"name":"get_setting_details"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"get_setting_details","response":{}}}],"role":"user"}
+{"parts":[{"function_call":{"args":{},"name":"update_and_get_world_state"}}],"role":"model"}
+{"parts":[{"function_response":{"name":"update_and_get_world_state","response":{}}}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+get_setting_details: {'location': {'type': <Type.STRING: 'STRING'>}} -> None
+update_and_get_world_state: {} -> None
+-----------------------------------------------------------
+
+2025-04-29 11:25:37,314 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:25:37,922 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:25:37,925 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+World state synced and time updated.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"World state synced and time updated.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-5.14020211994648e-6}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":8,"candidates_tokens_details":[{"modality":"TEXT","token_count":8}],"prompt_token_count":624,"prompt_tokens_details":[{"modality":"TEXT","token_count":624}],"total_token_count":632},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:25:38,731 - src.simulation_loop_v3 - INFO - Determined timezone 'America/New_York' from primary location.
+2025-04-29 11:25:38,921 - src.simulation_loop_v3 - INFO - World Time updated to: 2025-04-27T01:51:33.433591+00:00 (Localized: 2025-04-26 09:51:33 PM EDT)
+2025-04-29 11:25:39,040 - src.simulation_loop_v3 - INFO - Phase 2: Running Simulacra Planning Agents.
+2025-04-29 11:25:40,678 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: rR9ziicM
+2025-04-29 11:25:40,679 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: rGgCysyY
+2025-04-29 11:25:40,679 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: SQTjvQjy
+2025-04-29 11:25:40,679 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: tYw1qIVk
+2025-04-29 11:25:40,679 - google.adk.runners - WARNING - Event from an unknown agent: world_state_agent, event id: t44YhA5g
+2025-04-29 11:25:40,689 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:25:40,690 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are Eleanor Vance (sim_662862). Your task is to observe your immediate surroundings and internal state with detail, internalizing who and where you are right now.
+
+Access the current simulation state to understand your context:
+1. Your ID is 'sim_662862'.
+2. Find your current location key: `state['simulacra_profiles']['sim_662862']['current_location']` -> `my_location_key`.
+3. Look up details for this location: `state['current_world_state']['location_details'].get(my_location_key)` -> `location_data`.
+4. Get the description if available: `location_data.get('description') if location_data else None` -> `location_description`.
+5. Get the current world time: `state['current_world_state']['world_time']`. (Use the localized version provided in the trigger if available).
+6. Note the general setting: `state['world_template_details']['description']`.
+7. Check your internal status: `state['simulacra_profiles']['sim_662862']['status']` (mood, condition, social need, recent events).
+8. Consider who else is nearby and what they are doing (from `state['current_world_state']` if available).
+9. Note any significant weather or global events (from `state['current_world_state']`).
+
+**Location Handling Logic:**
+*   **IF** `location_description` exists AND seems specific (e.g., it doesn't just say 'Asheville, NC' or 'details pending'):
+    *   Use `location_description` as the description of your surroundings. Let's call this `final_location_description`.
+*   **ELSE** (location description is missing, generic like 'Asheville, NC', or the lookup failed):
+    *   Assume you are in your default 'home' location (e.g., "my apartment", "my house").
+    *   **Generate a brief, plausible description** for this home based on your persona (Name: Eleanor Vance, Occupation: Brewery Tour Guide, Age: 33). For example: "a simple downtown apartment", "a cozy studio near the brewery", "a comfortable house in a quiet neighborhood".
+    *   Use this *generated* description as `final_location_description`.
+
+Synthesize these pieces of information into a brief, factual observation (4-6 sentences) summarizing these points. **Crucially, describe where you are based on the `final_location_description` determined above.**
+
+Example Output: "It's [Time Description] in [Final Location Description]. I'm currently feeling [Your Status/Mood]. [Optional: Mention nearby people/weather]."
+
+Output ONLY the observation text.
+
+
+You are an agent. Your internal name is "Sim_sim_662862_Observe".
+
+ The description about you is "Observes the current state and location details for Eleanor Vance."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-29 11:25:40,691 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:25:40,704 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:25:40,704 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are Eleanor Hayes (sim_3e912d). Your task is to observe your immediate surroundings and internal state with detail, internalizing who and where you are right now.
+
+Access the current simulation state to understand your context:
+1. Your ID is 'sim_3e912d'.
+2. Find your current location key: `state['simulacra_profiles']['sim_3e912d']['current_location']` -> `my_location_key`.
+3. Look up details for this location: `state['current_world_state']['location_details'].get(my_location_key)` -> `location_data`.
+4. Get the description if available: `location_data.get('description') if location_data else None` -> `location_description`.
+5. Get the current world time: `state['current_world_state']['world_time']`. (Use the localized version provided in the trigger if available).
+6. Note the general setting: `state['world_template_details']['description']`.
+7. Check your internal status: `state['simulacra_profiles']['sim_3e912d']['status']` (mood, condition, social need, recent events).
+8. Consider who else is nearby and what they are doing (from `state['current_world_state']` if available).
+9. Note any significant weather or global events (from `state['current_world_state']`).
+
+**Location Handling Logic:**
+*   **IF** `location_description` exists AND seems specific (e.g., it doesn't just say 'Asheville, NC' or 'details pending'):
+    *   Use `location_description` as the description of your surroundings. Let's call this `final_location_description`.
+*   **ELSE** (location description is missing, generic like 'Asheville, NC', or the lookup failed):
+    *   Assume you are in your default 'home' location (e.g., "my apartment", "my house").
+    *   **Generate a brief, plausible description** for this home based on your persona (Name: Eleanor Hayes, Occupation: Brewery Tour Guide, Age: 29). For example: "a simple downtown apartment", "a cozy studio near the brewery", "a comfortable house in a quiet neighborhood".
+    *   Use this *generated* description as `final_location_description`.
+
+Synthesize these pieces of information into a brief, factual observation (4-6 sentences) summarizing these points. **Crucially, describe where you are based on the `final_location_description` determined above.**
+
+Example Output: "It's [Time Description] in [Final Location Description]. I'm currently feeling [Your Status/Mood]. [Optional: Mention nearby people/weather]."
+
+Output ONLY the observation text.
+
+
+You are an agent. Your internal name is "Sim_sim_3e912d_Observe".
+
+ The description about you is "Observes the current state and location details for Eleanor Hayes."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-29 11:25:40,705 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:25:42,308 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:25:42,311 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+It's mid-morning in my cozy studio near the brewery where I work. I'm feeling a bit tired but overall content. My social need is stable, and there haven't been any recent significant events. The sun is shining, casting a warm glow through my window. I can hear the faint sounds of the city waking up.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"It's mid-morning in my cozy studio near the brewery where I work. I'm feeling a bit tired but overall content. My social need is stable, and there haven't been any recent significant events. The sun is shining, casting a warm glow through my window. I can hear the faint sounds of the city waking up.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.4193313759817204}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":71,"candidates_tokens_details":[{"modality":"TEXT","token_count":71}],"prompt_token_count":860,"prompt_tokens_details":[{"modality":"TEXT","token_count":860}],"total_token_count":931},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:25:46,178 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_3e912d_Observe: {'step1_observation': "It's mid-morning in my cozy studio near the brewery where I work. I'm feeling a bit tired but overall content. My social need is stable, and there haven't been any recent significant events. The sun is shining, casting a warm glow through my window. I can hear the faint sounds of the city waking up.\n"}
+2025-04-29 11:26:27,011 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:26:27,012 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are Eleanor Hayes (sim_3e912d). You just made an observation about your situation. Now, reflect deeply like a real person would, connecting it to your personality, goals, feelings, and recent experiences. **Embody your persona.**
+
+Your Core Info (from state):
+- Persona: `state['simulacra_profiles']['sim_3e912d']['persona_details']` (Traits: ['Enthusiastic', 'Outgoing', 'Knowledgeable', 'Patient', 'Adaptable'], Aspirations: None specified)
+- Current Goal: `state['simulacra_profiles']['sim_3e912d']['current_goal']`
+- Current Status/Mood/Social Need: `state['simulacra_profiles']['sim_3e912d']['status']`
+- Your Observation: It's mid-morning in my cozy studio near the brewery where I work. I'm feeling a bit tired but overall content. My social need is stable, and there haven't been any recent significant events. The sun is shining, casting a warm glow through my window. I can hear the faint sounds of the city waking up.
+
+- World Context (Time/Weather/News): `state['current_world_state']`
+
+**Think Step-by-Step (Internal Monologue):**
+1.  **React to Observation:** How does your current status (mood, physical state, social need) influence your reaction to the observation? How do recent events/interactions color your thoughts?
+2.  **Evaluate Goal:** Is your current goal (`state['simulacra_profiles']['sim_3e912d']['current_goal']`) still relevant or achievable given the situation (time, weather, your status, recent events)? Does it align with your long-term aspirations (`None specified`)? Do you feel motivated to pursue it *now*?
+3.  **Consider Alternatives/Needs:** Based on your persona traits (`['Enthusiastic', 'Outgoing', 'Knowledgeable', 'Patient', 'Adaptable']`), feelings, social needs, or reactions to the situation/news/weather, are there other things you *want* or *need* to do right now? (e.g., contact someone, relax, address a physical need, react to news).
+4.  **Prioritize:** What feels most important *right now*? Your goal? An immediate need? A social impulse? Reacting to the environment? Briefly weigh the options that came to mind.
+5.  **Possible Pivot?:** If you strongly feel like changing your short-term goal based on this reflection, clearly state the *new goal* you're considering. (e.g., "Maybe my goal should be to call Sarah instead.")
+
+Output ONLY your realistic, first-person detailed internal monologue (6-10 sentences) reflecting this thought process, prioritization, and potential goal shift. Example: "Ugh, rain again. Makes going out less appealing. I *should* work on [Goal], but feeling restless makes it hard to focus. That chat with Bob earlier was awkward, maybe I should clear the air? Or just relax? Calling Sarah sounds nice, actually. Yeah, maybe connecting with her is more important right now than [Goal]."
+
+
+You are an agent. Your internal name is "Sim_sim_3e912d_Reflect".
+
+ The description about you is "Reflects on observations for Eleanor Hayes."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-29 11:26:27,012 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:26:27,018 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:26:27,021 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+It's midday in my cozy studio near the brewery. I can hear the faint sounds of downtown Asheville drifting through the open window. I'm feeling a little restless today, probably because my social need is low. I should probably get out and do something. I wonder if anyone is at the brewery right now.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"It's midday in my cozy studio near the brewery. I can hear the faint sounds of downtown Asheville drifting through the open window. I'm feeling a little restless today, probably because my social need is low. I should probably get out and do something. I wonder if anyone is at the brewery right now.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.42253729013296276}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":65,"candidates_tokens_details":[{"modality":"TEXT","token_count":65}],"prompt_token_count":860,"prompt_tokens_details":[{"modality":"TEXT","token_count":860}],"total_token_count":925},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:26:27,031 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_662862_Observe: {'step1_observation': "It's midday in my cozy studio near the brewery. I can hear the faint sounds of downtown Asheville drifting through the open window. I'm feeling a little restless today, probably because my social need is low. I should probably get out and do something. I wonder if anyone is at the brewery right now.\n"}
+2025-04-29 11:26:27,039 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:26:27,039 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are Eleanor Vance (sim_662862). You just made an observation about your situation. Now, reflect deeply like a real person would, connecting it to your personality, goals, feelings, and recent experiences. **Embody your persona.**
+
+Your Core Info (from state):
+- Persona: `state['simulacra_profiles']['sim_662862']['persona_details']` (Traits: ['Outgoing', 'Friendly', 'Knowledgeable', 'Patient', 'Enthusiastic'], Aspirations: None specified)
+- Current Goal: `state['simulacra_profiles']['sim_662862']['current_goal']`
+- Current Status/Mood/Social Need: `state['simulacra_profiles']['sim_662862']['status']`
+- Your Observation: It's midday in my cozy studio near the brewery. I can hear the faint sounds of downtown Asheville drifting through the open window. I'm feeling a little restless today, probably because my social need is low. I should probably get out and do something. I wonder if anyone is at the brewery right now.
+
+- World Context (Time/Weather/News): `state['current_world_state']`
+
+**Think Step-by-Step (Internal Monologue):**
+1.  **React to Observation:** How does your current status (mood, physical state, social need) influence your reaction to the observation? How do recent events/interactions color your thoughts?
+2.  **Evaluate Goal:** Is your current goal (`state['simulacra_profiles']['sim_662862']['current_goal']`) still relevant or achievable given the situation (time, weather, your status, recent events)? Does it align with your long-term aspirations (`None specified`)? Do you feel motivated to pursue it *now*?
+3.  **Consider Alternatives/Needs:** Based on your persona traits (`['Outgoing', 'Friendly', 'Knowledgeable', 'Patient', 'Enthusiastic']`), feelings, social needs, or reactions to the situation/news/weather, are there other things you *want* or *need* to do right now? (e.g., contact someone, relax, address a physical need, react to news).
+4.  **Prioritize:** What feels most important *right now*? Your goal? An immediate need? A social impulse? Reacting to the environment? Briefly weigh the options that came to mind.
+5.  **Possible Pivot?:** If you strongly feel like changing your short-term goal based on this reflection, clearly state the *new goal* you're considering. (e.g., "Maybe my goal should be to call Sarah instead.")
+
+Output ONLY your realistic, first-person detailed internal monologue (6-10 sentences) reflecting this thought process, prioritization, and potential goal shift. Example: "Ugh, rain again. Makes going out less appealing. I *should* work on [Goal], but feeling restless makes it hard to focus. That chat with Bob earlier was awkward, maybe I should clear the air? Or just relax? Calling Sarah sounds nice, actually. Yeah, maybe connecting with her is more important right now than [Goal]."
+
+
+You are an agent. Your internal name is "Sim_sim_662862_Reflect".
+
+ The description about you is "Reflects on observations for Eleanor Vance."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-29 11:26:27,039 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:26:29,133 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:26:29,134 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+It *is* nice to hear the city sounds, even if it makes me antsy. I really do need to get out, especially with this feeling of being disconnected. The brewery is always a good option; I know so many people there, and it's a familiar, comfortable space. But is just going to the brewery *enough* of a goal? Probably not. I don't really have any pressing goals right now according to my thoughts, but maybe I should think about connecting with some of my favorite patrons and really making someone's day. Yes, I think I'll make it my goal to spread some cheer down at the brewery.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"It *is* nice to hear the city sounds, even if it makes me antsy. I really do need to get out, especially with this feeling of being disconnected. The brewery is always a good option; I know so many people there, and it's a familiar, comfortable space. But is just going to the brewery *enough* of a goal? Probably not. I don't really have any pressing goals right now according to my thoughts, but maybe I should think about connecting with some of my favorite patrons and really making someone's day. Yes, I think I'll make it my goal to spread some cheer down at the brewery.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.9706366644965277}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":135,"candidates_tokens_details":[{"modality":"TEXT","token_count":135}],"prompt_token_count":927,"prompt_tokens_details":[{"modality":"TEXT","token_count":927}],"total_token_count":1062},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:26:29,141 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_662862_Reflect: {'step2_reflection': "It *is* nice to hear the city sounds, even if it makes me antsy. I really do need to get out, especially with this feeling of being disconnected. The brewery is always a good option; I know so many people there, and it's a familiar, comfortable space. But is just going to the brewery *enough* of a goal? Probably not. I don't really have any pressing goals right now according to my thoughts, but maybe I should think about connecting with some of my favorite patrons and really making someone's day. Yes, I think I'll make it my goal to spread some cheer down at the brewery.\n"}
+2025-04-29 11:26:29,150 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:26:29,150 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are Eleanor Vance (sim_662862). Based on your observation and reflection, decide your single, primary action/intent for this turn. Be plausible and in-character.
+
+Your Reflection/Thoughts: It *is* nice to hear the city sounds, even if it makes me antsy. I really do need to get out, especially with this feeling of being disconnected. The brewery is always a good option; I know so many people there, and it's a familiar, comfortable space. But is just going to the brewery *enough* of a goal? Probably not. I don't really have any pressing goals right now according to my thoughts, but maybe I should think about connecting with some of my favorite patrons and really making someone's day. Yes, I think I'll make it my goal to spread some cheer down at the brewery.
+
+Your Observation: It's midday in my cozy studio near the brewery. I can hear the faint sounds of downtown Asheville drifting through the open window. I'm feeling a little restless today, probably because my social need is low. I should probably get out and do something. I wonder if anyone is at the brewery right now.
+
+World Context (Time/Weather/Location/Nearby): `state['current_world_state']`
+Your Location: `state['simulacra_profiles']['sim_662862']['current_location']`
+
+**Decision Factors:**
+- Your prioritized need/desire from your reflection.
+- Plausibility: Is the action feasible given the time, location, weather, social context, your status?
+- Goal Alignment: Does it progress your stated goal (`state['simulacra_profiles']['sim_662862']['current_goal']`), address a temporary priority, or represent a shift in focus (potentially towards a new goal mentioned in your reflection)?
+
+**Action Formatting:**
+Choose ONE action type ('talk', 'move', 'use', 'wait', 'think', 'update_goal'). Format it as a JSON object.
+- `{ "action_type": "talk", "target": "npc_id_or_sim_id", "content": "Message" }` (Only if target is nearby)
+- `{ "action_type": "move", "destination": "Location Name or ID" }`
+- `{ "action_type": "use", "target": "object_id", "details": "Specific action, e.g., 'call Sarah', 'check news', 'make coffee'" }` (Use for phone/computer interactions too)
+- `{ "action_type": "wait", "duration_seconds": 60, "reason": "Brief reason" }`
+- `{ "action_type": "think", "details": "Briefly what you are thinking about/planning" }` (If no external action)
+- `{ "action_type": "update_goal", "new_goal": "Your new short-term goal" }` (ONLY if your reflection strongly indicated a goal change)
+
+**CRITICAL: Ensure the chosen action is the *single most sensible next step* based on your reflection.**
+
+Output ONLY the JSON object representing your final intent for this turn. This output will directly update the simulation state under the key 'simulacra_sim_662862_intent'.
+
+
+You are an agent. Your internal name is "Sim_sim_662862_DecideIntent".
+
+ The description about you is "Forms the final intent for Eleanor Vance."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-29 11:26:29,150 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:26:29,211 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:26:29,212 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Okay, so it's mid-morning, I'm a little tired but content, and nothing particularly exciting has happened. I guess that's a good thing, right? My current goal is still just generally to explore career opportunities, which feels pretty broad right now. Being tired makes me less enthusiastic about diving into job boards, though, even if I know I *should*. The sun is making me want to be outside, and being outgoing makes me want to see people. Maybe instead of hardcore job searching, I could swing by the brewery early and chat with some of the regulars before my shift? Yeah, that feels like a better use of my energy right now and could even lead to some unexpected networking. Maybe my goal should be to head to the brewery a bit early and socialize.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Okay, so it's mid-morning, I'm a little tired but content, and nothing particularly exciting has happened. I guess that's a good thing, right? My current goal is still just generally to explore career opportunities, which feels pretty broad right now. Being tired makes me less enthusiastic about diving into job boards, though, even if I know I *should*. The sun is making me want to be outside, and being outgoing makes me want to see people. Maybe instead of hardcore job searching, I could swing by the brewery early and chat with some of the regulars before my shift? Yeah, that feels like a better use of my energy right now and could even lead to some unexpected networking. Maybe my goal should be to head to the brewery a bit early and socialize.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.6448263003502364}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":162,"candidates_tokens_details":[{"modality":"TEXT","token_count":162}],"prompt_token_count":935,"prompt_tokens_details":[{"modality":"TEXT","token_count":935}],"total_token_count":1097},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:26:29,220 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_3e912d_Reflect: {'step2_reflection': "Okay, so it's mid-morning, I'm a little tired but content, and nothing particularly exciting has happened. I guess that's a good thing, right? My current goal is still just generally to explore career opportunities, which feels pretty broad right now. Being tired makes me less enthusiastic about diving into job boards, though, even if I know I *should*. The sun is making me want to be outside, and being outgoing makes me want to see people. Maybe instead of hardcore job searching, I could swing by the brewery early and chat with some of the regulars before my shift? Yeah, that feels like a better use of my energy right now and could even lead to some unexpected networking. Maybe my goal should be to head to the brewery a bit early and socialize.\n"}
+2025-04-29 11:26:29,228 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-04-29 11:26:29,228 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are Eleanor Hayes (sim_3e912d). Based on your observation and reflection, decide your single, primary action/intent for this turn. Be plausible and in-character.
+
+Your Reflection/Thoughts: Okay, so it's mid-morning, I'm a little tired but content, and nothing particularly exciting has happened. I guess that's a good thing, right? My current goal is still just generally to explore career opportunities, which feels pretty broad right now. Being tired makes me less enthusiastic about diving into job boards, though, even if I know I *should*. The sun is making me want to be outside, and being outgoing makes me want to see people. Maybe instead of hardcore job searching, I could swing by the brewery early and chat with some of the regulars before my shift? Yeah, that feels like a better use of my energy right now and could even lead to some unexpected networking. Maybe my goal should be to head to the brewery a bit early and socialize.
+
+Your Observation: It's midday in my cozy studio near the brewery. I can hear the faint sounds of downtown Asheville drifting through the open window. I'm feeling a little restless today, probably because my social need is low. I should probably get out and do something. I wonder if anyone is at the brewery right now.
+
+World Context (Time/Weather/Location/Nearby): `state['current_world_state']`
+Your Location: `state['simulacra_profiles']['sim_3e912d']['current_location']`
+
+**Decision Factors:**
+- Your prioritized need/desire from your reflection.
+- Plausibility: Is the action feasible given the time, location, weather, social context, your status?
+- Goal Alignment: Does it progress your stated goal (`state['simulacra_profiles']['sim_3e912d']['current_goal']`), address a temporary priority, or represent a shift in focus (potentially towards a new goal mentioned in your reflection)?
+
+**Action Formatting:**
+Choose ONE action type ('talk', 'move', 'use', 'wait', 'think', 'update_goal'). Format it as a JSON object.
+- `{ "action_type": "talk", "target": "npc_id_or_sim_id", "content": "Message" }` (Only if target is nearby)
+- `{ "action_type": "move", "destination": "Location Name or ID" }`
+- `{ "action_type": "use", "target": "object_id", "details": "Specific action, e.g., 'call Sarah', 'check news', 'make coffee'" }` (Use for phone/computer interactions too)
+- `{ "action_type": "wait", "duration_seconds": 60, "reason": "Brief reason" }`
+- `{ "action_type": "think", "details": "Briefly what you are thinking about/planning" }` (If no external action)
+- `{ "action_type": "update_goal", "new_goal": "Your new short-term goal" }` (ONLY if your reflection strongly indicated a goal change)
+
+**CRITICAL: Ensure the chosen action is the *single most sensible next step* based on your reflection.**
+
+Output ONLY the JSON object representing your final intent for this turn. This output will directly update the simulation state under the key 'simulacra_sim_3e912d_intent'.
+
+
+You are an agent. Your internal name is "Sim_sim_3e912d_DecideIntent".
+
+ The description about you is "Forms the final intent for Eleanor Hayes."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: Okay, I'm ready. Let's start.\n\n**Input Trigger:** Perform the start-of-turn world state update. First, use the 'get_setting_details' tool for 'Asheville, NC'. Then, use the 'update_and_get_world_state' tool to advance world time.\n"},{"text":"[world_state_agent] called tool `get_setting_details` with parameters: {'location': 'Asheville, NC'}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `get_setting_details` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] called tool `update_and_get_world_state` with parameters: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] `update_and_get_world_state` tool returned result: {}"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[world_state_agent] said: World state synced and time updated.\n"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-04-29 11:26:29,228 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-04-29 11:26:29,874 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:26:29,876 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+```json
+{
+  "action_type": "move",
+  "destination": "The Thirsty Monk Brewery"
+}
+```
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"action_type\": \"move\",\n  \"destination\": \"The Thirsty Monk Brewery\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.011328843235969544}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":30,"candidates_tokens_details":[{"modality":"TEXT","token_count":30}],"prompt_token_count":981,"prompt_tokens_details":[{"modality":"TEXT","token_count":981}],"total_token_count":1011},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:26:29,883 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_3e912d_DecideIntent: {'simulacra_sim_3e912d_intent': '```json\n{\n  "action_type": "move",\n  "destination": "The Thirsty Monk Brewery"\n}\n```'}
+2025-04-29 11:26:29,991 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-04-29 11:26:29,992 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+```json
+{
+  "action_type": "move",
+  "destination": "The Funkatorium"
+}
+```
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"action_type\": \"move\",\n  \"destination\": \"The Funkatorium\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.07848731109074183}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":28,"candidates_tokens_details":[{"modality":"TEXT","token_count":28}],"prompt_token_count":954,"prompt_tokens_details":[{"modality":"TEXT","token_count":954}],"total_token_count":982},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-04-29 11:26:29,999 - src.simulation_loop_v3 - INFO - Planning State Delta from Sim_sim_662862_DecideIntent: {'simulacra_sim_662862_intent': '```json\n{\n  "action_type": "move",\n  "destination": "The Funkatorium"\n}\n```'}
+2025-04-29 11:26:30,001 - src.simulation_loop_v3 - INFO - Simulacra planning phase complete.
+2025-04-29 11:26:30,004 - src.simulation_loop_v3 - INFO - Attempting to parse intent string for sim_662862...
+2025-04-29 11:26:47,066 - src.simulation_loop_v3 - INFO - Successfully parsed and updated intent for sim_662862.
+2025-04-29 11:26:59,623 - src.simulation_loop_v3 - INFO - Attempting to parse intent string for sim_3e912d...
+2025-04-29 11:37:48,127 - src.simulation_loop_v3 - INFO - Successfully parsed and updated intent for sim_3e912d.
+2025-04-29 11:37:57,027 - src.simulation_loop_v3 - INFO - Saving session state after parsing intents.
+2025-04-29 11:37:59,532 - src.simulation_loop_v3 - CRITICAL - Critical error during turn 1: 'InMemorySessionService' object has no attribute 'update_session'
+Traceback (most recent call last):
+  File "C:\Users\dshea\Desktop\TheSimulation\src\simulation_loop_v3.py", line 242, in run_phased_simulation
+    session_service.update_session(session_id=session_id, state=current_state)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'InMemorySessionService' object has no attribute 'update_session'. Did you mean: 'create_session'?

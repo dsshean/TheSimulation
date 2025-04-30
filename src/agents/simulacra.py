@@ -32,12 +32,12 @@ def create_agent(sim_id: str, persona: Dict, session: Session) -> Optional[BaseA
             description=f"Simulacra agent representing {name}.", # Dynamic description
             instruction=instructions, # Use the formatted instructions
             tools=[
-                FunctionTool(simulacra_tools.generate_internal_monologue),
-                FunctionTool(simulacra_tools.attempt_move_to),
-                FunctionTool(simulacra_tools.attempt_talk_to),
-                FunctionTool(simulacra_tools.check_self_status),
-                FunctionTool(simulacra_tools.attempt_interact_with),
-                FunctionTool(simulacra_tools.update_self_goal) 
+                FunctionTool(func=simulacra_tools.generate_internal_monologue),
+                FunctionTool(func=simulacra_tools.attempt_move_to),
+                FunctionTool(func=simulacra_tools.attempt_talk_to),
+                FunctionTool(func=simulacra_tools.check_self_status),
+                FunctionTool(func=simulacra_tools.attempt_interact_with),
+                FunctionTool(func=simulacra_tools.update_self_goal) 
             ],
         )
         return agent

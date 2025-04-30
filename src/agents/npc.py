@@ -2,6 +2,7 @@ from google.adk.agents import Agent # Alias for LlmAgent
 from src.config import settings
 from src.tools import npc_tools
 from src.prompts import npc_instructions
+from google.adk.tools import FunctionTool
 from rich.console import Console
 import logging
 
@@ -19,12 +20,12 @@ try:
         ),
         instruction=npc_instructions.NPC_AGENT_INSTRUCTION,
         tools=[
-            npc_tools.get_validated_interactions,
-            npc_tools.update_interaction_results,
+            FunctionTool(func=npc_tools.get_validated_interactions),
+            FunctionTool(func=npc_tools.update_interaction_results),
         ],
     )
     console.print(f"Agent '[bold green]{npc_agent.name}[/bold green]' defined (Interaction Resolver Role).")
-    logger.info(f"NpcInteractionAgent initialized with tools: {[t.__name__ for t in npc_agent.tools]}")
+    logger.info(f"NpcInteractionAgent initialized with tools: {[t.func.__name__ for t in npc_agent.tools]}")
 
 except Exception as e:
     console.print(f"[bold red]Error creating NpcInteractionAgent:[/bold red] {e}")
