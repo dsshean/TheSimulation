@@ -137,7 +137,7 @@ Examine the output both from console and the log file, which you will find some 
 
 To the narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
 
-![Alt text](output1.png)
+![Alt text](output2.png)
 
 - **Simulacra Monologues:** Rich text showing the agent's internal reasoning – reacting to observations ("The door is locked, drat!"), considering its persona ("As Eleanor Vance, a brewery guide, maybe I should look for local history books?"), weighing options, and finally stating its chosen action.
 - **Simulacra Intents:** Clean JSON objects like `{"action_type": "use", "target_id": "door_main", "details": "try the handle"}` or `{"action_type": "look_around", "target_id": null, "details": ""}`.
