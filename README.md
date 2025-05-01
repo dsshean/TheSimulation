@@ -88,6 +88,7 @@ The `simulacra_v3.py` script includes a test function (`_test_agent`) to demonst
 
 ```bash
 python src/agents/simulacra_v3.py
+```
 
 This will:
 
@@ -107,10 +108,9 @@ Print the intermediate outputs (Observation, Reflection) and the final Intent JS
 6.  **Current Status and Future Directions:** Updated the current status to reflect the implemented V3 agent and outlined more specific next steps.
 7.  **Placeholders:** Kept placeholders for sections like Contributing, Ethical Considerations, etc., but noted they need content.
 
-
 ## Project Insights & Future Directions
 
-*(The following is a reflection on the project's status and potential based on the architecture developed in `src/simulation_async.py`)*
+_(The following is a reflection on the project's status and potential based on the architecture developed in `src/simulation_async.py`)_
 
 ### Breathing Life into Code: Simulating Reality with LLMs in "TheSimulation"
 
@@ -125,9 +125,9 @@ Based on the code structure (primarily in `src/simulation_async.py`), TheSimulat
 3.  **The Event Bus:** A simple `asyncio.Queue` acts as a communication channel, primarily for agents to declare their intended actions.
 4.  **The World Engine (LLM Agent):** This ADK `LlmAgent` listens for intents on the event bus. It uses an LLM (like Gemini) to interpret the agent's intended action within the context of the current world state (location, object properties, rules). It determines if the action is valid, calculates its duration, figures out the consequences (state changes), and generates a descriptive narrative of the outcome. We've worked on refining its prompt to ensure it focuses on results and uses sensory details.
 5.  **The Simulacra/Boltzmann Brain (LLM Agents):** Each active agent is also an ADK `LlmAgent`. When idle, it:
-    *   **Observes:** Gathers context from the simulation state (location, recent events, nearby objects/agents, its own status, and persona).
-    *   **Reflects & Decides:** Feeds this context into its LLM, guided by a detailed prompt. The LLM generates an internal monologue (following a structured thinking process: Recall/React -> Analyze Goal -> Identify Options -> Prioritize/Choose) and decides on the next action (like `move`, `use`, `look_around`, `talk`, `wait`). This decision is formatted as a JSON "intent".
-    *   **Declares Intent:** Puts the generated intent onto the event bus for the World Engine to process.
+    - **Observes:** Gathers context from the simulation state (location, recent events, nearby objects/agents, its own status, and persona).
+    - **Reflects & Decides:** Feeds this context into its LLM, guided by a detailed prompt. The LLM generates an internal monologue (following a structured thinking process: Recall/React -> Analyze Goal -> Identify Options -> Prioritize/Choose) and decides on the next action (like `move`, `use`, `look_around`, `talk`, `wait`). This decision is formatted as a JSON "intent".
+    - **Declares Intent:** Puts the generated intent onto the event bus for the World Engine to process.
 6.  **ADK Integration:** The `Runner`, `SessionService`, and the `MemoryService` from the ADK are used to manage the interaction flow with the LLM agents and handle features like tool calling.
 
 ### Observing the Simulation: What the Logs Might Tell Us
@@ -139,39 +139,40 @@ To the narration agent: "The room is bleak without any features, there are no do
 
 ![Alt text](output1.png)
 
-*   **Simulacra Monologues:** Rich text showing the agent's internal reasoning – reacting to observations ("The door is locked, drat!"), considering its persona ("As Eleanor Vance, a brewery guide, maybe I should look for local history books?"), weighing options, and finally stating its chosen action.
-*   **Simulacra Intents:** Clean JSON objects like `{"action_type": "use", "target_id": "door_main", "details": "try the handle"}` or `{"action_type": "look_around", "target_id": null, "details": ""}`.
-*   **World Engine Resolutions:** JSON outputs from the World Engine detailing the action's validity, duration, any state changes (`results`), and the crucial narrative (e.g., `"narrative": "Eleanor Vance tries the handle of the main door, but it's firmly locked."`).
-*   **Narrative Log:** A growing list showing the chronological story unfolding based on the World Engine's narratives: `[T10.5] Eleanor Vance looks around.`, `[T13.5] The room is dusty, containing only a table and a locked chest.`, `[T15.0] Eleanor Vance tries the handle of the chest, but it's firmly locked.`
+- **Simulacra Monologues:** Rich text showing the agent's internal reasoning – reacting to observations ("The door is locked, drat!"), considering its persona ("As Eleanor Vance, a brewery guide, maybe I should look for local history books?"), weighing options, and finally stating its chosen action.
+- **Simulacra Intents:** Clean JSON objects like `{"action_type": "use", "target_id": "door_main", "details": "try the handle"}` or `{"action_type": "look_around", "target_id": null, "details": ""}`.
+- **World Engine Resolutions:** JSON outputs from the World Engine detailing the action's validity, duration, any state changes (`results`), and the crucial narrative (e.g., `"narrative": "Eleanor Vance tries the handle of the main door, but it's firmly locked."`).
+- **Narrative Log:** A growing list showing the chronological story unfolding based on the World Engine's narratives: `[T10.5] Eleanor Vance looks around.`, `[T13.5] The room is dusty, containing only a table and a locked chest.`, `[T15.0] Eleanor Vance tries the handle of the chest, but it's firmly locked.`
 
 ### Future Work
 
 While the core loop is functional, several exciting areas need development:
 
 1.  **Longer-Term Memory:**
-    *   **Current State:** We've just integrated ADK's `InMemoryMemoryService` to store the initial persona. Agents can use the `load_memory` tool to recall this static background. The main `memory_log` is still just a list in the state file, prone to growing large and lacking efficient search.
-    *   **Next Steps:** Persistent, searchable memory. Replacing `InMemoryMemoryService` with `VertexAiRagMemoryService` (leveraging Vertex AI Vector Search). This would allow agents to semantically search *all* their past observations, actions, and reflections ("What did I learn about locked doors yesterday?", "Who did I talk to in the library?").
+
+    - **Current State:** We've just integrated ADK's `InMemoryMemoryService` to store the initial persona. Agents can use the `load_memory` tool to recall this static background. The main `memory_log` is still just a list in the state file, prone to growing large and lacking efficient search.
+    - **Next Steps:** Persistent, searchable memory. Replacing `InMemoryMemoryService` with `VertexAiRagMemoryService` (leveraging Vertex AI Vector Search). This would allow agents to semantically search _all_ their past observations, actions, and reflections ("What did I learn about locked doors yesterday?", "Who did I talk to in the library?").
 
 2.  **Multi-Agent Interaction:**
-    *   **Current State:** The basic `talk` action exists. An agent can declare an intent to talk to another agent in the same location, and the World Engine bypasses the LLM to directly update the target's `last_observation`.
-    *   **Next Steps:** This is very rudimentary. True multi-agent dialogue requires agents to process incoming messages, reflect on them, and formulate replies within their turn cycle. This might involve dedicated "conversation manager" logic or more sophisticated prompting for the Simulacra agents to handle dialogue turns naturally. Beyond simple Q&A, modeling social dynamics, relationship building, and group interactions is a long-term goal.
+
+    - **Current State:** The basic `talk` action exists. An agent can declare an intent to talk to another agent in the same location, and the World Engine bypasses the LLM to directly update the target's `last_observation`.
+    - **Next Steps:** This is very rudimentary. True multi-agent dialogue requires agents to process incoming messages, reflect on them, and formulate replies within their turn cycle. This might involve dedicated "conversation manager" logic or more sophisticated prompting for the Simulacra agents to handle dialogue turns naturally. Beyond simple Q&A, modeling social dynamics, relationship building, and group interactions is a long-term goal.
 
 3.  **Real-World Sync:**
-    *   **Current State:** The simulation runs on its own accelerated or decelerated clock (`SIMULATION_SPEED_FACTOR`).
-    *   **Next Steps:**
-        *   For certain applications (e.g., simulating contemporary events), linking the simulation clock to real-world external real-time events to influence the simulation. Prior implementation included this code base which is basic weather sync and google news searches to set the stage on what the world state is.  The hierachy is World, Regional, and Local Weather/News context.  Again this will use the memory service and a timed sync mechanism.
-        * For non-real (ie Sci-Fi/Fantazy) worlds - split on world history generation is needed and many of the tasks will be offloaded either through on demand generation or based on similar structure life summaries are generated for the simulacras.
-        * Real time interaction with simulacra - Mechanism to talk to the simulated individual - Either via Text/IM/Chat (in real word) to crystal ball / telepathy / disembodied voice... to interact with individual.
-        * Ability to inject events - ie "You suddently meet your long lost high school best friend in the street" , "All of a sudden you are teleported to the moon." Or more practical - "You are shopping at a supermarket, you are faced with two different toothbrushes... which one do you choose and why?"
-        * Detailed locality
+
+    - **Current State:** The simulation runs on its own accelerated or decelerated clock (`SIMULATION_SPEED_FACTOR`).
+    - **Next Steps:**
+      - For certain applications (e.g., simulating contemporary events), linking the simulation clock to real-world external real-time events to influence the simulation. Prior implementation included this code base which is basic weather sync and google news searches to set the stage on what the world state is. The hierachy is World, Regional, and Local Weather/News context. Again this will use the memory service and a timed sync mechanism.
+      - For non-real (ie Sci-Fi/Fantazy) worlds - split on world history generation is needed and many of the tasks will be offloaded either through on demand generation or based on similar structure life summaries are generated for the simulacras.
+      - Real time interaction with simulacra - Mechanism to talk to the simulated individual - Either via Text/IM/Chat (in real word) to crystal ball / telepathy / disembodied voice... to interact with individual.
+      - Ability to inject events - ie "You suddently meet your long lost high school best friend in the street" , "All of a sudden you are teleported to the moon." Or more practical - "You are shopping at a supermarket, you are faced with two different toothbrushes... which one do you choose and why?"
+      - Detailed locality
 
 4.  **External Tool Integration:**
-    *   **Current State:** Agents have the `load_memory` tool.
-    *   **Next Steps:** This is where things get *really* interesting. The ADK's tool framework is perfect for expanding agent capabilities. Imagine agents that can:
-        *   **Search the Web:** Give them a tool to query Google Search for real-time information relevant to their goals.
-        *   **Generate Images:** Allow an agent to "visualize" something by calling an image generation API (like Imagen).
-        *   **Interact with Social Media:** Create a tool for an agent to post updates or read feeds on platforms like Bluesky (using its API).
-        *   **Send/Receive Email:** Simulate communication with the "outside world."
-        *   **Access Other APIs:** Connect to weather services, stock market data, translation tools, etc.
-    Each tool requires defining the function, providing it to the `LlmAgent`, and instructing the agent on when and how to use it.
-```
+    - **Current State:** Agents have the `load_memory` tool.
+    - **Next Steps:** This is where things get _really_ interesting. The ADK's tool framework is perfect for expanding agent capabilities. Imagine agents that can:
+      _ **Search the Web:** Give them a tool to query Google Search for real-time information relevant to their goals.
+      _ **Generate Images:** Allow an agent to "visualize" something by calling an image generation API (like Imagen).
+      _ **Interact with Social Media:** Create a tool for an agent to post updates or read feeds on platforms like Bluesky (using its API).
+      _ **Send/Receive Email:** Simulate communication with the "outside world." \* **Access Other APIs:** Connect to weather services, stock market data, translation tools, etc.
+      Each tool requires defining the function, providing it to the `LlmAgent`, and instructing the agent on when and how to use it.
