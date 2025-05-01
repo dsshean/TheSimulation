@@ -82,12 +82,14 @@ This sequence uses LLMs (like Google's Gemini models) at each step, guided by sp
     - first run setup_simulation.py
     - python main3.py \* current working version
 
-### Running the Agent Test
+### Running
 
-The `simulacra_v3.py` script includes a test function (`_test_agent`) to demonstrate the agent's thinking process in isolation.
+The `setup_simulation.py` creates simulation setup and base life summaries needed to run the agents.
+
+The `main_async.py` script starts the simulation process
 
 ```bash
-python src/agents/simulacra_v3.py
+python main_async
 ```
 
 This will:
