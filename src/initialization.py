@@ -1,3 +1,4 @@
+# c:\Users\dshea\Desktop\TheSimulation\src\initialization.py
 # src/initialization.py
 
 import os
@@ -23,9 +24,12 @@ LOCATION_KEY = "location" # <<< Added for consistency (from world template)
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = os.path.join("data", "states")
-STATE_FILE_PATTERN = os.path.join(STATE_DIR, "simulation_state_*.json")
-LIFE_SUMMARY_DIR = os.path.join("data", "life_summaries")
+# Define default directories relative to the project root or a known base path
+# Assuming this file is in src/, data/ is one level up
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # Gets the directory containing src/
+STATE_DIR = os.path.join(BASE_DIR, "data", "states")
+LIFE_SUMMARY_DIR = os.path.join(BASE_DIR, "data", "life_summaries")
+# STATE_FILE_PATTERN is now constructed within find_latest_simulation_state_file
 
 def load_json_file(path: str, default: Optional[Any] = None) -> Optional[Any]:
     """Loads JSON from a file, returning default if file not found or invalid."""
@@ -53,34 +57,50 @@ def save_json_file(path: str, data: Any):
         logger.error(f"Error saving file {path}: {e}")
         raise
 
-def load_world_template(template_path: str) -> Dict[str, Any]:
+def load_world_template(template_path: str) -> Optional[Dict[str, Any]]:
     """Loads the world template configuration file."""
     logger.info(f"Loading world template from: {template_path}")
     template_data = load_json_file(template_path)
     if template_data is None:
         logger.critical(f"World template file not found or invalid at {template_path}. Cannot proceed.")
-        raise FileNotFoundError(f"World template not found or invalid: {template_path}")
+        # Return None instead of raising FileNotFoundError immediately
+        # Let the caller handle the missing template if necessary
+        return None
     if template_data.get("world_instance_uuid"): # Check if key exists and has a value
         logger.warning(f"Template file {template_path} contains a world_instance_uuid. This should ideally be null or absent in the template.")
+        # Consider removing it: del template_data["world_instance_uuid"]
     logger.info("World template loaded successfully.")
     return template_data
 
-def find_latest_simulation_state_file() -> Optional[str]:
-    """Finds the most recently modified simulation state file in STATE_DIR."""
+# --- <<< MODIFIED FUNCTION SIGNATURE >>> ---
+def find_latest_simulation_state_file(state_dir: str = STATE_DIR) -> Optional[str]:
+    """
+    Finds the most recently modified simulation state file in the specified directory.
+
+    Args:
+        state_dir: The directory to search for state files. Defaults to STATE_DIR.
+
+    Returns:
+        The path to the latest state file, or None if none are found or an error occurs.
+    """
     try:
-        os.makedirs(STATE_DIR, exist_ok=True)
-        list_of_files = glob.glob(STATE_FILE_PATTERN)
+        os.makedirs(state_dir, exist_ok=True)
+        # Construct pattern using the provided state_dir
+        state_file_pattern = os.path.join(state_dir, "simulation_state_*.json")
+        list_of_files = glob.glob(state_file_pattern)
         if not list_of_files:
-            logger.info(f"No existing simulation state files found in {STATE_DIR}.")
+            logger.info(f"No existing simulation state files found in {state_dir}.")
             return None
         latest_file = max(list_of_files, key=os.path.getmtime)
         logger.info(f"Found latest simulation state file: {latest_file}")
         return latest_file
-    except Exception as e:
-        logger.error(f"Error finding latest state file in {STATE_DIR}: {e}")
-        return None
 
-# --- <<< MODIFIED FUNCTION >>> ---
+    except Exception as e:
+        logger.error(f"Error finding latest state file in {state_dir}: {e}")
+        return None
+# --- <<< END MODIFICATION >>> ---
+
+
 def load_or_create_simulation_instance(
     world_template: Dict[str, Any],
     session_id: str, # Keep session_id for logging/state update
@@ -130,10 +150,10 @@ def load_or_create_simulation_instance(
     else:
         # Find latest file using the state_dir
         try:
-            os.makedirs(state_dir, exist_ok=True)
-            list_of_files = glob.glob(state_file_pattern)
-            if list_of_files:
-                latest_state_file = max(list_of_files, key=os.path.getmtime)
+            # --- <<< CALL MODIFIED FUNCTION >>> ---
+            latest_state_file = find_latest_simulation_state_file(state_dir)
+            # --- <<< END CALL MODIFICATION >>> ---
+            if latest_state_file:
                 logger.info(f"Attempting to load latest instance state: {latest_state_file}")
                 state = load_json_file(latest_state_file)
                 # Extract UUID from filename as fallback if missing in content
@@ -171,30 +191,27 @@ def load_or_create_simulation_instance(
         logger.info(f"New instance UUID: {world_instance_uuid}")
         logger.info(f"New state file path: {state_file_path}")
 
-        # --- <<< START: Initialize location_details >>> ---
+        # --- Initialize location_details ---
         initial_location_details = {}
-        wc_location = world_template.get(LOCATION_KEY) # Use defined key
+        wc_location = world_template.get(LOCATION_KEY)
         if isinstance(wc_location, dict):
             city = wc_location.get("city", "UnknownCity")
-            state_code = wc_location.get("state") # Can be None
+            state_code = wc_location.get("state")
             country = wc_location.get("country", "UnknownCountry")
 
-            # Create a reasonably unique key for this primary location
             location_key_parts = [part for part in [city, state_code, country] if part]
             location_key = ", ".join(location_key_parts) if location_key_parts else "default_location"
 
-            # Populate initial details - ADD A DEFAULT DESCRIPTION
             initial_location_details[location_key] = {
-                "name": location_key, # Use the key as the initial name
-                "description": f"The primary starting location: {location_key}. Further details pending.", # Default description
-                "objects_present": [], # Start empty
-                "connected_locations": [], # Start empty
-                "coordinates": wc_location.get("coordinates", {"latitude": None, "longitude": None}) # Copy coordinates
+                "name": location_key,
+                "description": f"The primary starting location: {location_key}. Further details pending.",
+                "objects_present": [],
+                "connected_locations": [],
+                "coordinates": wc_location.get("coordinates", {"latitude": None, "longitude": None})
             }
             logger.info(f"Initialized '{LOCATION_DETAILS_KEY}' with primary location: '{location_key}'")
         else:
             logger.warning(f"Template '{LOCATION_KEY}' key missing/invalid. Initial '{LOCATION_DETAILS_KEY}' empty.")
-        # --- <<< END: Initialize location_details >>> ---
 
         wc_rules = world_template.get("rules", {})
         if not isinstance(wc_rules, dict):
@@ -205,23 +222,22 @@ def load_or_create_simulation_instance(
         state = {
             "world_instance_uuid": world_instance_uuid,
             "session_id": session_id,
-            WORLD_TEMPLATE_DETAILS_KEY: { # Embed template details
+            WORLD_TEMPLATE_DETAILS_KEY: {
                 "world_type": world_template.get("world_type"),
                 "sub_genre": world_template.get("sub_genre"),
                 "description": world_template.get("description", "Default description."),
                 "rules": wc_rules,
-                LOCATION_KEY: wc_location # Store original location structure
+                LOCATION_KEY: wc_location
             },
-            WORLD_STATE_KEY: { # Dynamic world state
+            WORLD_STATE_KEY: {
                 "world_time": datetime.now(timezone.utc).isoformat(),
-                LOCATION_DETAILS_KEY: initial_location_details, # <<< Add the new key here
+                LOCATION_DETAILS_KEY: initial_location_details,
                 "global_events": [],
-                # Keep these for compatibility/direct access if needed
                 "setting_description": world_template.get("description", "Default description."),
                 "world_rules": wc_rules
             },
             ACTIVE_SIMULACRA_IDS_KEY: [],
-            SIMULACRA_PROFILES_KEY: {} # <<< Initialize profiles dict
+            SIMULACRA_PROFILES_KEY: {}
         }
         logger.info("Initialized new simulation state structure.")
         save_json_file(state_file_path, state) # Save immediately
@@ -229,26 +245,8 @@ def load_or_create_simulation_instance(
     # --- State Loaded Successfully ---
     else:
         state_changed = False
-        # Ensure essential keys exist
-        if ACTIVE_SIMULACRA_IDS_KEY not in state:
-            state[ACTIVE_SIMULACRA_IDS_KEY] = []
-            logger.warning(f"Added missing '{ACTIVE_SIMULACRA_IDS_KEY}' key to loaded state.")
-            state_changed = True
-        if WORLD_STATE_KEY not in state:
-            state[WORLD_STATE_KEY] = {}
-            logger.warning(f"Added missing '{WORLD_STATE_KEY}' key structure to loaded state.")
-            state_changed = True
-        # --- <<< START: Ensure location_details exists in loaded state >>> ---
-        if LOCATION_DETAILS_KEY not in state.get(WORLD_STATE_KEY, {}):
-             if WORLD_STATE_KEY not in state: state[WORLD_STATE_KEY] = {} # Ensure world_state exists first
-             state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY] = {}
-             logger.warning(f"Added missing '{LOCATION_DETAILS_KEY}' key to loaded state's '{WORLD_STATE_KEY}'.")
-             state_changed = True
-        # --- <<< END: Ensure location_details exists >>> ---
-        if SIMULACRA_PROFILES_KEY not in state: # <<< Ensure profiles dict exists
-             state[SIMULACRA_PROFILES_KEY] = {}
-             logger.warning(f"Added missing '{SIMULACRA_PROFILES_KEY}' key to loaded state.")
-             state_changed = True
+        # Ensure essential keys exist using the helper function
+        state_changed = ensure_state_structure(state)
 
         # Always update the session ID
         if state.get("session_id") != session_id:
@@ -278,9 +276,7 @@ def create_life_summary_data(sim_id: str, world_uuid: str, persona_data: Dict[st
          persona_data = {}
 
     logger.info(f"Structuring life summary data for {sim_id} in world {world_uuid}")
-    # Assuming persona_data is the dict generated by life_generator
-    # Ensure 'persona_details' key exists if that's the standard
-    persona_details_key = "persona_details" # Or just "persona" depending on generator output
+    persona_details_key = "persona_details"
     if persona_details_key not in persona_data:
         logger.warning(f"Persona data for {sim_id} missing '{persona_details_key}'. Wrapping existing data.")
         persona_data = {persona_details_key: persona_data}
@@ -288,7 +284,7 @@ def create_life_summary_data(sim_id: str, world_uuid: str, persona_data: Dict[st
     return {
       "simulacra_id": sim_id,
       "world_instance_uuid": world_uuid,
-      **persona_data, # Merge the persona data (which should contain 'persona_details')
+      **persona_data,
       "generation_timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -297,7 +293,7 @@ def generate_unique_id(prefix: str = "id") -> str:
     unique_part = str(uuid.uuid4()).split('-')[0]
     return f"{prefix}_{unique_part}"
 
-# --- <<< ADDED: Function to ensure state structure (call from main3.py) >>> ---
+# --- Function to ensure state structure (call from main3.py or simulation_async.py) ---
 def ensure_state_structure(state: Dict[str, Any]) -> bool:
     """
     Checks and adds missing essential keys/structures to a loaded state dictionary.
@@ -340,6 +336,34 @@ def ensure_state_structure(state: Dict[str, Any]) -> bool:
         logger.warning(f"Added missing '{SIMULACRA_PROFILES_KEY}' key.")
         modified = True
 
-    # Add checks for other essential top-level keys if needed
+    # Ensure narrative log exists
+    if "narrative_log" not in state:
+        state["narrative_log"] = []
+        logger.warning("Added missing 'narrative_log' key.")
+        modified = True
+    elif not isinstance(state["narrative_log"], list):
+        state["narrative_log"] = [] # Ensure it's a list
+        logger.warning("Corrected 'narrative_log' key to be a list.")
+        modified = True
+
+    # Ensure objects exists
+    if "objects" not in state:
+        state["objects"] = {}
+        logger.warning("Added missing 'objects' key.")
+        modified = True
+    elif not isinstance(state["objects"], dict):
+        state["objects"] = {} # Ensure it's a dict
+        logger.warning("Corrected 'objects' key to be a dict.")
+        modified = True
+
+    # Ensure world_details exists
+    if WORLD_TEMPLATE_DETAILS_KEY not in state:
+        state[WORLD_TEMPLATE_DETAILS_KEY] = {"description": "Default", "rules": {}}
+        logger.warning(f"Added missing '{WORLD_TEMPLATE_DETAILS_KEY}' key.")
+        modified = True
+    elif not isinstance(state[WORLD_TEMPLATE_DETAILS_KEY], dict):
+        state[WORLD_TEMPLATE_DETAILS_KEY] = {"description": "Default", "rules": {}}
+        logger.warning(f"Corrected '{WORLD_TEMPLATE_DETAILS_KEY}' key to be a dict.")
+        modified = True
 
     return modified

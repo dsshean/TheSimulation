@@ -1,0 +1,38 @@
+2025-04-30 17:34:03,145 - __main__ - INFO - --- Application Start (main_async.py) --- Logging to: simulation_async.log
+2025-04-30 17:34:03,150 - asyncio - DEBUG - Using selector: SelectSelector
+2025-04-30 17:34:03,169 - src.simulation_async - INFO - Starting simulation initialization.
+2025-04-30 17:34:03,169 - src.simulation_async - INFO - No instance UUID specified, attempting to load the latest state file.
+2025-04-30 17:34:03,171 - src.initialization - INFO - Found latest simulation state file: data/states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-30 17:34:03,171 - src.simulation_async - INFO - Found latest state file: data/states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json (UUID from filename: 05e07dad-f24b-420b-822c-1ae7862220f6)
+2025-04-30 17:34:03,172 - src.simulation_async - INFO - Attempting to load state file: data/states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-04-30 17:34:03,173 - src.simulation_async - INFO - Successfully loaded and verified simulation state for UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
+2025-04-30 17:34:03,175 - src.simulation_async - INFO - Ensuring essential state structure...
+2025-04-30 17:34:03,177 - src.simulation_async - INFO - Found 2 potential summary files for instance 05e07dad-f24b-420b-822c-1ae7862220f6.
+2025-04-30 17:34:03,178 - src.simulation_async - INFO - Found 2 valid life summaries by content: {'sim_662862', 'sim_3e912d'}
+2025-04-30 17:34:03,178 - src.simulation_async - WARNING - Persona for sim_662862 not found in state profile. Attempting fallback load.
+2025-04-30 17:34:03,178 - src.simulation_async - INFO - Successfully loaded persona for sim_662862 from fallback file.
+2025-04-30 17:34:03,178 - src.simulation_async - WARNING - Simulacrum 'sim_662862' missing current AND home location. Setting to primary/first world location: 'UnknownLocation'.
+2025-04-30 17:34:03,178 - src.simulation_async - INFO - Populated state for simulacrum: sim_662862
+2025-04-30 17:34:03,178 - src.simulation_async - WARNING - Persona for sim_3e912d not found in state profile. Attempting fallback load.
+2025-04-30 17:34:03,179 - src.simulation_async - INFO - Successfully loaded persona for sim_3e912d from fallback file.
+2025-04-30 17:34:03,179 - src.simulation_async - WARNING - Simulacrum 'sim_3e912d' missing current AND home location. Setting to primary/first world location: 'UnknownLocation'.
+2025-04-30 17:34:03,179 - src.simulation_async - INFO - Populated state for simulacrum: sim_3e912d
+2025-04-30 17:34:03,179 - src.simulation_async - INFO - Initialization complete. Instance 05e07dad-f24b-420b-822c-1ae7862220f6 ready with 2 simulacra.
+2025-04-30 17:34:03,657 - src.simulation_async - INFO - Google Generative AI configured.
+2025-04-30 17:34:03,657 - src.simulation_async - INFO - ADK World Engine Runner initialized (Session ID: sim_session_05e07dad-f24b-420b-822c-1ae7862220f6).
+2025-04-30 17:34:03,657 - src.simulation_async - INFO - ADK Agent created for Simulacrum: Eleanor Vance (sim_662862)
+2025-04-30 17:34:03,657 - src.simulation_async - INFO - ADK Agent created for Simulacrum: Eleanor Hayes (sim_3e912d)
+2025-04-30 17:34:03,838 - src.simulation_async - INFO - Started 4 tasks.
+2025-04-30 17:34:03,839 - src.tasks_async - INFO - [TimeManager] Task started.
+2025-04-30 17:34:03,840 - src.tasks_async - INFO - [WorldEngineLLM] Task started.
+2025-04-30 17:34:06,789 - src.tasks_async - INFO - [Eleanor Vance] LLM Agent task started.
+2025-04-30 17:34:06,794 - src.tasks_async - DEBUG - [Eleanor Vance] Sending prompt to LLM.
+2025-04-30 17:34:06,794 - src.tasks_async - DEBUG - [Eleanor Vance] Runner Service ID: 2085669790800
+2025-04-30 17:34:09,122 - src.tasks_async - DEBUG - [Eleanor Vance] Context Service ID: 2085669790800
+2025-04-30 17:34:20,652 - src.tasks_async - ERROR - [Eleanor Vance] Error in main loop: Session not found: sim_session_05e07dad-f24b-420b-822c-1ae7862220f6
+Traceback (most recent call last):
+  File "C:\Users\dshea\Desktop\TheSimulation\src\tasks_async.py", line 616, in simulacra_agent_task_llm
+    async for event in simulacra_runner.run_async( # Use the single runner
+  File "c:\Users\dshea\.conda\envs\simulation\Lib\site-packages\google\adk\runners.py", line 179, in run_async
+    raise ValueError(f'Session not found: {session_id}')
+ValueError: Session not found: sim_session_05e07dad-f24b-420b-822c-1ae7862220f6

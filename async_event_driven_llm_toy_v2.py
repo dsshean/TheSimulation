@@ -4,11 +4,11 @@ import asyncio
 import json
 import logging
 import time
-import heapq # For priority queue (schedule)
+import heapq
 import os
 import sys
-import random # For agent sleep variation
-import re # Import regex
+import random
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 # --- ADK Imports ---
@@ -17,7 +17,6 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
 from google.genai import types
 
-# --- Rich Console (Optional but nice) ---
 try:
     from rich.console import Console
     from rich.panel import Panel
@@ -26,7 +25,6 @@ try:
     from rich.syntax import Syntax
     console = Console()
 except ImportError:
-    # Define a dummy console if rich is not installed
     class DummyConsole:
         def print(self, *args, **kwargs): print(*args)
         def rule(self, *args, **kwargs): print(f"\n--- {args[0] if args else ''} ---")
@@ -34,7 +32,7 @@ except ImportError:
     print("Rich console not found, using basic print.")
 
 # --- Logging Setup ---
-log_filename = "async_toy_v3.log" # Log file name
+log_filename = "async_toy_v3.log"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -57,12 +55,12 @@ except ImportError:
     logger.info("dotenv not installed, ensure GOOGLE_API_KEY is set in environment.")
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
-MODEL_NAME = os.getenv("MODEL_GEMINI_PRO", "gemini-1.5-flash-latest")
+MODEL_NAME = os.getenv("MODEL_GEMINI_PRO", "gemini-2.0-flash")
 APP_NAME = "AsyncToySimV3"
 USER_ID = "user1"
 
 # --- Simulation Parameters ---
-SIMULATION_SPEED_FACTOR = 5.0
+SIMULATION_SPEED_FACTOR = 0.5
 UPDATE_INTERVAL = 0.1
 MAX_SIMULATION_TIME = 180.0
 
