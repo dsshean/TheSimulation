@@ -2,7 +2,7 @@
   "world_instance_uuid": "uuid-goes-here-or-null",
   "world_type": "real",
   "sub_genre": "realtime",
-  "description": "A simulation mirroring the current real world in Asheville, NC, United States. Standard physics apply.",
+  "description": "The real world in Asheville, NC, United States. Standard physics apply.",
   "rules": {
     "allow_teleportation": false,
     "time_progression_rate": 1.0,

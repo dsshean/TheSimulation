@@ -1,4 +1,3 @@
-# c:\Users\dshea\Desktop\TheSimulation\main_async.py
 import argparse
 import asyncio
 import logging
