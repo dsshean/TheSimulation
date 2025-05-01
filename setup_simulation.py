@@ -247,12 +247,16 @@ async def main():
         sim_id = f"sim_{''.join(random.choices(string.ascii_lowercase + string.digits, k=6))}"
         console.print(f"\n--- Preparing generation for Simulacra {i+1}/{num_simulacra} (ID: {sim_id}) ---")
 
+        # Determine if real-world context should be allowed based on world type
+        allow_real_context = (config_data["world_type"] == "real")
+
         # Create the async task for generation
         task = generate_new_simulacra_background(
             sim_id=sim_id,
             world_instance_uuid=instance_uuid,
-            world_type=config_data["world_type"],
-            world_description=config_data["description"]
+            world_type=config_data["world_type"], # Pass world type for context
+            world_description=config_data["description"],
+            allow_real_context=allow_real_context # Pass the flag
             # age_range uses default (18-45)
         )
         generation_tasks.append(task)
@@ -296,3 +300,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"A critical error occurred during setup: {e}", exc_info=True)
         console.print(f"\n[bold red]A critical error occurred:[/bold red] {e}")
+
