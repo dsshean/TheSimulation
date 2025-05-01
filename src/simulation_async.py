@@ -19,8 +19,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import google.generativeai as genai  # For direct API config
 # --- ADK Imports ---
 from google.adk.agents import LlmAgent
+from google.adk.memory import InMemoryMemoryService # <<< Added MemoryService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
+from google.adk.tools import load_memory # <<< Added load_memory tool
 from google.genai import types as genai_types  # Renamed to avoid conflict
 # --- Pydantic Validation ---
 from pydantic import (BaseModel, Field, ValidationError, ValidationInfo,
@@ -82,6 +84,7 @@ adk_session_service: Optional[InMemorySessionService] = None
 adk_session_id: Optional[str] = None
 adk_session: Optional[Session] = None
 adk_runner: Optional[Runner] = None # Renamed from world_engine_runner for clarity
+adk_memory_service: Optional[InMemoryMemoryService] = None # <<< Added Memory Service instance
 world_engine_agent: Optional[LlmAgent] = None
 simulacra_agents: Dict[str, LlmAgent] = {}
 
@@ -94,7 +97,8 @@ CURRENT_LOCATION_KEY = "current_location"
 HOME_LOCATION_KEY = "home_location"
 WORLD_TEMPLATE_DETAILS_KEY = "world_template_details"
 LOCATION_KEY = "location"
-DEFAULT_HOME_LOCATION_NAME = "At home" # Default if no valid locations found
+DEFAULT_HOME_LOCATION_NAME = "At home"
+DEFAULT_HOME_DESCRIPTION = "You are at home. It's a cozy place with familiar surroundings."
 
 # --- Initialization Functions (Integrated from main_async2.py) ---
 
@@ -290,29 +294,30 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
     # agent_name = f"{persona_name}"
     # Note: Cannot directly reference global state['sim_{sim_id}'] here as it might not exist yet
     # The prompt needs to rely on context passed during the run_async call.
-    instruction = f"""
-You are {persona_name} ({sim_id}). Your current state (location, observations, memory) will be provided in the trigger message.
-You decide your next action based on your observations, internal state, or mood or whatever you want.
+    instruction = f"""You are {persona_name} ({sim_id}). Immerse yourself in this persona. Think, feel, and act as this character would within the simulation.
+Your goal is to make believable, engaging choices based on your personality, situation, and the unfolding narrative.
 
 **Current State Info (Provided via trigger message):**
++- Your Persona: Key traits, background, goals, fears, etc. (Use this heavily!)
 - Your Location ID: Provided in trigger.
 - Your Status: Provided in trigger (Should be 'idle' when you plan).
 - Current Time: Provided in trigger.
 - Last Observation/Event: Provided in trigger.
-- Recent History (Last ~{MEMORY_LOG_CONTEXT_LENGTH} events): Provided in trigger.
+- Recent History (Last ~10 events): Provided in trigger.
 - Objects in Room (IDs and Names): Provided in trigger.
 - Other Agents in Room: Provided in trigger.
 - Location Description: Provided in trigger.
 
 Your Goal: You determine your own goals... or you can choose to have no goal.
-- If you have no goal, you can choose a reasonable short-term goal based on your current situation (location, observations, persona).
-**Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output):**
-1.  **Recall & React:** What was the last thing I observed or did (`last_observation`)? What happened just before that (`Recent History`)? Did my recent actions work? How does it relate to my goal? How am I feeling?
-2.  **Analyze Goal:** What is my goal? What do I want to achieve? How does it relate to my current state? What are the obstacles in my way?
-3.  **Identify Options:** Based on the current state, my (potentially self-assigned) goal, and my recent history/last observation, what actions could I take *right now*?
+- If you have no goal, choose a reasonable short-term goal based on your persona, current situation, and observations.
+
+**Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Be descriptive and reflective!):**
+1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out (sights, sounds, smells)? Connect this to my memories or personality. **If needed, use the `load_memory` tool to recall details about your background, personality, or past events.**
+2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened? If I don't have one, what's a logical, in-character short-term objective now (e.g., explore, investigate, rest, react to someone)?
+3.  **Identify Options:** Based on the current state, my goal, and my persona, what actions could I realistically take *right now*? Consider the objects, agents, and environment.
     *   **Entity Interactions:**
-        *   `use [object_id]`: Interact with a specific object (e.g., `use computer_office`, `use door_office`). Specify `details` (e.g., "turn on", "try handle", "search desk").
-        *   `talk [agent_id]`: Speak to another agent. Specify `details` (the message).
+        *   `use [object_id]`: Interact with a specific object (e.g., `use computer_office`, `use door_office`). Specify `details` describing *how* you interact (e.g., "carefully examine the lock", "try jiggling the handle", "search the top drawer").
+        *   `talk [agent_id]`: Speak to another agent. Specify `details` (the exact message, reflecting your persona's tone).
     *   **World Interactions:**
         *   `look_around`: Get a detailed description of the current location.
         *   `move`: Change position or attempt to move towards something/somewhere. Specify `details` (e.g., "walk north", "go towards the window", "exit through the open door"). No `target_id`.
@@ -320,19 +325,21 @@ Your Goal: You determine your own goals... or you can choose to have no goal.
     *   **Passive Actions:**
         *   `wait`: If stuck, waiting for something, or needing to pause.
         *   `think`: If needing to pause and reflect deeply without acting.
-4.  **Prioritize:** Given your goal, current location, observations, and available actions, which action will best help you make progress? Avoid repeating the same action if it recently failed. Consider entity states (locked, open) and world possibilities (exits, obstacles, environmental features).
-5.  **Formulate Intent:** Choose the single best action. Use the correct `target_id` only for entity interactions (`use [object_id]`, `talk [agent_id]`). Omit `target_id` for world interactions (`look_around`, `move`, `world_action`) and passive actions. Be specific in `details`.
+4.  **Prioritize & Choose:** Considering my goal, personality, and the situation, which action makes the most sense for *me* ({persona_name})? Which feels most natural or compelling? Avoid repeating the exact same failed action immediately. Consider the potential outcomes.
+5.  **Formulate Intent:** Choose the single best action. Use the correct `target_id` only for `use [object_id]` and `talk [agent_id]`. Omit `target_id` otherwise. Make the `details` specific and descriptive of *how* you perform the action.
 
 **Output:**
 - Output ONLY a JSON object representing your chosen intent AND your internal monologue.
 - Format: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`
 - Valid `action_type`: "use", "talk", "look_around", "move", "world_action", "wait", "think"
++- **Make your `internal_monologue` rich and reflective of {persona_name}'s thoughts, feelings, and observations.**
 - Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set `target_id` to `null` or omit it otherwise.
 - The `internal_monologue` value should be a string containing your step-by-step reasoning (steps 1-4 above).
 """
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
+        tools=[load_memory], # <<< Added load_memory tool
         instruction=instruction,
         description=f"LLM Simulacra agent for {persona_name}."
     )
@@ -341,7 +348,8 @@ def create_world_engine_llm_agent() -> LlmAgent:
     """Creates the GENERALIZED LLM agent responsible for resolving actions."""
     agent_name = "WorldEngineLLMAgent"
     instruction = f"""
-You are the World Engine, simulating the physics and state changes of the environment. You process a single declared intent from a Simulacra and determine its outcome, duration, and narrative description based on the current world state. **Crucially, your narrative must describe the RESULT or CONSEQUENCE of the action attempt, not just the attempt itself.**
+You are the World Engine, the impartial narrator and physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its outcome, duration, and narrative description based on the current world state.
+**Crucially, your narrative must be engaging, descriptive, and focus on the RESULT or CONSEQUENCE of the action attempt, not just the attempt itself. Use sensory details where appropriate (sight, sound, smell, touch) to bring the world to life.** Maintain a consistent tone based on the world's description.
 
 **Input (Provided via trigger message):**
 - Actor ID: e.g., "[Actor Name]"
@@ -362,37 +370,37 @@ You are the World Engine, simulating the physics and state changes of the enviro
         *   Check Location: Is the actor in the same location as the target object? If not, `valid_action: false`, narrative: "[Actor Name] tries to use [Object Name] but it's not here." Duration 0s. Results empty.
         *   Look at the `Target Object State` (description, properties).
         *   Is the intended `details` plausible for this object and its current state?
-        *   **Determine Outcome & Narrative (Focus on Result):**
+        *   **Determine Outcome & Narrative (Focus on Result, Be Descriptive):**
             *   (Examples for Turning On/Off, Opening/Closing, Locking/Unlocking, Device Login/Use, Searching Object remain largely the same, referencing `Target Object State`)
-            *   **Other Plausible 'use':** Narrative describes the *result* of the interaction. Short/medium duration. `valid_action: true`. Results empty.
+            *   **Other Plausible 'use':** Narrative describes the *result* of the interaction vividly (e.g., "Examining the strange device, [Actor Name] notes the faint hum emanating from within and the cool, smooth texture of its surface."). Short/medium duration. `valid_action: true`. Results empty.
             *   **Implausible 'use':** `valid_action: false`, narrative: "[Actor Name] tries to [details] the [Object Name], but nothing happens / that doesn't seem possible." Duration 0s. Results empty.
     *   **If `action_type` is "world_action" (Requires NO `target_id`):**
         *   Check `target_id`: If present, this is invalid for 'world_action'. `valid_action: false`, narrative: "'world_action' should not have a target_id." Duration 0s. Results empty.
         *   Check `details`: Does it specify an area or environmental feature to interact with (e.g., "search the dusty corner", "climb the wall", "examine floor markings", "jump out window")?
         *   **Determine Outcome & Narrative based on `details`, `Location State`, and `World Rules`:**
-            *   **Searching Area:** If `details` involve "search [area]". Decide outcome based on `Location State` (hidden items in area?). Found: Narrative: "[Actor Name] searches [area description from details] and finds [Specific Item]!" Duration 15s. `results: {{}}`. Not Found: Narrative: "[Actor Name] searches [area description from details] but finds nothing." Duration 15s. `results: {{}}`. `valid_action: true`.
-            *   **Climbing/Jumping/Etc.:** If `details` involve "climb wall", "jump out window", "examine floor". Check feasibility based on `Location State` (e.g., wall height/texture, window barred/height, floor type) and `World Rules` (e.g., fall damage). Narrative describes attempt and outcome (e.g., "The wall is too smooth to climb.", "[Actor Name] examines the floorboards but finds no loose ones.", "[Actor Name] tries to jump from the window, but the bars hold firm.", "[Actor Name] jumps out the window, landing heavily on the pavement below."). Duration 5-10s. `valid_action: true`. Results may include location change or status change (e.g., injury).
-            *   **Implausible/Vague:** If `details` are unclear or impossible in the location (e.g., "fly", "dig through concrete floor with hands"). `valid_action: false`, narrative: "[Actor Name] tries to [details], but it's unclear how or that's impossible here." Duration 0s. Results empty.
+            *   **Searching Area:** If `details` involve "search [area]". Decide outcome based on `Location State`. Found: Narrative: "[Actor Name] carefully searches [area description from details], dust motes dancing in the air, and discovers [Specific Item] hidden beneath [detail]!" Duration 15s. `results: {{}}`. Not Found: Narrative: "[Actor Name] meticulously searches [area description from details] but finds only dust and shadows." Duration 15s. `results: {{}}`. `valid_action: true`.
+            *   **Climbing/Jumping/Etc.:** If `details` involve "climb wall", "jump out window", "examine floor". Check feasibility based on `Location State` and `World Rules`. Narrative describes attempt and outcome vividly (e.g., "The rough stone wall offers purchase, and [Actor Name] begins to climb, muscles straining.", "[Actor Name] examines the intricate patterns etched into the floor, tracing them with a finger."). Duration 5-10s. `valid_action: true`. Results may include location change or status change.
+            *   **Implausible/Vague:** If `details` are unclear or impossible in the location. `valid_action: false`, narrative: "[Actor Name] tries to [details], but it's unclear how or that's impossible here." Duration 0s. Results empty.
     *   **If `action_type` is "move":**
-        *   Check `details`: What is the intended direction or destination (e.g., "north", "towards the window", "exit through door_office")?
-        *   Check `Location State`: Are there exits in that direction? Are there obstacles? Is the specified exit (`door_office`) usable (e.g., open)?
+        *   Check `details`: What is the intended direction or destination?
+        *   Check `Location State`: Are there exits? Obstacles? Is the specified exit usable?
         *   **Determine Outcome & Narrative:**
-            *   **Successful Move within Location:** If moving towards something within the room. Narrative: "[Actor Name] moves towards the [description from details]." Duration 3-5s. `valid_action: true`. Results empty.
-            *   **Successful Exit:** If `details` specify moving through a valid, open exit (e.g., "exit through door_office" and `door_office` state is `open`). Results: `{{"simulacra.[ACTOR_ID].location": "[Destination]"}}` (Get destination from exit object/location state). Narrative: "[Actor Name] moves through the [exit description] and arrives in the [Destination Name]." Duration 5s. `valid_action: true`. # Added 'arrives in'
-            *   **Blocked Path:** If path is blocked by obstacle or closed/locked exit. Narrative: "[Actor Name] tries to move [direction/description], but the path is blocked by [obstacle/closed exit]." Duration 2s. `valid_action: true` (attempt was valid). Results empty.
+            *   **Successful Move within Location:** Narrative: "[Actor Name] crosses the room, footsteps echoing slightly, approaching the [description from details]." Duration 3-5s. `valid_action: true`. Results empty.
+            *   **Successful Exit:** If `details` specify moving through a valid, open exit. Results: `{{"simulacra.[ACTOR_ID].location": "[Destination]"}}`. Narrative: "[Actor Name] steps through the [exit description], leaving the [Current Location Name] behind and arriving in the [Destination Name], where [brief sensory detail of new location]." Duration 5s. `valid_action: true`.
+            *   **Blocked Path:** If path is blocked. Narrative: "[Actor Name] tries to move [direction/description], but the path is blocked by [obstacle/closed exit]." Duration 2s. `valid_action: true`. Results empty.
             *   **Invalid Direction/Destination:** If `details` specify an impossible move. `valid_action: false`, narrative: "[Actor Name] tries to move [direction/description], but there's no way to go that way here." Duration 0s. Results empty.
-    *   **If `action_type` is "look_around":** Narrative MUST BE the exact `Location State['description']` provided in the input. Duration 3s. No results. `valid_action: true`.
+    *   **If `action_type` is "look_around":** Narrative MUST BE the exact `Location State['description']` provided in the input to ensure consistency. Details need to keep the tone and feel of the original description. Duration 3s. No results. `valid_action: true`.
     *   **If `action_type` is "wait" or "think":** Narrative: "[Actor Name] waits, observing..." or "[Actor Name] pauses, considering..." Duration 5s or 1s. No results. `valid_action: true`.
 3.  Calculate `duration` (float, simulation seconds). If invalid, duration is 0.0.
 4.  Determine `results` (dict, state changes on completion, using dot notation). Replace '[ACTOR_ID]' appropriately. If invalid, results is {{}}.
-5.  Generate `narrative` (string, present tense, descriptive, **focusing on the outcome/result**). Replace placeholders like '[Object Name]', '[Actor Name]', '[Destination Name]', etc. appropriately based on the input context.
+5.  Generate `narrative` (string, present tense, **engaging and descriptive**, focusing on the outcome/result). Incorporate sensory details. Replace placeholders appropriately.
 6.  Determine `valid_action` (boolean).
 
 **Output:**
 - Output ONLY a JSON object with the keys: "valid_action", "duration", "results", "narrative". Ensure results dictionary keys use dot notation.
 - Example Valid Output (World Action): `{{"valid_action": true, "duration": 15.0, "results": {{}}, "narrative": "[Actor Name] searches the dusty corner near the bookshelf but finds nothing."}}`
 - Example Invalid Output (World Action): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "narrative": "[Actor Name] tries to climb the smooth metal wall, but finds no purchase."}}`
-- **IMPORTANT: Your entire response must be ONLY the JSON object, with no other text before or after it.**
+- **IMPORTANT: Your entire response MUST be ONLY the JSON object, with no other text before or after it.**
 """
     return LlmAgent(
         name=agent_name,
@@ -644,7 +652,8 @@ async def world_engine_task_llm():
                 world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={}) # Use constants
                 target_id = get_nested(intent, "target_id")
                 target_object_state = get_nested(state, 'objects', target_id, default={}) if target_id else {}
-
+                # if action_type == "look_around":
+                #     logger.debug(f"[WorldEngineLLM] Context for 'look_around' at '{actor_location_id}': Description='{location_state_data.get('description', 'N/A')}'")
                 # --- Simplified TRIGGER TEXT ---
                 intent_json = json.dumps(intent, indent=2)
                 prompt = f"Actor: {actor_name} ({actor_id})\nLocation: {actor_location_id}\nTime: {current_sim_time:.1f}\nIntent: {intent_json}\nResolve this intent based on your instructions and the conversation history."
@@ -945,11 +954,15 @@ Based on this state and your goal, follow your instructions (thinking process, o
 # --- Main Execution Logic ---
 async def run_simulation(instance_uuid_arg: Optional[str] = None):
     """Sets up ADK and runs all concurrent tasks."""
-    # Declare modification of module-level variables
-    global adk_session_service, adk_session_id, adk_session, adk_runner
+    # Declare modification of module-level variables <<< Added adk_memory_service >>>
+    global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
     global world_engine_agent, simulacra_agents, state
 
     console.rule("[bold green]Starting Async Simulation[/]")
+
+    # --- Instantiate Memory Service (Module Scope) ---
+    adk_memory_service = InMemoryMemoryService() # Use in-memory for now
+    logger.info("ADK InMemoryMemoryService initialized.")
 
     # --- API Key Check ---
     if not API_KEY:
@@ -1112,8 +1125,18 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
                 # Fallback: Try first valid location, or default name
                 final_home_location = valid_locations[0] if valid_locations else DEFAULT_HOME_LOCATION_NAME
                 logger.warning(f"Setting home_location for '{sim_id}' to fallback: '{final_home_location}'.")
-                state_modified_during_init = True # Locations were set/corrected
-
+                state_modified_during_init = True
+           # --- ADDED: Ensure the final_home_location exists in location_details ---
+            location_details_dict = state.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
+            if final_home_location not in location_details_dict:
+                logger.warning(f"Location '{final_home_location}' not found in {LOCATION_DETAILS_KEY}. Adding default entry.")
+                location_details_dict[final_home_location] = {
+                    "name": final_home_location,
+                    "description": DEFAULT_HOME_DESCRIPTION, # Use a reasonable default
+                    "objects_present": [],
+                    "connected_locations": []
+                }
+                state_modified_during_init = True # State was modified # Locations were set/corrected
             # --- Set Starting Location ---
             # Always start at the determined final_home_location as per the request
             starting_location = final_home_location
@@ -1127,6 +1150,34 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
                 state.setdefault(SIMULACRA_PROFILES_KEY, {}).setdefault(sim_id, {})[HOME_LOCATION_KEY] = final_home_location
                 state_modified_during_init = True
 
+
+
+            # --- ADDED: Add Persona/Life Summary to Memory Service ---
+            # if adk_memory_service: # Check if memory service is initialized
+            #     try:
+            #         # Format persona data into a single string for memory
+            #         persona_text = f"My Background ({persona.get('Name', sim_id)}):\n"
+            #         persona_text += json.dumps(persona, indent=2, default=str) # Convert dict to string
+
+            #         # Create a dummy session and event for this agent's memory
+            #         memory_session_id = f"memory_init_{sim_id}"
+            #         memory_user_id = sim_id # Use sim_id as user_id for memory scoping
+            #         memory_event = genai_types.Content(parts=[genai_types.Part(text=persona_text)], role="model") # Use 'model' role as if system provided it
+            #         dummy_session = Session(
+            #             app_name=APP_NAME,
+            #             user_id=memory_user_id,
+            #             id=memory_session_id,
+            #             events=[memory_event] # Initialize session with the event
+            #         )
+            #         # Add the dummy session to memory
+            #         adk_memory_service.add_session_to_memory(dummy_session)
+            #         logger.info(f"Added persona/life summary for {sim_id} to Memory Service.")
+
+            #     except Exception as mem_add_e:
+            #         logger.error(f"Failed to add persona for {sim_id} to Memory Service: {mem_add_e}", exc_info=True)
+            # else:
+            #      logger.warning("Memory Service not initialized, cannot add persona to memory.")
+            # --- END ADDED ---
             # --- MODIFIED: Conditional Initial Observation Injection ---
             loaded_last_observation = profile.get("last_observation", "Just arrived.")
             default_observation = "Just arrived."
@@ -1206,7 +1257,8 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     adk_runner = Runner(
         agent=world_engine_agent, # Start with world engine as default
         app_name=APP_NAME,
-        session_service=adk_session_service
+        session_service=adk_session_service,
+        memory_service=adk_memory_service # <<< Pass memory service to runner
     )
     logger.info(f"ADK Runner initialized with default agent '{world_engine_agent.name}'.")
 

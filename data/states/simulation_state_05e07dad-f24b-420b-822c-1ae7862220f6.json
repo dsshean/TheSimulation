@@ -6,9 +6,14 @@
   },
   "location_details": {},
   "objects": {},
-  "active_simulacra_ids": ["sim_662862", "sim_3e912d"],
-  "world_time": 372.71564999987885,
-  "narrative_log": [],
+  "active_simulacra_ids": [
+    "sim_662862"
+  ],
+  "world_time": 381.6124499998788,
+  "narrative_log": [
+    "[T381.2] The room is spartan but functional. A simple cot sits against one wall, its thin mattress offering little comfort. A metal desk, scarred with age and use, stands opposite, bearing a single flickering lamp. The air is stale, carrying a faint metallic tang, and the only sound is the hum of unseen machinery.",
+    "[T381.4] Examining the scarred metal desk, Eleanor Vance notes the grime etched into its surface and the faint scratches that tell silent stories. A single flickering lamp casts long shadows, but reveals no obvious drawers or compartments. The cool, rough texture of the metal is strangely grounding."
+  ],
   "simulacra": {
     "sim_662862": {
       "id": "sim_662862",
@@ -53,64 +58,22 @@
       },
       "location": "At home",
       "home_location": "At home",
-      "status": "busy",
-      "current_action_end_time": 373.08134999988323,
+      "status": "idle",
+      "current_action_end_time": 381.40314999987936,
       "goal": "Determine your own long term goals.",
-      "last_observation": "You are at home, a cozy space filled with books and plants. The walls are painted a soft blue, and the scent of fresh coffee lingers in the air. A large window offers a view of the street outside, where people walk by, some with dogs. A small table is set for breakfast, with a steaming cup of coffee waiting.",
-      "memory_log": []
-    },
-    "sim_3e912d": {
-      "id": "sim_3e912d",
-      "name": "Eleanor Hayes",
-      "persona": {
-        "Name": "Eleanor Hayes",
-        "Age": 29,
-        "Occupation": "Brewery Tour Guide",
-        "Current_location": "Asheville, NC",
-        "Personality_Traits": [
-          "Enthusiastic",
-          "Outgoing",
-          "Knowledgeable",
-          "Patient",
-          "Adaptable"
-        ],
-        "Birthplace": "Charlotte, NC",
-        "Birthdate": "1995-07-15",
-        "Birthtime": "14:30",
-        "Education": "Bachelor of Arts in History",
-        "Physical_Appearance": "5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.",
-        "Hobbies": "Hiking, trying new craft beers, reading local history, volunteering at the animal shelter",
-        "Skills": "Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville",
-        "Languages": "English",
-        "Health_Status": "Generally healthy, occasional allergies",
-        "Family_Background": "Middle-class family, parents still living in Charlotte, one younger brother.",
-        "Life_Goals": "To become a local history expert and potentially open a small historical tour business.",
-        "Notable_Achievements": "Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.",
-        "Fears": "Heights, public speaking failures, not being able to achieve her goals",
-        "Strengths": "Strong communication skills, historical knowledge, adaptability",
-        "Weaknesses": "Can be overly critical of herself, sometimes struggles to say no.",
-        "Ethnicity": "Caucasian",
-        "Religion": null,
-        "Political_Views": "Liberal",
-        "Favorite_Foods": "Anything from local Asheville restaurants, especially farm-to-table cuisine.",
-        "Favorite_Music": "Indie rock, bluegrass, local Asheville bands",
-        "Favorite_Books": "Local history books, historical fiction",
-        "Favorite_Movies": "Documentaries, comedies",
-        "Pet_Peeves": "Rude tourists, littering, traffic congestion",
-        "Dreams": "To share her love of history with others and create a successful business.",
-        "Past_Traumas": null
-      },
-      "location": "At home",
-      "home_location": "At home",
-      "status": "busy",
-      "current_action_end_time": 373.95164999987986,
-      "goal": "Determine your own long term goals.",
-      "last_observation": "You are at home, a cozy space filled with books and plants. The walls are painted a soft blue, and the scent of fresh coffee lingers in the air. A large window offers a view of the street outside, where people walk by, some with dogs. A small table is set for breakfast, with a steaming cup of coffee waiting.",
+      "last_observation": "Examining the scarred metal desk, Eleanor Vance notes the grime etched into its surface and the faint scratches that tell silent stories. A single flickering lamp casts long shadows, but reveals no obvious drawers or compartments. The cool, rough texture of the metal is strangely grounding.",
       "memory_log": []
     }
   },
   "current_world_state": {
-    "location_details": {}
+    "location_details": {
+      "At home": {
+        "name": "At home",
+        "description": "You are at home. It's a cozy place with familiar surroundings.",
+        "objects_present": [],
+        "connected_locations": []
+      }
+    }
   },
   "simulacra_profiles": {
     "sim_662862": {
@@ -150,48 +113,6 @@
         "Favorite_Movies": "Documentaries, comedies, classic films.",
         "Pet_Peeves": "People being rude to service staff, littering, close-mindedness.",
         "Dreams": "To own a successful brewery that is known for its innovative beers and sustainable practices.",
-        "Past_Traumas": null
-      },
-      "current_location": "At home",
-      "home_location": "At home"
-    },
-    "sim_3e912d": {
-      "persona_details": {
-        "Name": "Eleanor Hayes",
-        "Age": 29,
-        "Occupation": "Brewery Tour Guide",
-        "Current_location": "Asheville, NC",
-        "Personality_Traits": [
-          "Enthusiastic",
-          "Outgoing",
-          "Knowledgeable",
-          "Patient",
-          "Adaptable"
-        ],
-        "Birthplace": "Charlotte, NC",
-        "Birthdate": "1995-07-15",
-        "Birthtime": "14:30",
-        "Education": "Bachelor of Arts in History",
-        "Physical_Appearance": "5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.",
-        "Hobbies": "Hiking, trying new craft beers, reading local history, volunteering at the animal shelter",
-        "Skills": "Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville",
-        "Languages": "English",
-        "Health_Status": "Generally healthy, occasional allergies",
-        "Family_Background": "Middle-class family, parents still living in Charlotte, one younger brother.",
-        "Life_Goals": "To become a local history expert and potentially open a small historical tour business.",
-        "Notable_Achievements": "Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.",
-        "Fears": "Heights, public speaking failures, not being able to achieve her goals",
-        "Strengths": "Strong communication skills, historical knowledge, adaptability",
-        "Weaknesses": "Can be overly critical of herself, sometimes struggles to say no.",
-        "Ethnicity": "Caucasian",
-        "Religion": null,
-        "Political_Views": "Liberal",
-        "Favorite_Foods": "Anything from local Asheville restaurants, especially farm-to-table cuisine.",
-        "Favorite_Music": "Indie rock, bluegrass, local Asheville bands",
-        "Favorite_Books": "Local history books, historical fiction",
-        "Favorite_Movies": "Documentaries, comedies",
-        "Pet_Peeves": "Rude tourists, littering, traffic congestion",
-        "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
       "current_location": "At home",
