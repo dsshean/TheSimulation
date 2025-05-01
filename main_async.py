@@ -9,24 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Rich Imports ---
-try:
-    from rich.console import Console
-    # Keep Panel/Rule if needed for entry point messages, but likely not
-    # from rich.panel import Panel
-    # from rich.rule import Rule
-    # Live, Syntax, Table are likely only used in tasks/simulation_async
-    console = Console()
-except ImportError:
-    class DummyConsole:
-        def print(self, *args, **kwargs): print(*args)
-        def rule(self, *args, **kwargs): print(f"\n--- {args[0] if args else ''} ---")
-        # No need for dummy table methods here
-    console = DummyConsole()
-    print("Rich console not found, using basic print.")
-
-# --- Project Imports ---
-# Import the main runner function from the new simulation module
+from rich.console import Console
+console = Console()
 # Ensure src directory is in Python path or use relative import if appropriate
 from src.simulation_async import run_simulation, APP_NAME # Import APP_NAME too
 
