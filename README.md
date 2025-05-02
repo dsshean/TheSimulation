@@ -89,7 +89,7 @@ The `setup_simulation.py` creates simulation setup and base life summaries neede
 The `main_async.py` script starts the simulation process
 
 ```bash
-python main_async
+python main_async.py
 ```
 
 This will:

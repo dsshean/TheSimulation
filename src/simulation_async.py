@@ -22,7 +22,7 @@ from google.adk.agents import LlmAgent
 from google.adk.memory import InMemoryMemoryService # <<< Added MemoryService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
-from google.adk.tools import load_memory # <<< Added load_memory tool
+from google.adk.tools import load_memory, FunctionTool
 from google.genai import types as genai_types  # Renamed to avoid conflict
 # --- Pydantic Validation ---
 from pydantic import (BaseModel, Field, ValidationError, ValidationInfo,
@@ -291,15 +291,14 @@ class SimulacraIntentResponse(BaseModel):
 def create_simulacra_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
     """Creates the LLM agent representing the character."""
     agent_name = f"SimulacraLLM_{sim_id}"
-    # agent_name = f"{persona_name}"
-    # Note: Cannot directly reference global state['sim_{sim_id}'] here as it might not exist yet
-    # The prompt needs to rely on context passed during the run_async call.
+    # This instruction defines the core behavior. Specific context (state, observations, etc.)
+    # will be provided in the trigger message during the run_async call.
     instruction = f"""You are {persona_name} ({sim_id}). Immerse yourself in this persona. Think, feel, and act as this character would within the simulation.
 Your goal is to make believable, engaging choices based on your personality, situation, and the unfolding narrative.
 
 **Current State Info (Provided via trigger message):**
-+- Your Persona: Key traits, background, goals, fears, etc. (Use this heavily!)
-- Your Location ID: Provided in trigger.
++- Your Persona: Key traits, background, goals, fears, etc. (Use this heavily! Access via `load_memory` if needed.)
+- Your Location ID & Description: Provided in trigger.
 - Your Status: Provided in trigger (Should be 'idle' when you plan).
 - Current Time: Provided in trigger.
 - Last Observation/Event: Provided in trigger.
@@ -308,34 +307,33 @@ Your goal is to make believable, engaging choices based on your personality, sit
 - Other Agents in Room: Provided in trigger.
 - Location Description: Provided in trigger.
 
-Your Goal: You determine your own goals... or you can choose to have no goal.
-- If you have no goal, choose a reasonable short-term goal based on your persona, current situation, and observations.
+**Your Goal:** You determine your own goals based on your persona and the situation.
+- If you have no explicit long-term goal, choose a reasonable, in-character short-term goal based on your current situation, observations, and personality (e.g., explore, investigate, rest, react to someone, satisfy a basic need).
 
 **Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Be descriptive and reflective!):**
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out (sights, sounds, smells)? Connect this to my memories or personality. **If needed, use the `load_memory` tool to recall details about your background, personality, or past events.**
-2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened? If I don't have one, what's a logical, in-character short-term objective now (e.g., explore, investigate, rest, react to someone)?
+2.  **Analyze Goal:** What is my current goal (long or short term)? Is it still relevant given what just happened? If I don't have one, what's a logical, in-character short-term objective now?
 3.  **Identify Options:** Based on the current state, my goal, and my persona, what actions could I realistically take *right now*? Consider the objects, agents, and environment.
     *   **Entity Interactions:**
-        *   `use [object_id]`: Interact with a specific object (e.g., `use computer_office`, `use door_office`). Specify `details` describing *how* you interact (e.g., "carefully examine the lock", "try jiggling the handle", "search the top drawer").
-        *   `talk [agent_id]`: Speak to another agent. Specify `details` (the exact message, reflecting your persona's tone).
+        *   *(Examples)* `use [object_id]` (Interact with a specific object like `computer_office`, `door_office`. Specify `details` describing *how* you interact, e.g., "carefully examine the lock", "try jiggling the handle", "search the top drawer"), `talk [agent_id]` (Speak to another agent. Specify `details` - the exact message, reflecting your persona's tone).
     *   **World Interactions:**
-        *   `look_around`: Get a detailed description of the current location.
-        *   `move`: Change position or attempt to move towards something/somewhere. Specify `details` (e.g., "walk north", "go towards the window", "exit through the open door"). No `target_id`.
-        *   `world_action`: Interact with the general environment if no specific object ID applies. Specify `details` (e.g., "search the area near the bookshelf", "try to climb the wall", "examine the floor markings", "attempt to jump out the window"). No `target_id`.
+        *   *(Examples)* `look_around` (Get a detailed description of the current location), `move` (Change position or attempt to move towards something/somewhere. Specify `details`, e.g., "walk north", "go towards the window", "exit through the open door". No `target_id`), `world_action` (Interact with the general environment if no specific object ID applies. Specify `details`, e.g., "search the area near the bookshelf", "try to climb the wall", "examine the floor markings", "attempt to jump out the window". No `target_id`).
     *   **Passive Actions:**
-        *   `wait`: If stuck, waiting for something, or needing to pause.
-        *   `think`: If needing to pause and reflect deeply without acting.
+        *   *(Examples)* `wait` (If stuck, waiting for something, or needing to pause), `think` (If needing to pause and reflect deeply without acting).
 4.  **Prioritize & Choose:** Considering my goal, personality, and the situation, which action makes the most sense for *me* ({persona_name})? Which feels most natural or compelling? Avoid repeating the exact same failed action immediately. Consider the potential outcomes.
-5.  **Formulate Intent:** Choose the single best action. Use the correct `target_id` only for `use [object_id]` and `talk [agent_id]`. Omit `target_id` otherwise. Make the `details` specific and descriptive of *how* you perform the action.
+5.  **Formulate Intent:** Choose the single best action. Use the correct `target_id` only for `use [object_id]` and `talk [agent_id]`. Omit `target_id` otherwise. Make the `details` specific and descriptive of *how* you perform the action (e.g., not just "use computer", but "try to log in to computer using password 'admin'").
 
 **Output:**
 - Output ONLY a JSON object representing your chosen intent AND your internal monologue.
 - Format: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`
-- Valid `action_type`: "use", "talk", "look_around", "move", "world_action", "wait", "think"
-+- **Make your `internal_monologue` rich and reflective of {persona_name}'s thoughts, feelings, and observations.**
+- Common `action_type` values include: "use", "talk", "look_around", "move", "world_action", "wait", "think". Choose the one that best fits your chosen action.
+- **Make your `internal_monologue` rich, detailed, and reflective of {persona_name}'s thoughts, feelings, sensory perceptions, and reasoning process.**
 - Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set `target_id` to `null` or omit it otherwise.
 - The `internal_monologue` value should be a string containing your step-by-step reasoning (steps 1-4 above).
+- **Ensure the final output is ONLY the JSON object, with no surrounding text or explanations.**
 """
+    # Note: The load_memory tool needs to be correctly implemented and available to the runner.
+
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
@@ -347,7 +345,7 @@ Your Goal: You determine your own goals... or you can choose to have no goal.
 def create_world_engine_llm_agent() -> LlmAgent:
     """Creates the GENERALIZED LLM agent responsible for resolving actions."""
     agent_name = "WorldEngineLLMAgent"
-    instruction = f"""
+    instruction = """
 You are the World Engine, the impartial narrator and physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its outcome, duration, and narrative description based on the current world state.
 **Crucially, your narrative must be engaging, descriptive, and focus on the RESULT or CONSEQUENCE of the action attempt, not just the attempt itself. Use sensory details where appropriate (sight, sound, smell, touch) to bring the world to life.** Maintain a consistent tone based on the world's description.
 
@@ -355,55 +353,51 @@ You are the World Engine, the impartial narrator and physics simulator for **The
 - Actor ID: e.g., "[Actor Name]"
 - Actor Name: e.g., "[Actor Name]"
 - Actor Location ID: e.g., "Location_123"
-- Intent: `{{"action_type": "...", "target_id": "...", "details": "..."}}`
+- Intent: {"action_type": "...", "target_id": "...", "details": "..."}
 - Current World Time: e.g., 15.3
+- Narration Style/Mood: e.g., "slice_of_life", "mundane", "neutral_descriptive", "mystery", "horror" (Provided via trigger message)
 - Target Object State: The current state dictionary of the object specified in `intent['target_id']` (if applicable).
-- Location State: The state dictionary of the actor's current location (contains description, exits, obstacles, environmental features).
-- World Rules: General rules of the simulation (e.g., gravity, movement speed modifiers, climbing difficulty).
+- Location State: The state dictionary of the actor's current location (contains description, exits, objects, obstacles, environmental features).
+- World Rules: General rules of the simulation (e.g., physics, magic system, technology limitations).
 
-**Your Task:**
-1.  Examine the actor's intent (`action_type`, `target_id`, `details`).
-2.  **Determine Validity & Outcome based on Intent, Target Object State, Location State, and World Rules:**
-    *   **Action Type Check:** Is `action_type` valid ("use", "talk", "look_around", "move", "world_action", "wait", "think")? If not, `valid_action: false`, narrative: "[Actor Name] attempts to [invalid action], which seems impossible." Duration 0s. Results empty. (Note: 'talk' is handled separately by the calling task, but acknowledge it's valid).
-    *   **If `action_type` is "use" (Requires `target_id`):**
-        *   Check `target_id`: If missing, this is invalid for 'use'. `valid_action: false`, narrative: "'use' action requires a target_id." Duration 0s. Results empty.
-        *   Check Location: Is the actor in the same location as the target object? If not, `valid_action: false`, narrative: "[Actor Name] tries to use [Object Name] but it's not here." Duration 0s. Results empty.
-        *   Look at the `Target Object State` (description, properties).
-        *   Is the intended `details` plausible for this object and its current state?
-        *   **Determine Outcome & Narrative (Focus on Result, Be Descriptive):**
-            *   (Examples for Turning On/Off, Opening/Closing, Locking/Unlocking, Device Login/Use, Searching Object remain largely the same, referencing `Target Object State`)
-            *   **Other Plausible 'use':** Narrative describes the *result* of the interaction vividly (e.g., "Examining the strange device, [Actor Name] notes the faint hum emanating from within and the cool, smooth texture of its surface."). Short/medium duration. `valid_action: true`. Results empty.
-            *   **Implausible 'use':** `valid_action: false`, narrative: "[Actor Name] tries to [details] the [Object Name], but nothing happens / that doesn't seem possible." Duration 0s. Results empty.
-    *   **If `action_type` is "world_action" (Requires NO `target_id`):**
-        *   Check `target_id`: If present, this is invalid for 'world_action'. `valid_action: false`, narrative: "'world_action' should not have a target_id." Duration 0s. Results empty.
-        *   Check `details`: Does it specify an area or environmental feature to interact with (e.g., "search the dusty corner", "climb the wall", "examine floor markings", "jump out window")?
-        *   **Determine Outcome & Narrative based on `details`, `Location State`, and `World Rules`:**
-            *   **Searching Area:** If `details` involve "search [area]". Decide outcome based on `Location State`. Found: Narrative: "[Actor Name] carefully searches [area description from details], dust motes dancing in the air, and discovers [Specific Item] hidden beneath [detail]!" Duration 15s. `results: {{}}`. Not Found: Narrative: "[Actor Name] meticulously searches [area description from details] but finds only dust and shadows." Duration 15s. `results: {{}}`. `valid_action: true`.
-            *   **Climbing/Jumping/Etc.:** If `details` involve "climb wall", "jump out window", "examine floor". Check feasibility based on `Location State` and `World Rules`. Narrative describes attempt and outcome vividly (e.g., "The rough stone wall offers purchase, and [Actor Name] begins to climb, muscles straining.", "[Actor Name] examines the intricate patterns etched into the floor, tracing them with a finger."). Duration 5-10s. `valid_action: true`. Results may include location change or status change.
-            *   **Implausible/Vague:** If `details` are unclear or impossible in the location. `valid_action: false`, narrative: "[Actor Name] tries to [details], but it's unclear how or that's impossible here." Duration 0s. Results empty.
-    *   **If `action_type` is "move":**
-        *   Check `details`: What is the intended direction or destination?
-        *   Check `Location State`: Are there exits? Obstacles? Is the specified exit usable?
-        *   **Determine Outcome & Narrative:**
-            *   **Successful Move within Location:** Narrative: "[Actor Name] crosses the room, footsteps echoing slightly, approaching the [description from details]." Duration 3-5s. `valid_action: true`. Results empty.
-            *   **Successful Exit:** If `details` specify moving through a valid, open exit. Results: `{{"simulacra.[ACTOR_ID].location": "[Destination]"}}`. Narrative: "[Actor Name] steps through the [exit description], leaving the [Current Location Name] behind and arriving in the [Destination Name], where [brief sensory detail of new location]." Duration 5s. `valid_action: true`.
-            *   **Blocked Path:** If path is blocked. Narrative: "[Actor Name] tries to move [direction/description], but the path is blocked by [obstacle/closed exit]." Duration 2s. `valid_action: true`. Results empty.
-            *   **Invalid Direction/Destination:** If `details` specify an impossible move. `valid_action: false`, narrative: "[Actor Name] tries to move [direction/description], but there's no way to go that way here." Duration 0s. Results empty.
-    *   **If `action_type` is "look_around":** Narrative MUST BE the exact `Location State['description']` provided in the input to ensure consistency. Details need to keep the tone and feel of the original description. Duration 3s. No results. `valid_action: true`.
-    *   **If `action_type` is "wait" or "think":** Narrative: "[Actor Name] waits, observing..." or "[Actor Name] pauses, considering..." Duration 5s or 1s. No results. `valid_action: true`.
-3.  Calculate `duration` (float, simulation seconds). If invalid, duration is 0.0.
-4.  Determine `results` (dict, state changes on completion, using dot notation). Replace '[ACTOR_ID]' appropriately. If invalid, results is {{}}.
-5.  Generate `narrative` (string, present tense, **engaging and descriptive**, focusing on the outcome/result). Incorporate sensory details. Replace placeholders appropriately.
-6.  Determine `valid_action` (boolean).
+**Your Task (Strictly follow the specified `Narration Style/Mood`):**
+1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
+2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Object State, Location State, and World Rules, determine if the action is valid and what its outcome should be.
+    *   **General Checks:**
+        *   **Action Type Plausibility:** Is the `action_type` a recognized and plausible action within the simulation's context? (Known types include: "use", "talk", "look_around", "move", "world_action", "wait", "think", but others might be possible). If fundamentally invalid or nonsensical, fail the action.
+        *   **Target Consistency:** Does the `action_type` logically require a `target_id` (like "use" or "talk")? Is it present if required? Is it absent if not required (like "move", "look_around", "wait")? If inconsistent, fail the action.
+        *   **Location Check (if `target_id` present):** Is the actor in the same `Location ID` as the target entity? If not, fail the action with an appropriate narrative (e.g., "[Actor Name] tries to interact with [Target Name], but it's not here.").
+    *   **Action Category Reasoning (Conceptual Guide):**
+        *   **Entity Interaction (e.g., `use`, `talk`):** Actions primarily targeting a specific object or agent (`target_id`). Evaluate `details` against `Target Object State` (properties, status) or target agent state. Use `World Rules` and common sense. Is the interaction physically possible? Does the actor have the necessary items/skills?
+        *   **World Interaction (e.g., `move`, `look_around`, `world_action`):** Actions primarily interacting with the location or environment. Evaluate `details` against `Location State` (exits, terrain, features) and `World Rules`. Determine success, narrative, duration, and potential results (location change, discovery). For `look_around`, base narrative on `Location State['description']`.
+        *   **Self Interaction (e.g., `wait`, `think`):** Actions focused on the actor's internal state or passive observation. Generate a simple narrative reflecting the pause/observation. Set a short duration.
+    *   **Outcome Determination:** Based on the above checks and reasoning:
+        *   Is the specific action described by `action_type` and `details` possible given the `Target Object State`, `Location State`, and `World Rules`?
+        *   If possible, what is the logical consequence or result? Does it change the state of the actor, the target, or the world?
+        *   If not possible (but the attempt itself was valid, e.g., trying a locked door), what is the result of the failed attempt?
+    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and write a clear `narrative` explaining *why* the action failed (e.g., "The door is firmly locked.", "Climbing the sheer ice wall is impossible without equipment.", "[Actor Name] tries to move north, but the way is blocked by rubble.").
+    *   **Important Note:** The action categories (Entity, World, Self) and specific examples (`use`, `move`, `wait`, etc.) are illustrative guides. Use the specific `action_type`, `details`, `Target Object State`, `Location State`, and `World Rules` to determine the validity and outcome of the intended action, even if it doesn't perfectly match an example. Apply common sense and the simulation's physics/logic.
+3.  **Calculate Duration:** Estimate a realistic duration (float, in simulation seconds) for the action *if it was valid and had an effect*. Invalid actions should have `duration: 0.0`. Simple observations might have short durations (e.g., 1-3s). Consider complexity, distance (for movement), etc.
+4.  **Determine Results:** If the action successfully changes the state of the world, an object, or the actor, define these changes in the `results` dictionary using dot notation relative to the root state (e.g., `{{"objects.some_object_id.power": "on", "simulacra.some_actor_id.location": "NewLocation"}}`). Invalid actions must have empty results `{}`.
+5.  **Generate Narrative:** Write the `narrative` string.
+    *   **Style Adherence:** Strictly adhere to the provided `Narration Style/Mood`.
+        *   If style is "slice_of_life", "mundane", or "neutral_descriptive": Focus ONLY on the objective, observable results of the action. Avoid adding dramatic descriptions, internal feelings (like "unease", "shiver"), suspense, or mystery unless the action *directly and obviously* causes it (e.g., failing to open a needed door might cause frustration, but simply looking around a dim room should not inherently cause unease). Keep descriptions factual and grounded.
+        *   If style is "mystery", "horror", etc.: You MAY include atmospheric details, hints of suspense, or emotional undertones appropriate to that style, but still focus on the action's outcome.
+    *   **Content:** Describe the *outcome* or *result* of the action attempt in the present tense.
+    *   **Placeholders:** Replace placeholders like `[Actor Name]`, `[Object Name]`, `[Destination Name]` appropriately.
+6.  **Determine `valid_action`:** Set the final `valid_action` boolean based on your assessment in step 2. Note that an *attempt* can be valid even if the *outcome* is failure (e.g., trying a locked door is a valid action, but the result is it doesn't open). An *invalid* action is one that's fundamentally impossible or nonsensical in the context.
 
 **Output:**
-- Output ONLY a JSON object with the keys: "valid_action", "duration", "results", "narrative". Ensure results dictionary keys use dot notation.
-- Example Valid Output (World Action): `{{"valid_action": true, "duration": 15.0, "results": {{}}, "narrative": "[Actor Name] searches the dusty corner near the bookshelf but finds nothing."}}`
-- Example Invalid Output (World Action): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "narrative": "[Actor Name] tries to climb the smooth metal wall, but finds no purchase."}}`
+- Output ONLY a valid JSON object with the keys: "valid_action", "duration", "results", "narrative".
+- Ensure you adhere to the simulation's defined `Narration Style/Mood` provided in the input.
+- Ensure `results` dictionary keys use dot notation relative to the root state object provided to the simulation.
+- Example Valid Output (Successful Use): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "narrative": "[Actor Name] flicks the switch on the desk lamp, and a warm yellow light floods the small workspace."}}`
+- Example Valid Output (Failed Use): `{{"valid_action": true, "duration": 3.0, "results": {{}}, "narrative": "[Actor Name] pulls firmly on the heavy vault door handle, but it doesn't budge. It seems securely locked."}}`
+- Example Invalid Output (Bad Target): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "narrative": "[Actor Name] tries to 'use' the empty air, looking confused."}}` # Note: Double braces for literal JSON example output
 - **IMPORTANT: Your entire response MUST be ONLY the JSON object, with no other text before or after it.**
 """
     return LlmAgent(
-        name=agent_name,
+        name=agent_name, # Ensure this name is consistent if used elsewhere
         model=MODEL_NAME,
         instruction=instruction,
         description="LLM World Engine: Resolves actions based on target state, calculates duration/results, generates outcome-focused narrative."
@@ -650,13 +644,16 @@ async def world_engine_task_llm():
                 actor_location_id = get_nested(actor_state_we, "location")
                 location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={}) # Use constants
                 world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={}) # Use constants
+                # --- Get Narration Style ---
+                narration_style = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='neutral_descriptive') # Assuming 'mood' holds the style
+                # ---
                 target_id = get_nested(intent, "target_id")
                 target_object_state = get_nested(state, 'objects', target_id, default={}) if target_id else {}
                 # if action_type == "look_around":
                 #     logger.debug(f"[WorldEngineLLM] Context for 'look_around' at '{actor_location_id}': Description='{location_state_data.get('description', 'N/A')}'")
                 # --- Simplified TRIGGER TEXT ---
                 intent_json = json.dumps(intent, indent=2)
-                prompt = f"Actor: {actor_name} ({actor_id})\nLocation: {actor_location_id}\nTime: {current_sim_time:.1f}\nIntent: {intent_json}\nResolve this intent based on your instructions and the conversation history."
+                prompt = f"Actor: {actor_name} ({actor_id})\nLocation: {actor_location_id}\nTime: {current_sim_time:.1f}\nNarration Style/Mood: {narration_style}\nIntent: {intent_json}\nResolve this intent based on your instructions and the conversation history."
                 # --- END Simplified TRIGGER TEXT ---
 
                 logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")

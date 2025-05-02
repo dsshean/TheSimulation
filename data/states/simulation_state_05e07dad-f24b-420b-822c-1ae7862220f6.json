@@ -1,19 +1,12 @@
 {
   "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6",
-  "world_details": {
-    "description": "Default",
-    "rules": {}
-  },
   "location_details": {},
   "objects": {},
   "active_simulacra_ids": [
     "sim_662862"
   ],
-  "world_time": 381.6124499998788,
-  "narrative_log": [
-    "[T381.2] The room is spartan but functional. A simple cot sits against one wall, its thin mattress offering little comfort. A metal desk, scarred with age and use, stands opposite, bearing a single flickering lamp. The air is stale, carrying a faint metallic tang, and the only sound is the hum of unseen machinery.",
-    "[T381.4] Examining the scarred metal desk, Eleanor Vance notes the grime etched into its surface and the faint scratches that tell silent stories. A single flickering lamp casts long shadows, but reveals no obvious drawers or compartments. The cool, rough texture of the metal is strangely grounding."
-  ],
+  "world_time": 99.46399999999473,
+  "narrative_log": [],
   "simulacra": {
     "sim_662862": {
       "id": "sim_662862",
@@ -59,9 +52,9 @@
       "location": "At home",
       "home_location": "At home",
       "status": "idle",
-      "current_action_end_time": 381.40314999987936,
+      "current_action_end_time": 99.46399999999473,
       "goal": "Determine your own long term goals.",
-      "last_observation": "Examining the scarred metal desk, Eleanor Vance notes the grime etched into its surface and the faint scratches that tell silent stories. A single flickering lamp casts long shadows, but reveals no obvious drawers or compartments. The cool, rough texture of the metal is strangely grounding.",
+      "last_observation": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside.",
       "memory_log": []
     }
   },
@@ -74,6 +67,10 @@
         "connected_locations": []
       }
     }
+  },
+  "world_template_details": {
+    "description": "Default",
+    "rules": {}
   },
   "simulacra_profiles": {
     "sim_662862": {
@@ -118,9 +115,5 @@
       "current_location": "At home",
       "home_location": "At home"
     }
-  },
-  "world_template_details": {
-    "description": "Default",
-    "rules": {}
   }
 }
