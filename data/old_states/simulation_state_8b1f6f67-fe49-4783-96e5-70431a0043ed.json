@@ -1,0 +1,32 @@
+{
+  "world_instance_uuid": "8b1f6f67-fe49-4783-96e5-70431a0043ed",
+  "location_details": {
+    "limbo": {
+      "name": "Limbo",
+      "description": "An empty, featureless starting point.",
+      "objects_present": [],
+      "connected_locations": []
+    }
+  },
+  "objects": {},
+  "active_simulacra_ids": [],
+  "world_time": 0.0,
+  "narrative_log": [],
+  "simulacra": {},
+  "npcs": {},
+  "current_world_state": {
+    "location_details": {
+      "limbo": {
+        "name": "Limbo",
+        "description": "An empty, featureless starting point.",
+        "objects_present": [],
+        "connected_locations": []
+      }
+    }
+  },
+  "world_template_details": {
+    "description": "Initial Blank State",
+    "rules": {}
+  },
+  "simulacra_profiles": {}
+}

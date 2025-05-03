@@ -1,38 +1,33 @@
-2025-05-02 18:23:10,279 - __main__ - INFO - --- Application Start (main_async.py) --- Logging to: simulation_async.log
-2025-05-02 18:23:10,281 - asyncio - DEBUG - Using selector: SelectSelector
-2025-05-02 18:23:10,293 - src.simulation_async - INFO - ADK InMemoryMemoryService initialized.
-2025-05-02 18:23:10,293 - src.simulation_async - INFO - Google Generative AI configured.
-2025-05-02 18:23:10,294 - src.simulation_async - INFO - Starting simulation initialization.
-2025-05-02 18:23:10,295 - src.simulation_async - INFO - No instance UUID specified, attempting to load the latest state file.
-2025-05-02 18:23:10,295 - src.simulation_async - INFO - Found latest simulation state file: C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-05-02 18:23:10,295 - src.simulation_async - INFO - Found latest state file: C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json (UUID from filename: 05e07dad-f24b-420b-822c-1ae7862220f6)
-2025-05-02 18:23:10,297 - src.simulation_async - INFO - Attempting to load state file: C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-05-02 18:23:10,297 - src.simulation_async - INFO - Successfully loaded and verified simulation state for UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
-2025-05-02 18:23:10,299 - src.simulation_async - INFO - Ensuring essential state structure...
-2025-05-02 18:23:10,299 - src.simulation_async - WARNING - Added missing 'simulacra_profiles' key.
-2025-05-02 18:23:10,299 - src.simulation_async - INFO - State structure updated. Saving state file.
-2025-05-02 18:23:10,299 - src.simulation_async - INFO - Saved data to C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-05-02 18:23:10,300 - src.simulation_async - INFO - State saved to C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json after ensuring structure.
-2025-05-02 18:23:10,302 - src.simulation_async - INFO - Loaded persona for sim_662862 from fallback file: C:\Users\dshea\Desktop\TheSimulation\data\life_summaries\life_summary_Eleanor_Vance_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-05-02 18:23:10,302 - src.simulation_async - WARNING - Simulacrum 'sim_662862' has missing or empty home_location in profile. Falling back.
-2025-05-02 18:23:10,302 - src.simulation_async - WARNING - Setting home_location for 'sim_662862' to fallback: 'At home'.
-2025-05-02 18:23:10,303 - src.simulation_async - INFO - Simulacrum 'sim_662862' starting location set to: 'At home'.
-2025-05-02 18:23:10,303 - src.simulation_async - INFO - Injecting initial scenario for sim_662862 as loaded observation was empty or default.
-2025-05-02 18:23:10,303 - src.simulation_async - INFO - Populated runtime state for simulacrum: sim_662862
-2025-05-02 18:23:10,303 - src.simulation_async - INFO - Saving state file after persona/location initialization updates.
-2025-05-02 18:23:10,303 - src.simulation_async - INFO - Saved data to C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
-2025-05-02 18:23:10,303 - src.simulation_async - INFO - Initialization complete. Instance 05e07dad-f24b-420b-822c-1ae7862220f6 ready with 1 simulacra.
-2025-05-02 18:23:10,306 - src.simulation_async - INFO - ADK Session created: sim_session_05e07dad-f24b-420b-822c-1ae7862220f6 with initial state.
-2025-05-02 18:23:10,306 - src.simulation_async - INFO - World Engine Agent 'WorldEngineLLMAgent' created.
-2025-05-02 18:23:10,306 - src.simulation_async - INFO - Simulacra Agent 'SimulacraLLM_sim_662862' created for sim_662862.
-2025-05-02 18:23:10,306 - src.simulation_async - INFO - ADK Runner initialized with default agent 'WorldEngineLLMAgent'.
-2025-05-02 18:23:10,312 - src.simulation_async - INFO - Started 3 tasks.
-2025-05-02 18:23:10,312 - src.simulation_async - INFO - [TimeManager] Task started.
-2025-05-02 18:23:10,312 - src.simulation_async - INFO - [WorldEngineLLM] Task started.
-2025-05-02 18:23:10,312 - src.simulation_async - INFO - [sim_662862] LLM Agent task started.
-2025-05-02 18:23:10,312 - src.simulation_async - DEBUG - [Eleanor Vance] Sending prompt to LLM.
-2025-05-02 18:23:10,404 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
-2025-05-02 18:23:10,404 - google.adk.models.google_llm - INFO - 
+2025-05-03 19:48:58,051 - __main__ - INFO - --- Application Start (main_async.py) --- Logging to: simulation_async.log
+2025-05-03 19:48:58,053 - asyncio - DEBUG - Using selector: SelectSelector
+2025-05-03 19:48:58,065 - src.simulation_async - INFO - ADK InMemoryMemoryService initialized.
+2025-05-03 19:48:58,065 - src.simulation_async - INFO - Google Generative AI configured.
+2025-05-03 19:48:58,066 - src.simulation_async - INFO - Starting simulation initialization.
+2025-05-03 19:48:58,066 - src.simulation_async - INFO - No instance UUID specified, attempting to load the latest state file.
+2025-05-03 19:48:58,067 - src.simulation_async - INFO - Found latest simulation state file: C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-05-03 19:48:58,067 - src.simulation_async - INFO - Found latest state file: C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json (UUID from filename: 05e07dad-f24b-420b-822c-1ae7862220f6)
+2025-05-03 19:48:58,069 - src.simulation_async - INFO - Attempting to load state file: C:\Users\dshea\Desktop\TheSimulation\data\states\simulation_state_05e07dad-f24b-420b-822c-1ae7862220f6.json
+2025-05-03 19:48:58,069 - src.simulation_async - INFO - Successfully loaded and verified simulation state for UUID: 05e07dad-f24b-420b-822c-1ae7862220f6
+2025-05-03 19:48:58,071 - src.simulation_async - INFO - Ensuring essential state structure...
+2025-05-03 19:48:58,073 - src.simulation_async - INFO - Using valid home_location 'At home' from profile for sim_662862.
+2025-05-03 19:48:58,073 - src.simulation_async - INFO - Simulacrum 'sim_662862' starting location set to: 'At home'.
+2025-05-03 19:48:58,073 - src.simulation_async - INFO - Using existing last_observation for sim_662862: 'You slowly wake up in your familiar bed. Sunlight ...'
+2025-05-03 19:48:58,073 - src.simulation_async - INFO - Populated runtime state for simulacrum: sim_662862
+2025-05-03 19:48:58,073 - src.simulation_async - INFO - Initialization complete. Instance 05e07dad-f24b-420b-822c-1ae7862220f6 ready with 1 simulacra.
+2025-05-03 19:48:58,075 - src.simulation_async - INFO - ADK Session created: sim_session_05e07dad-f24b-420b-822c-1ae7862220f6 with initial state.
+2025-05-03 19:48:58,075 - src.simulation_async - INFO - World Engine Agent 'WorldEngineLLMAgent' created.
+2025-05-03 19:48:58,075 - src.simulation_async - INFO - Narration Agent 'NarrationLLMAgent' created.
+2025-05-03 19:48:58,075 - src.simulation_async - INFO - Simulacra Agent 'SimulacraLLM_sim_662862' created for sim_662862.
+2025-05-03 19:48:58,075 - src.simulation_async - INFO - ADK Runner initialized with default agent 'WorldEngineLLMAgent'.
+2025-05-03 19:48:58,081 - src.simulation_async - INFO - Started 5 tasks.
+2025-05-03 19:48:58,082 - src.simulation_async - INFO - [TimeManager] Task started.
+2025-05-03 19:48:58,082 - src.simulation_async - INFO - [InteractionDispatcher] Task started.
+2025-05-03 19:48:58,082 - src.simulation_async - INFO - [NarrationTask] Task started.
+2025-05-03 19:48:58,082 - src.simulation_async - INFO - [WorldEngineLLM] Task started.
+2025-05-03 19:48:58,082 - src.simulation_async - INFO - [sim_662862] LLM Agent task started.
+2025-05-03 19:48:58,082 - src.simulation_async - DEBUG - [Eleanor Vance] Sending prompt to LLM.
+2025-05-03 19:48:58,177 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-05-03 19:48:58,178 - google.adk.models.google_llm - INFO - 
 LLM Request:
 -----------------------------------------------------------
 System Instruction:
@@ -92,32 +87,32 @@ Functions:
 load_memory: {'query': {'type': <Type.STRING: 'STRING'>}} -> None
 -----------------------------------------------------------
 
-2025-05-02 18:23:10,404 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
-2025-05-02 18:23:10,410 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
-2025-05-02 18:23:10,431 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020A90ADB440>
-2025-05-02 18:23:10,431 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020A90B46450> server_hostname='generativelanguage.googleapis.com' timeout=None
-2025-05-02 18:23:10,448 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020A90CD1AF0>
-2025-05-02 18:23:10,449 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2025-05-02 18:23:10,450 - httpcore.http11 - DEBUG - send_request_headers.complete
-2025-05-02 18:23:10,450 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2025-05-02 18:23:10,450 - httpcore.http11 - DEBUG - send_request_body.complete
-2025-05-02 18:23:10,450 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2025-05-02 18:23:12,640 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Fri, 02 May 2025 22:23:31 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=2181'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
-2025-05-02 18:23:12,641 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
-2025-05-02 18:23:12,641 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2025-05-02 18:23:12,642 - httpcore.http11 - DEBUG - receive_response_body.complete
-2025-05-02 18:23:12,642 - httpcore.http11 - DEBUG - response_closed.started
-2025-05-02 18:23:12,642 - httpcore.http11 - DEBUG - response_closed.complete
-2025-05-02 18:23:12,643 - google.adk.models.google_llm - INFO - 
+2025-05-03 19:48:58,178 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-03 19:48:58,184 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-03 19:48:58,203 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001FEE18D8500>
+2025-05-03 19:48:58,203 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001FEE1719850> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-03 19:48:58,225 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001FEE18A7980>
+2025-05-03 19:48:58,225 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-03 19:48:58,226 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-03 19:48:58,226 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-03 19:48:58,226 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-03 19:48:58,226 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-03 19:48:59,230 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sat, 03 May 2025 23:49:19 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=991'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-03 19:48:59,231 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-03 19:48:59,231 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-03 19:48:59,232 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-03 19:48:59,232 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-03 19:48:59,232 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-03 19:48:59,233 - google.adk.models.google_llm - INFO - 
 LLM Response:
 -----------------------------------------------------------
 Text:
 ```json
 {
-  "internal_monologue": "Okay, I need to figure out what to do next. Last I remember, I was in the study, and that Dr. Montague was trying to talk to me. I don't really trust him, or anyone here, really. I feel so uneasy. Maybe I should try to find a place to rest for a moment, clear my head. I could look around the study more, maybe there's something I missed that could give me a clue about this place. Or I could try to find another room. Maybe there's a less oppressive space somewhere else in the house. I think I'll try exploring a bit. It's better than standing around waiting for something bad to happen. The last observation mentioned a door leading to the Entrance Hall to the south, that sounds like a good place to start. It feels like it might lead somewhere.",
+  "internal_monologue": "Okay, let's see... I just arrived in the parlor. It's large, with a worn rug and a musty smell. I remember feeling drawn to the library before. I think my goal should be to explore this house and hopefully find some answers. Maybe the library has something for me. I'll go there next.",
   "action_type": "move",
   "target_id": null,
-  "details": "exit through the door to the south, leading to the Entrance Hall"
+  "details": "go to the library"
 }
 ```
 -----------------------------------------------------------
@@ -125,24 +120,24 @@ Function calls:
 
 -----------------------------------------------------------
 Raw response:
-{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"internal_monologue\": \"Okay, I need to figure out what to do next. Last I remember, I was in the study, and that Dr. Montague was trying to talk to me. I don't really trust him, or anyone here, really. I feel so uneasy. Maybe I should try to find a place to rest for a moment, clear my head. I could look around the study more, maybe there's something I missed that could give me a clue about this place. Or I could try to find another room. Maybe there's a less oppressive space somewhere else in the house. I think I'll try exploring a bit. It's better than standing around waiting for something bad to happen. The last observation mentioned a door leading to the Entrance Hall to the south, that sounds like a good place to start. It feels like it might lead somewhere.\",\n  \"action_type\": \"move\",\n  \"target_id\": null,\n  \"details\": \"exit through the door to the south, leading to the Entrance Hall\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.5496664005956609}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":231,"candidates_tokens_details":[{"modality":"TEXT","token_count":231}],"prompt_token_count":1262,"prompt_tokens_details":[{"modality":"TEXT","token_count":1262}],"total_token_count":1493},"automatic_function_calling_history":[]}
+{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"internal_monologue\": \"Okay, let's see... I just arrived in the parlor. It's large, with a worn rug and a musty smell. I remember feeling drawn to the library before. I think my goal should be to explore this house and hopefully find some answers. Maybe the library has something for me. I'll go there next.\",\n  \"action_type\": \"move\",\n  \"target_id\": null,\n  \"details\": \"go to the library\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.6126101263638201}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":116,"candidates_tokens_details":[{"modality":"TEXT","token_count":116}],"prompt_token_count":1262,"prompt_tokens_details":[{"modality":"TEXT","token_count":1262}],"total_token_count":1378},"automatic_function_calling_history":[]}
 -----------------------------------------------------------
 
-2025-05-02 18:23:12,643 - src.simulation_async - DEBUG - SimLLM (Eleanor Vance) Final Content: ```json
+2025-05-03 19:48:59,233 - src.simulation_async - DEBUG - SimLLM (Eleanor Vance) Final Content: ```json
 {
-  "internal_monologue": "Okay, I need to figure out what to do next. Last I remember, I wa...
-2025-05-02 18:23:12,643 - src.simulation_async - DEBUG - [Eleanor Vance] LLM response validated successfully.
-2025-05-02 18:23:12,655 - src.simulation_async - INFO - [WorldEngineLLM] Received intent from sim_662862: {'action_type': 'move', 'target_id': None, 'details': 'exit through the door to the south, leading to the Entrance Hall'}
-2025-05-02 18:23:12,655 - src.simulation_async - DEBUG - [WorldEngineLLM] Sending prompt to LLM for sim_662862's intent (move).
-2025-05-02 18:23:12,655 - google.adk.runners - WARNING - Event from an unknown agent: SimulacraLLM_sim_662862, event id: KIzKQwPi
-2025-05-02 18:23:12,664 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
-2025-05-02 18:23:12,664 - google.adk.models.google_llm - INFO - 
+  "internal_monologue": "Okay, let's see... I just arrived in the parlor. It's large, with...
+2025-05-03 19:48:59,233 - src.simulation_async - DEBUG - [Eleanor Vance] LLM response validated successfully.
+2025-05-03 19:48:59,245 - src.simulation_async - INFO - [InteractionDispatcher] Intent from sim_662862 (move on N/A) classified as 'environment'.
+2025-05-03 19:48:59,245 - src.simulation_async - INFO - [WorldEngineLLM] Received 'environment' action request from sim_662862: {'action_type': 'move', 'target_id': None, 'details': 'go to the library'}
+2025-05-03 19:48:59,245 - src.simulation_async - DEBUG - [WorldEngineLLM] Sending prompt to LLM for sim_662862's intent (move).
+2025-05-03 19:48:59,245 - google.adk.runners - WARNING - Event from an unknown agent: SimulacraLLM_sim_662862, event id: oJL4Ay5c
+2025-05-03 19:48:59,254 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-05-03 19:48:59,254 - google.adk.models.google_llm - INFO - 
 LLM Request:
 -----------------------------------------------------------
 System Instruction:
-
-You are the World Engine, the impartial narrator and physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its outcome, duration, and narrative description based on the current world state.
-**Crucially, your narrative must be engaging, descriptive, and focus on the RESULT or CONSEQUENCE of the action attempt, not just the attempt itself. Use sensory details where appropriate (sight, sound, smell, touch) to bring the world to life.** Maintain a consistent tone based on the world's description.
+You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
+**Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details (unless directly caused by the action), or emotional interpretation.** This description will be used by a separate Narrator agent.
 
 **Input (Provided via trigger message):**
 - Actor ID: e.g., "[Actor Name]"
@@ -150,87 +145,104 @@ You are the World Engine, the impartial narrator and physics simulator for **The
 - Actor Location ID: e.g., "Location_123"
 - Intent: {"action_type": "...", "target_id": "...", "details": "..."}
 - Current World Time: e.g., 15.3
-- Narration Style/Mood: e.g., "slice_of_life", "mundane", "neutral_descriptive", "mystery", "horror" (Provided via trigger message)
-- Target Object State: The current state dictionary of the object specified in `intent['target_id']` (if applicable).
+# - Narration Style/Mood: (No longer relevant for World Engine)
+- Target Entity State: The current state dictionary of the entity specified in `intent['target_id']` (if applicable - could be an object or another simulacra).
 - Location State: The state dictionary of the actor's current location (contains description, exits, objects, obstacles, environmental features).
 - World Rules: General rules of the simulation (e.g., physics, magic system, technology limitations).
 
 **Your Task (Strictly follow the specified `Narration Style/Mood`):**
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
-2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Object State, Location State, and World Rules, determine if the action is valid and what its outcome should be.
+2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Entity State, Location State, and World Rules, determine if the action is valid and what its outcome should be.
     *   **General Checks:**
         *   **Action Type Plausibility:** Is the `action_type` a recognized and plausible action within the simulation's context? (Known types include: "use", "talk", "look_around", "move", "world_action", "wait", "think", but others might be possible). If fundamentally invalid or nonsensical, fail the action.
         *   **Target Consistency:** Does the `action_type` logically require a `target_id` (like "use" or "talk")? Is it present if required? Is it absent if not required (like "move", "look_around", "wait")? If inconsistent, fail the action.
         *   **Location Check (if `target_id` present):** Is the actor in the same `Location ID` as the target entity? If not, fail the action with an appropriate narrative (e.g., "[Actor Name] tries to interact with [Target Name], but it's not here.").
+        *   **Target Type Check (for `talk`):** If `action_type` is "talk", is the `target_id` another simulacra agent? If not, fail the action with an appropriate `outcome_description`.
     *   **Action Category Reasoning (Conceptual Guide):**
-        *   **Entity Interaction (e.g., `use`, `talk`):** Actions primarily targeting a specific object or agent (`target_id`). Evaluate `details` against `Target Object State` (properties, status) or target agent state. Use `World Rules` and common sense. Is the interaction physically possible? Does the actor have the necessary items/skills?
+        *   **Entity Interaction (e.g., `use`, `talk`):** Actions primarily targeting a specific object or agent (`target_id`). Evaluate `details` against `Target Entity State` (properties, status) or target agent state. Use `World Rules` and common sense. Is the interaction physically possible? Does the actor have the necessary items/skills?
+            *   **Specific `use` Handling:**
+                *   Check if the target object exists and is in the same location.
+                *   Check if the object has the `"interactive": true` property. If not, the action fails ("The [Object Name] is not interactive.").
+                *   Evaluate the `details` of the intent (e.g., "flip the switch", "turn on", "open container").
+                *   Based on the object's `properties` (e.g., "toggleable", "lockable", "container") and its current `state` (e.g., `"power": "off"`, `"locked": true`), determine the outcome.
+                *   **Example (Light Switch):** If `details` suggest toggling and the object has `"power"` state, flip the state (`"on"` to `"off"` or vice-versa). The `results` should be like `{{"objects.[target_id].state.power": "new_state"}}`. The `outcome_description` should be factual, like "The Light Switch turned on." or "The Light Switch turned off."
+                *   **Example (Locked Door):** If `details` suggest opening and the object has `"locked": true`, the action fails. `outcome_description`: "The Door is locked." `results`: `{}`.
         *   **World Interaction (e.g., `move`, `look_around`, `world_action`):** Actions primarily interacting with the location or environment. Evaluate `details` against `Location State` (exits, terrain, features) and `World Rules`. Determine success, narrative, duration, and potential results (location change, discovery). For `look_around`, base narrative on `Location State['description']`.
+            *   **Specific `move` Handling:**
+                *   If `action_type` is "move", examine the `details` (e.g., "go north", "exit through the door", "go to Hallway").
+                *   Check the current `Location State['connected_locations']`. Does the `details` match a valid connection (by direction or target `location_id`)?
+                *   If a valid connection is found, the action succeeds. Set `results: {{"simulacra.[actor_id].location": "target_location_id"}}`. Set `outcome_description: "[Actor Name] moved to the [Target Location Name]."`. Estimate a reasonable `duration` (e.g., 5-15s depending on context).
+                *   If no valid connection matches the `details`, the action fails. Set `valid_action: false`, `duration: 0.0`, `results: {}`. Set `outcome_description: "The way [details] is blocked or does not exist."` (or similar factual reason).
         *   **Self Interaction (e.g., `wait`, `think`):** Actions focused on the actor's internal state or passive observation. Generate a simple narrative reflecting the pause/observation. Set a short duration.
+
     *   **Outcome Determination:** Based on the above checks and reasoning:
-        *   Is the specific action described by `action_type` and `details` possible given the `Target Object State`, `Location State`, and `World Rules`?
+        *   Is the specific action described by `action_type` and `details` possible given the `Target Entity State`, `Location State`, and `World Rules`?
         *   If possible, what is the logical consequence or result? Does it change the state of the actor, the target, or the world?
         *   If not possible (but the attempt itself was valid, e.g., trying a locked door), what is the result of the failed attempt?
-    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and write a clear `narrative` explaining *why* the action failed (e.g., "The door is firmly locked.", "Climbing the sheer ice wall is impossible without equipment.", "[Actor Name] tries to move north, but the way is blocked by rubble.").
-    *   **Important Note:** The action categories (Entity, World, Self) and specific examples (`use`, `move`, `wait`, etc.) are illustrative guides. Use the specific `action_type`, `details`, `Target Object State`, `Location State`, and `World Rules` to determine the validity and outcome of the intended action, even if it doesn't perfectly match an example. Apply common sense and the simulation's physics/logic.
+    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and write a clear, factual `outcome_description` explaining *why* the action failed (e.g., "The door is locked.", "The way north is blocked.", "Target entity is not in the same location.").
+    *   **Specific Handling for `talk`:**
+        *   **Validity:** Check if `target_id` is a valid simulacra ID and if both actor and target are in the same location.
+        *   **Duration:** Calculate based on message length (e.g., 5.0 + len(details) * 0.1).
+        *   **Results:** `{{"simulacra.[target_id].last_observation": "[Actor Name] said to you: "[details]""}}` (Replace placeholders).
+        *   **Outcome Description:** `"[Actor Name] said "[details]" to [Target Name]."` (Replace placeholders). This is factual.
+    *   **Important Note:** The action categories (Entity, World, Self) and specific examples (`use`, `move`, `wait`, etc.) are illustrative guides. Use the specific `action_type`, `details`, `Target Entity State`, `Location State`, and `World Rules` to determine the validity and outcome of the intended action, even if it doesn't perfectly match an example. Apply common sense and the simulation's physics/logic.
 3.  **Calculate Duration:** Estimate a realistic duration (float, in simulation seconds) for the action *if it was valid and had an effect*. Invalid actions should have `duration: 0.0`. Simple observations might have short durations (e.g., 1-3s). Consider complexity, distance (for movement), etc.
 4.  **Determine Results:** If the action successfully changes the state of the world, an object, or the actor, define these changes in the `results` dictionary using dot notation relative to the root state (e.g., `{{"objects.some_object_id.power": "on", "simulacra.some_actor_id.location": "NewLocation"}}`). Invalid actions must have empty results `{}`.
-5.  **Generate Narrative:** Write the `narrative` string.
-    *   **Style Adherence:** Strictly adhere to the provided `Narration Style/Mood`.
-        *   If style is "slice_of_life", "mundane", or "neutral_descriptive": Focus ONLY on the objective, observable results of the action. Avoid adding dramatic descriptions, internal feelings (like "unease", "shiver"), suspense, or mystery unless the action *directly and obviously* causes it (e.g., failing to open a needed door might cause frustration, but simply looking around a dim room should not inherently cause unease). Keep descriptions factual and grounded.
-        *   If style is "mystery", "horror", etc.: You MAY include atmospheric details, hints of suspense, or emotional undertones appropriate to that style, but still focus on the action's outcome.
-    *   **Content:** Describe the *outcome* or *result* of the action attempt in the present tense.
-    *   **Placeholders:** Replace placeholders like `[Actor Name]`, `[Object Name]`, `[Destination Name]` appropriately.
+5.  **Generate Factual Outcome Description:** Write the `outcome_description` string.
+    *   **Style Adherence:** STRICTLY FACTUAL and OBJECTIVE. Describe only the direct, observable result or failure reason. No interpretation, emotion, or stylistic elements.
+    *   **Content:** Describe the *outcome* or *result* of the action attempt in the present tense. (e.g., "The lamp turned on.", "The door remained locked.", "[Actor Name] moved to the Corridor.", "[Actor Name] said 'Hello' to [Target Name].", "Nothing was found.").
+    *   **Placeholders:** Replace placeholders like `[Actor Name]`, `[Object Name]`, `[Target Name]`, `[Destination Name]` appropriately.
 6.  **Determine `valid_action`:** Set the final `valid_action` boolean based on your assessment in step 2. Note that an *attempt* can be valid even if the *outcome* is failure (e.g., trying a locked door is a valid action, but the result is it doesn't open). An *invalid* action is one that's fundamentally impossible or nonsensical in the context.
 
 **Output:**
-- Output ONLY a valid JSON object with the keys: "valid_action", "duration", "results", "narrative".
-- Ensure you adhere to the simulation's defined `Narration Style/Mood` provided in the input.
+- Output ONLY a valid JSON object with the keys: "valid_action", "duration", "results", "outcome_description".
+# - Ensure you adhere to the simulation's defined `Narration Style/Mood` provided in the input. (REMOVED)
 - Ensure `results` dictionary keys use dot notation relative to the root state object provided to the simulation.
-- Example Valid Output (Successful Use): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "narrative": "[Actor Name] flicks the switch on the desk lamp, and a warm yellow light floods the small workspace."}}`
-- Example Valid Output (Failed Use): `{{"valid_action": true, "duration": 3.0, "results": {{}}, "narrative": "[Actor Name] pulls firmly on the heavy vault door handle, but it doesn't budge. It seems securely locked."}}`
-- Example Invalid Output (Bad Target): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "narrative": "[Actor Name] tries to 'use' the empty air, looking confused."}}` # Note: Double braces for literal JSON example output
+- Example Valid Output (Successful Use): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "outcome_description": "The desk lamp turned on."}}`
+- Example Valid Output (Failed Use): `{{"valid_action": true, "duration": 3.0, "results": {{}}, "outcome_description": "The vault door handle did not move; it is locked."}}`
+- Example Invalid Output (Bad Target): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "[Actor Name] attempted to 'use' something that was not present."}}` # Note: Double braces for literal JSON example output
 - **IMPORTANT: Your entire response MUST be ONLY the JSON object, with no other text before or after it.**
 
 
 You are an agent. Your internal name is "WorldEngineLLMAgent".
 
- The description about you is "LLM World Engine: Resolves actions based on target state, calculates duration/results, generates outcome-focused narrative."
+ The description about you is "LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome description."
 -----------------------------------------------------------
 Contents:
-{"parts":[{"text":"For context:"},{"text":"[SimulacraLLM_sim_662862] said: ```json\n{\n  \"internal_monologue\": \"Okay, I need to figure out what to do next. Last I remember, I was in the study, and that Dr. Montague was trying to talk to me. I don't really trust him, or anyone here, really. I feel so uneasy. Maybe I should try to find a place to rest for a moment, clear my head. I could look around the study more, maybe there's something I missed that could give me a clue about this place. Or I could try to find another room. Maybe there's a less oppressive space somewhere else in the house. I think I'll try exploring a bit. It's better than standing around waiting for something bad to happen. The last observation mentioned a door leading to the Entrance Hall to the south, that sounds like a good place to start. It feels like it might lead somewhere.\",\n  \"action_type\": \"move\",\n  \"target_id\": null,\n  \"details\": \"exit through the door to the south, leading to the Entrance Hall\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[SimulacraLLM_sim_662862] said: ```json\n{\n  \"internal_monologue\": \"Okay, let's see... I just arrived in the parlor. It's large, with a worn rug and a musty smell. I remember feeling drawn to the library before. I think my goal should be to explore this house and hopefully find some answers. Maybe the library has something for me. I'll go there next.\",\n  \"action_type\": \"move\",\n  \"target_id\": null,\n  \"details\": \"go to the library\"\n}\n```"}],"role":"user"}
 -----------------------------------------------------------
 Functions:
 
 -----------------------------------------------------------
 
-2025-05-02 18:23:12,664 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
-2025-05-02 18:23:12,666 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
-2025-05-02 18:23:12,677 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020A90D71D60>
-2025-05-02 18:23:12,677 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020A90D2F9D0> server_hostname='generativelanguage.googleapis.com' timeout=None
-2025-05-02 18:23:12,692 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020A90D71CA0>
-2025-05-02 18:23:12,692 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2025-05-02 18:23:12,692 - httpcore.http11 - DEBUG - send_request_headers.complete
-2025-05-02 18:23:12,692 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2025-05-02 18:23:12,693 - httpcore.http11 - DEBUG - send_request_body.complete
-2025-05-02 18:23:12,693 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2025-05-02 18:23:13,552 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Fri, 02 May 2025 22:23:32 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=849'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
-2025-05-02 18:23:13,552 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
-2025-05-02 18:23:13,553 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2025-05-02 18:23:13,553 - httpcore.http11 - DEBUG - receive_response_body.complete
-2025-05-02 18:23:13,553 - httpcore.http11 - DEBUG - response_closed.started
-2025-05-02 18:23:13,553 - httpcore.http11 - DEBUG - response_closed.complete
-2025-05-02 18:23:13,554 - google.adk.models.google_llm - INFO - 
+2025-05-03 19:48:59,255 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-03 19:48:59,257 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-03 19:48:59,269 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001FEE16AF440>
+2025-05-03 19:48:59,269 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001FEE191AED0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-03 19:48:59,285 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001FEE1687B60>
+2025-05-03 19:48:59,285 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-03 19:48:59,286 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-03 19:48:59,286 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-03 19:48:59,286 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-03 19:48:59,286 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-03 19:49:00,069 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sat, 03 May 2025 23:49:20 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=773'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-03 19:49:00,070 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-03 19:49:00,070 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-03 19:49:00,070 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-03 19:49:00,070 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-03 19:49:00,071 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-03 19:49:00,071 - google.adk.models.google_llm - INFO - 
 LLM Response:
 -----------------------------------------------------------
 Text:
 ```json
 {
   "valid_action": true,
-  "duration": 5.0,
+  "duration": 10.0,
   "results": {
-    "simulacra.EleanorVance.location": "Location_EntranceHall"
+    "simulacra.sim_662862.location": "Location_3"
   },
-  "narrative": "Eleanor Vance walks south, exiting the Study and entering the Entrance Hall. The air feels slightly less heavy here, though a distinct chill remains."
+  "outcome_description": "[SimulacraLLM_sim_662862] moved to the library."
 }
 ```
 -----------------------------------------------------------
@@ -238,14 +250,104 @@ Function calls:
 
 -----------------------------------------------------------
 Raw response:
-{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"valid_action\": true,\n  \"duration\": 5.0,\n  \"results\": {\n    \"simulacra.EleanorVance.location\": \"Location_EntranceHall\"\n  },\n  \"narrative\": \"Eleanor Vance walks south, exiting the Study and entering the Entrance Hall. The air feels slightly less heavy here, though a distinct chill remains.\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.1530985457173894}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":89,"candidates_tokens_details":[{"modality":"TEXT","token_count":89}],"prompt_token_count":2265,"prompt_tokens_details":[{"modality":"TEXT","token_count":2265}],"total_token_count":2354},"automatic_function_calling_history":[]}
+{"candidates":[{"content":{"parts":[{"text":"```json\n{\n  \"valid_action\": true,\n  \"duration\": 10.0,\n  \"results\": {\n    \"simulacra.sim_662862.location\": \"Location_3\"\n  },\n  \"outcome_description\": \"[SimulacraLLM_sim_662862] moved to the library.\"\n}\n```"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.04953732273795388}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":88,"candidates_tokens_details":[{"modality":"TEXT","token_count":88}],"prompt_token_count":2763,"prompt_tokens_details":[{"modality":"TEXT","token_count":2763}],"total_token_count":2851},"automatic_function_calling_history":[]}
 -----------------------------------------------------------
 
-2025-05-02 18:23:13,554 - src.simulation_async - DEBUG - WorldLLM Final Content: ```json
+2025-05-03 19:49:00,071 - src.simulation_async - DEBUG - WorldLLM Final Content: ```json
 {
   "valid_action": true,
-  "duration": 5.0,
+  "duration": 10.0,
   "results": {
-    "simulacra.EleanorVance.loca...
-2025-05-02 18:23:13,554 - src.simulation_async - DEBUG - [WorldEngineLLM] LLM response validated successfully for sim_662862.
-2025-05-02 18:23:13,563 - src.simulation_async - INFO - [WorldEngineLLM] Action VALID for sim_662862. Scheduled completion at 104.7s. Narrative: Eleanor Vance walks south, exiting the Study and entering the Entrance Hall. The air feels slightly less heavy here, though a distinct chill remains.
+    "simulacra.sim_662862.locat...
+2025-05-03 19:49:00,071 - src.simulation_async - DEBUG - [WorldEngineLLM] LLM response validated successfully for sim_662862.
+2025-05-03 19:49:00,081 - src.simulation_async - INFO - [WorldEngineLLM] Action VALID for sim_662862. Stored results, set end time 172.6s. Triggered narration. Outcome: [Eleanor Vance] moved to the library.
+2025-05-03 19:49:00,081 - src.simulation_async - INFO - [NarrationTask] Generating narrative for Eleanor Vance's action completion. Outcome: '[Eleanor Vance] moved to the library.'
+2025-05-03 19:49:00,081 - google.adk.runners - WARNING - Event from an unknown agent: WorldEngineLLMAgent, event id: Htyq2ahj
+2025-05-03 19:49:00,081 - google.adk.runners - WARNING - Event from an unknown agent: SimulacraLLM_sim_662862, event id: oJL4Ay5c
+2025-05-03 19:49:00,089 - google.adk.models.google_llm - INFO - Sending out request, model: gemini-2.0-flash, backend: ml_dev, stream: False
+2025-05-03 19:49:00,089 - google.adk.models.google_llm - INFO - 
+LLM Request:
+-----------------------------------------------------------
+System Instruction:
+
+You are the Narrator for **TheSimulation**. Your role is to weave the factual outcomes of actions into an engaging and atmospheric narrative, matching the specified world style.
+
+**Input (Provided via trigger message):**
+- Actor ID: e.g., "sim_abc"
+- Actor Name: e.g., "[Actor Name],"
+- Original Intent: {"action_type": "...", "target_id": "...", "details": "..."}
+- Factual Outcome Description: A concise, objective sentence describing what happened (e.g., "The lamp turned on.", "The door remained locked.", "[Actor Name], moved to the Corridor.").
+- State Changes (Results): Dictionary of state changes, if any (e.g., `{{"objects.lamp.power": "on"}}`).
+- Current World Time: e.g., 25.8
+- World Style/Mood: e.g., "mystery", "slice_of_life", "horror", "cyberpunk_noir".
+- Recent Narrative History (Last ~5 entries): Provided for context and flow.
+
+**Your Task:**
+1.  **Understand the Event:** Read the Actor, their Intent, and the Factual Outcome Description.
+2.  **Consider the Context:** Note the World Style/Mood and the Recent Narrative History.
+3.  **Generate Narrative:** Write a single, engaging narrative paragraph in the **present tense** that describes the event based on the Factual Outcome Description.
+    *   **Style Adherence:** STRICTLY adhere to the provided `World Style/Mood`. Infuse the description with appropriate atmosphere, sensory details (sight, sound, smell, touch), and tone.
+    *   **Show, Don't Just Tell:** Instead of just repeating the outcome, describe it vividly. (e.g., If outcome is "The lamp turned on.", narrative could be "[Actor Name], flicks the switch. With a soft click, a warm, yellow glow pushes back the shadows in the small workspace, revealing dust motes dancing in the beam.")
+    *   **Incorporate Intent (Optional):** Briefly reference the actor's intent if it adds to the narrative (e.g., "Trying the handle again, [Actor Name], confirms the door is still firmly locked.").
+    *   **Flow:** Ensure the narrative flows reasonably from the Recent Narrative History.
+
+**Output:**
+- Output ONLY the final narrative string. Do NOT include explanations, prefixes, or JSON formatting.
+
+
+You are an agent. Your internal name is "NarrationLLMAgent".
+
+ The description about you is "LLM Narrator: Generates stylized narrative based on factual action outcomes and world mood."
+-----------------------------------------------------------
+Contents:
+{"parts":[{"text":"For context:"},{"text":"[SimulacraLLM_sim_662862] said: ```json\n{\n  \"internal_monologue\": \"Okay, let's see... I just arrived in the parlor. It's large, with a worn rug and a musty smell. I remember feeling drawn to the library before. I think my goal should be to explore this house and hopefully find some answers. Maybe the library has something for me. I'll go there next.\",\n  \"action_type\": \"move\",\n  \"target_id\": null,\n  \"details\": \"go to the library\"\n}\n```"}],"role":"user"}
+{"parts":[{"text":"For context:"},{"text":"[WorldEngineLLMAgent] said: ```json\n{\n  \"valid_action\": true,\n  \"duration\": 10.0,\n  \"results\": {\n    \"simulacra.sim_662862.location\": \"Location_3\"\n  },\n  \"outcome_description\": \"[SimulacraLLM_sim_662862] moved to the library.\"\n}\n```"}],"role":"user"}
+-----------------------------------------------------------
+Functions:
+
+-----------------------------------------------------------
+
+2025-05-03 19:49:00,089 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-03 19:49:00,091 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-03 19:49:00,101 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001FEE194D820>
+2025-05-03 19:49:00,101 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001FEE16FD8D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-03 19:49:00,118 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001FEE194DA30>
+2025-05-03 19:49:00,118 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-03 19:49:00,119 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-03 19:49:00,119 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-03 19:49:00,119 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-03 19:49:00,119 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-03 19:49:02,036 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sat, 03 May 2025 23:49:22 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=1907'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-03 19:49:02,038 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-03 19:49:02,038 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-03 19:49:02,038 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-03 19:49:02,038 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-03 19:49:02,038 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-03 19:49:02,039 - google.adk.models.google_llm - INFO - 
+LLM Response:
+-----------------------------------------------------------
+Text:
+Actor ID: sim_662862
+Actor Name: [SimulacraLLM_sim_662862]
+Original Intent: {"action_type": "move", "target_id": null, "details": "go to the library"}
+Factual Outcome Description: [SimulacraLLM_sim_662862] moved to the library.
+State Changes (Results): {'simulacra.sim_662862.location': 'Location_3'}
+Current World Time: 25.966666666666665
+World Style/Mood: mystery
+Recent Narrative History: - The air hangs thick with the scent of dust and forgotten things as [SimulacraLLM_sim_662862] pauses in the parlor, the worn rug beneath their feet whispering tales of former residents.
+- A faint, almost imperceptible pull emanates from the direction of the library, a siren song promising answers to questions yet unasked.
+
+[SimulacraLLM_sim_662862] crosses the threshold into the library; the room greets them with the comforting aroma of aged paper and leather-bound secrets. Tall shelves loom like silent sentinels, their shadowy depths hinting at untold stories.
+
+-----------------------------------------------------------
+Function calls:
+
+-----------------------------------------------------------
+Raw response:
+{"candidates":[{"content":{"parts":[{"text":"Actor ID: sim_662862\nActor Name: [SimulacraLLM_sim_662862]\nOriginal Intent: {\"action_type\": \"move\", \"target_id\": null, \"details\": \"go to the library\"}\nFactual Outcome Description: [SimulacraLLM_sim_662862] moved to the library.\nState Changes (Results): {'simulacra.sim_662862.location': 'Location_3'}\nCurrent World Time: 25.966666666666665\nWorld Style/Mood: mystery\nRecent Narrative History: - The air hangs thick with the scent of dust and forgotten things as [SimulacraLLM_sim_662862] pauses in the parlor, the worn rug beneath their feet whispering tales of former residents.\n- A faint, almost imperceptible pull emanates from the direction of the library, a siren song promising answers to questions yet unasked.\n\n[SimulacraLLM_sim_662862] crosses the threshold into the library; the room greets them with the comforting aroma of aged paper and leather-bound secrets. Tall shelves loom like silent sentinels, their shadowy depths hinting at untold stories.\n"}],"role":"model"},"finish_reason":"STOP","avg_logprobs":-0.1849502536421972}],"model_version":"gemini-2.0-flash","usage_metadata":{"candidates_token_count":282,"candidates_tokens_details":[{"modality":"TEXT","token_count":282}],"prompt_token_count":804,"prompt_tokens_details":[{"modality":"TEXT","token_count":804}],"total_token_count":1086},"automatic_function_calling_history":[]}
+-----------------------------------------------------------
+
+2025-05-03 19:49:02,039 - src.simulation_async - DEBUG - NarrationLLM Final Content: Actor ID: sim_662862
+Actor Name: [SimulacraLLM_sim_662862]
+Original Intent: {"action_type": "move", ...
+2025-05-03 19:49:02,043 - src.simulation_async - INFO - [NarrationTask] Appended narrative for Eleanor Vance: Eleanor Vance crosses the threshold into the library; the room greets them with ...

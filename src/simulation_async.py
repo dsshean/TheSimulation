@@ -73,9 +73,10 @@ os.makedirs(LIFE_SUMMARY_DIR, exist_ok=True)
 os.makedirs(WORLD_CONFIG_DIR, exist_ok=True)
 
 # --- Core Components (Module Scope) ---
-event_bus = asyncio.Queue()
-schedule: List[Tuple[float, int, Dict[str, Any]]] = []
-schedule_event_counter = 0
+event_bus = asyncio.Queue() # For intent -> dispatcher -> world engine
+narration_queue = asyncio.Queue() # <<< ADDED: Dedicated queue for narration events
+schedule: List[Tuple[float, int, Dict[str, Any]]] = [] # No longer used for action timing
+schedule_event_counter = 0 # May not be needed anymore
 # output_log = deque(maxlen=20) # <<< REMOVED
 state: Dict[str, Any] = {} # Global state dictionary, initialized empty
 
@@ -84,8 +85,10 @@ adk_session_service: Optional[InMemorySessionService] = None
 adk_session_id: Optional[str] = None
 adk_session: Optional[Session] = None
 adk_runner: Optional[Runner] = None # Renamed from world_engine_runner for clarity
-adk_memory_service: Optional[InMemoryMemoryService] = None # <<< Added Memory Service instance
+adk_memory_service: Optional[InMemoryMemoryService] = None
 world_engine_agent: Optional[LlmAgent] = None
+live_display_object: Optional[Live] = None # <<< ADDED: Global reference for Live display
+narration_agent: Optional[LlmAgent] = None
 simulacra_agents: Dict[str, LlmAgent] = {}
 
 # --- State Keys ---
@@ -100,6 +103,41 @@ LOCATION_KEY = "location"
 DEFAULT_HOME_LOCATION_NAME = "At home"
 DEFAULT_HOME_DESCRIPTION = "You are at home. It's a cozy place with familiar surroundings."
 
+def create_blank_simulation_state(new_uuid: str) -> Dict[str, Any]:
+    """Creates a dictionary representing a minimal blank simulation state."""
+    logger.info(f"Generating blank state structure for new UUID: {new_uuid}")
+    return {
+      "world_instance_uuid": new_uuid,
+      "location_details": {
+        "limbo": {
+          "name": "Limbo",
+          "description": "An empty, featureless starting point.",
+          "objects_present": [],
+          "connected_locations": []
+        }
+      },
+      "objects": {},
+      "active_simulacra_ids": [],
+      "world_time": 0.0,
+      "narrative_log": [],
+      "simulacra": {},
+      "npcs": {},
+      "current_world_state": {
+        "location_details": {
+           "limbo": {
+              "name": "Limbo",
+              "description": "An empty, featureless starting point.",
+              "objects_present": [],
+              "connected_locations": []
+           }
+        }
+      },
+      "world_template_details": {
+        "description": "Initial Blank State",
+        "rules": {}
+      },
+      "simulacra_profiles": {}
+    }
 # --- Initialization Functions (Integrated from main_async2.py) ---
 
 def load_json_file(path: str, default: Optional[Any] = None) -> Optional[Any]:
@@ -262,7 +300,8 @@ class WorldEngineResponse(BaseModel):
     valid_action: bool
     duration: float = Field(ge=0.0)
     results: Dict[str, Any] = Field(default_factory=dict)
-    narrative: str
+    outcome_description: str # Factual description of what happened
+    # narrative: str # <<< REMOVED - Narrative is now handled by a separate agent
 
     @field_validator('duration')
     @classmethod
@@ -345,9 +384,8 @@ Your goal is to make believable, engaging choices based on your personality, sit
 def create_world_engine_llm_agent() -> LlmAgent:
     """Creates the GENERALIZED LLM agent responsible for resolving actions."""
     agent_name = "WorldEngineLLMAgent"
-    instruction = """
-You are the World Engine, the impartial narrator and physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its outcome, duration, and narrative description based on the current world state.
-**Crucially, your narrative must be engaging, descriptive, and focus on the RESULT or CONSEQUENCE of the action attempt, not just the attempt itself. Use sensory details where appropriate (sight, sound, smell, touch) to bring the world to life.** Maintain a consistent tone based on the world's description.
+    instruction = """You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
+**Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details (unless directly caused by the action), or emotional interpretation.** This description will be used by a separate Narrator agent.
 
 **Input (Provided via trigger message):**
 - Actor ID: e.g., "[Actor Name]"
@@ -355,52 +393,104 @@ You are the World Engine, the impartial narrator and physics simulator for **The
 - Actor Location ID: e.g., "Location_123"
 - Intent: {"action_type": "...", "target_id": "...", "details": "..."}
 - Current World Time: e.g., 15.3
-- Narration Style/Mood: e.g., "slice_of_life", "mundane", "neutral_descriptive", "mystery", "horror" (Provided via trigger message)
-- Target Object State: The current state dictionary of the object specified in `intent['target_id']` (if applicable).
+# - Narration Style/Mood: (No longer relevant for World Engine)
+- Target Entity State: The current state dictionary of the entity specified in `intent['target_id']` (if applicable - could be an object or another simulacra).
 - Location State: The state dictionary of the actor's current location (contains description, exits, objects, obstacles, environmental features).
 - World Rules: General rules of the simulation (e.g., physics, magic system, technology limitations).
 
 **Your Task (Strictly follow the specified `Narration Style/Mood`):**
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
-2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Object State, Location State, and World Rules, determine if the action is valid and what its outcome should be.
+2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Entity State, Location State, and World Rules, determine if the action is valid and what its outcome should be.
     *   **General Checks:**
         *   **Action Type Plausibility:** Is the `action_type` a recognized and plausible action within the simulation's context? (Known types include: "use", "talk", "look_around", "move", "world_action", "wait", "think", but others might be possible). If fundamentally invalid or nonsensical, fail the action.
         *   **Target Consistency:** Does the `action_type` logically require a `target_id` (like "use" or "talk")? Is it present if required? Is it absent if not required (like "move", "look_around", "wait")? If inconsistent, fail the action.
         *   **Location Check (if `target_id` present):** Is the actor in the same `Location ID` as the target entity? If not, fail the action with an appropriate narrative (e.g., "[Actor Name] tries to interact with [Target Name], but it's not here.").
+        *   **Target Type Check (for `talk`):** If `action_type` is "talk", is the `target_id` another simulacra agent? If not, fail the action with an appropriate `outcome_description`.
     *   **Action Category Reasoning (Conceptual Guide):**
-        *   **Entity Interaction (e.g., `use`, `talk`):** Actions primarily targeting a specific object or agent (`target_id`). Evaluate `details` against `Target Object State` (properties, status) or target agent state. Use `World Rules` and common sense. Is the interaction physically possible? Does the actor have the necessary items/skills?
+        *   **Entity Interaction (e.g., `use`, `talk`):** Actions primarily targeting a specific object or agent (`target_id`). Evaluate `details` against `Target Entity State` (properties, status) or target agent state. Use `World Rules` and common sense. Is the interaction physically possible? Does the actor have the necessary items/skills?
+            *   **Specific `use` Handling:**
+                *   Check if the target object exists and is in the same location.
+                *   Check if the object has the `"interactive": true` property. If not, the action fails ("The [Object Name] is not interactive.").
+                *   Evaluate the `details` of the intent (e.g., "flip the switch", "turn on", "open container").
+                *   Based on the object's `properties` (e.g., "toggleable", "lockable", "container") and its current `state` (e.g., `"power": "off"`, `"locked": true`), determine the outcome.
+                *   **Example (Light Switch):** If `details` suggest toggling and the object has `"power"` state, flip the state (`"on"` to `"off"` or vice-versa). The `results` should be like `{{"objects.[target_id].state.power": "new_state"}}`. The `outcome_description` should be factual, like "The Light Switch turned on." or "The Light Switch turned off."
+                *   **Example (Locked Door):** If `details` suggest opening and the object has `"locked": true`, the action fails. `outcome_description`: "The Door is locked." `results`: `{}`.
         *   **World Interaction (e.g., `move`, `look_around`, `world_action`):** Actions primarily interacting with the location or environment. Evaluate `details` against `Location State` (exits, terrain, features) and `World Rules`. Determine success, narrative, duration, and potential results (location change, discovery). For `look_around`, base narrative on `Location State['description']`.
+            *   **Specific `move` Handling:**
+                *   If `action_type` is "move", examine the `details` (e.g., "go north", "exit through the door", "go to Hallway").
+                *   Check the current `Location State['connected_locations']`. Does the `details` match a valid connection (by direction or target `location_id`)?
+                *   If a valid connection is found, the action succeeds. Set `results: {{"simulacra.[actor_id].location": "target_location_id"}}`. Set `outcome_description: "[Actor Name] moved to the [Target Location Name]."`. Estimate a reasonable `duration` (e.g., 5-15s depending on context).
+                *   If no valid connection matches the `details`, the action fails. Set `valid_action: false`, `duration: 0.0`, `results: {}`. Set `outcome_description: "The way [details] is blocked or does not exist."` (or similar factual reason).
         *   **Self Interaction (e.g., `wait`, `think`):** Actions focused on the actor's internal state or passive observation. Generate a simple narrative reflecting the pause/observation. Set a short duration.
+
     *   **Outcome Determination:** Based on the above checks and reasoning:
-        *   Is the specific action described by `action_type` and `details` possible given the `Target Object State`, `Location State`, and `World Rules`?
+        *   Is the specific action described by `action_type` and `details` possible given the `Target Entity State`, `Location State`, and `World Rules`?
         *   If possible, what is the logical consequence or result? Does it change the state of the actor, the target, or the world?
         *   If not possible (but the attempt itself was valid, e.g., trying a locked door), what is the result of the failed attempt?
-    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and write a clear `narrative` explaining *why* the action failed (e.g., "The door is firmly locked.", "Climbing the sheer ice wall is impossible without equipment.", "[Actor Name] tries to move north, but the way is blocked by rubble.").
-    *   **Important Note:** The action categories (Entity, World, Self) and specific examples (`use`, `move`, `wait`, etc.) are illustrative guides. Use the specific `action_type`, `details`, `Target Object State`, `Location State`, and `World Rules` to determine the validity and outcome of the intended action, even if it doesn't perfectly match an example. Apply common sense and the simulation's physics/logic.
+    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and write a clear, factual `outcome_description` explaining *why* the action failed (e.g., "The door is locked.", "The way north is blocked.", "Target entity is not in the same location.").
+    *   **Specific Handling for `talk`:**
+        *   **Validity:** Check if `target_id` is a valid simulacra ID and if both actor and target are in the same location.
+        *   **Duration:** Calculate based on message length (e.g., 5.0 + len(details) * 0.1).
+        *   **Results:** `{{"simulacra.[target_id].last_observation": "[Actor Name] said to you: \"[details]\""}}` (Replace placeholders).
+        *   **Outcome Description:** `"[Actor Name] said \"[details]\" to [Target Name]."` (Replace placeholders). This is factual.
+    *   **Important Note:** The action categories (Entity, World, Self) and specific examples (`use`, `move`, `wait`, etc.) are illustrative guides. Use the specific `action_type`, `details`, `Target Entity State`, `Location State`, and `World Rules` to determine the validity and outcome of the intended action, even if it doesn't perfectly match an example. Apply common sense and the simulation's physics/logic.
 3.  **Calculate Duration:** Estimate a realistic duration (float, in simulation seconds) for the action *if it was valid and had an effect*. Invalid actions should have `duration: 0.0`. Simple observations might have short durations (e.g., 1-3s). Consider complexity, distance (for movement), etc.
 4.  **Determine Results:** If the action successfully changes the state of the world, an object, or the actor, define these changes in the `results` dictionary using dot notation relative to the root state (e.g., `{{"objects.some_object_id.power": "on", "simulacra.some_actor_id.location": "NewLocation"}}`). Invalid actions must have empty results `{}`.
-5.  **Generate Narrative:** Write the `narrative` string.
-    *   **Style Adherence:** Strictly adhere to the provided `Narration Style/Mood`.
-        *   If style is "slice_of_life", "mundane", or "neutral_descriptive": Focus ONLY on the objective, observable results of the action. Avoid adding dramatic descriptions, internal feelings (like "unease", "shiver"), suspense, or mystery unless the action *directly and obviously* causes it (e.g., failing to open a needed door might cause frustration, but simply looking around a dim room should not inherently cause unease). Keep descriptions factual and grounded.
-        *   If style is "mystery", "horror", etc.: You MAY include atmospheric details, hints of suspense, or emotional undertones appropriate to that style, but still focus on the action's outcome.
-    *   **Content:** Describe the *outcome* or *result* of the action attempt in the present tense.
-    *   **Placeholders:** Replace placeholders like `[Actor Name]`, `[Object Name]`, `[Destination Name]` appropriately.
+5.  **Generate Factual Outcome Description:** Write the `outcome_description` string.
+    *   **Style Adherence:** STRICTLY FACTUAL and OBJECTIVE. Describe only the direct, observable result or failure reason. No interpretation, emotion, or stylistic elements.
+    *   **Content:** Describe the *outcome* or *result* of the action attempt in the present tense. (e.g., "The lamp turned on.", "The door remained locked.", "[Actor Name] moved to the Corridor.", "[Actor Name] said 'Hello' to [Target Name].", "Nothing was found.").
+    *   **Placeholders:** Replace placeholders like `[Actor Name]`, `[Object Name]`, `[Target Name]`, `[Destination Name]` appropriately.
 6.  **Determine `valid_action`:** Set the final `valid_action` boolean based on your assessment in step 2. Note that an *attempt* can be valid even if the *outcome* is failure (e.g., trying a locked door is a valid action, but the result is it doesn't open). An *invalid* action is one that's fundamentally impossible or nonsensical in the context.
 
 **Output:**
-- Output ONLY a valid JSON object with the keys: "valid_action", "duration", "results", "narrative".
-- Ensure you adhere to the simulation's defined `Narration Style/Mood` provided in the input.
+- Output ONLY a valid JSON object with the keys: "valid_action", "duration", "results", "outcome_description".
+# - Ensure you adhere to the simulation's defined `Narration Style/Mood` provided in the input. (REMOVED)
 - Ensure `results` dictionary keys use dot notation relative to the root state object provided to the simulation.
-- Example Valid Output (Successful Use): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "narrative": "[Actor Name] flicks the switch on the desk lamp, and a warm yellow light floods the small workspace."}}`
-- Example Valid Output (Failed Use): `{{"valid_action": true, "duration": 3.0, "results": {{}}, "narrative": "[Actor Name] pulls firmly on the heavy vault door handle, but it doesn't budge. It seems securely locked."}}`
-- Example Invalid Output (Bad Target): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "narrative": "[Actor Name] tries to 'use' the empty air, looking confused."}}` # Note: Double braces for literal JSON example output
+- Example Valid Output (Successful Use): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "outcome_description": "The desk lamp turned on."}}`
+- Example Valid Output (Failed Use): `{{"valid_action": true, "duration": 3.0, "results": {{}}, "outcome_description": "The vault door handle did not move; it is locked."}}`
+- Example Invalid Output (Bad Target): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "[Actor Name] attempted to 'use' something that was not present."}}` # Note: Double braces for literal JSON example output
 - **IMPORTANT: Your entire response MUST be ONLY the JSON object, with no other text before or after it.**
 """
     return LlmAgent(
         name=agent_name, # Ensure this name is consistent if used elsewhere
         model=MODEL_NAME,
         instruction=instruction,
-        description="LLM World Engine: Resolves actions based on target state, calculates duration/results, generates outcome-focused narrative."
+        description="LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome description."
+    )
+
+def create_narration_llm_agent() -> LlmAgent:
+    """Creates the LLM agent responsible for generating stylized narrative."""
+    agent_name = "NarrationLLMAgent"
+    instruction = """
+You are the Narrator for **TheSimulation**. Your role is to weave the factual outcomes of actions into an engaging and atmospheric narrative, matching the specified world style.
+
+**Input (Provided via trigger message):**
+- Actor ID: e.g., "sim_abc"
+- Actor Name: e.g., "[Actor Name],"
+- Original Intent: {"action_type": "...", "target_id": "...", "details": "..."}
+- Factual Outcome Description: A concise, objective sentence describing what happened (e.g., "The lamp turned on.", "The door remained locked.", "[Actor Name], moved to the Corridor.").
+- State Changes (Results): Dictionary of state changes, if any (e.g., `{{"objects.lamp.power": "on"}}`).
+- Current World Time: e.g., 25.8
+- World Style/Mood: e.g., "mystery", "slice_of_life", "horror", "cyberpunk_noir".
+- Recent Narrative History (Last ~5 entries): Provided for context and flow.
+
+**Your Task:**
+1.  **Understand the Event:** Read the Actor, their Intent, and the Factual Outcome Description.
+2.  **Consider the Context:** Note the World Style/Mood and the Recent Narrative History.
+3.  **Generate Narrative:** Write a single, engaging narrative paragraph in the **present tense** that describes the event based on the Factual Outcome Description.
+    *   **Style Adherence:** STRICTLY adhere to the provided `World Style/Mood`. Infuse the description with appropriate atmosphere, sensory details (sight, sound, smell, touch), and tone.
+    *   **Show, Don't Just Tell:** Instead of just repeating the outcome, describe it vividly. (e.g., If outcome is "The lamp turned on.", narrative could be "[Actor Name], flicks the switch. With a soft click, a warm, yellow glow pushes back the shadows in the small workspace, revealing dust motes dancing in the beam.")
+    *   **Incorporate Intent (Optional):** Briefly reference the actor's intent if it adds to the narrative (e.g., "Trying the handle again, [Actor Name], confirms the door is still firmly locked.").
+    *   **Flow:** Ensure the narrative flows reasonably from the Recent Narrative History.
+
+**Output:**
+- Output ONLY the final narrative string. Do NOT include explanations, prefixes, or JSON formatting.
+"""
+    return LlmAgent(
+        name=agent_name,
+        model=MODEL_NAME, # Consider using a model good at creative writing if needed
+        instruction=instruction,
+        description="LLM Narrator: Generates stylized narrative based on factual action outcomes and world mood."
     )
 
 # --- Task Functions (Integrated from main_async2.py) ---
@@ -449,15 +539,22 @@ def generate_table() -> Table:
          obj_power = get_nested(obj_state_data, 'power')
          obj_locked = get_nested(obj_state_data, 'locked')
          obj_status = get_nested(obj_state_data, 'status')
+         # --- ADDED: Check for 'interactive' property ---
+         obj_interactive = get_nested(obj_state_data, 'interactive')
+         # ---
          details = f"Loc: {obj_loc}"
          if obj_power is not None: details += f", Pwr: {obj_power}"
          if obj_locked is not None: details += f", Lck: {'Y' if obj_locked else 'N'}"
          if obj_status is not None: details += f", Sts: {obj_status}"
+         # --- ADDED: Display 'interactive' status ---
+         if obj_interactive is not None: details += f", Int: {'Y' if obj_interactive else 'N'}"
+         # ---
          table.add_row(f"  {obj_name}", details)
 
     table.add_row("--- System ---", "---")
-    table.add_row("Schedule Size", str(len(schedule)))
+    # table.add_row("Schedule Size", str(len(schedule))) # Schedule no longer used this way
     table.add_row("Event Bus Size", str(event_bus.qsize()))
+    table.add_row("Narration Q Size", str(narration_queue.qsize())) # Show narration queue size
     log_display = "\n".join(get_nested(state, 'narrative_log', default=[])[-6:])
     table.add_row("Narrative Log", log_display)
     return table
@@ -466,14 +563,14 @@ def generate_table() -> Table:
 # <<< REMOVED generate_output_panel function >>>
 
 async def time_manager_task(live_display: Live):
-    """Advances time, processes scheduled events, and updates state."""
-    global state, schedule # Explicitly mention modification of module-level vars
+    """Advances time, applies completed action effects, and updates display."""
+    global state # Explicitly mention modification of module-level vars
     logger.info("[TimeManager] Task started.")
     last_real_time = time.monotonic()
 
     try:
         while state.get("world_time", 0.0) < MAX_SIMULATION_TIME:
-            current_real_time = time.monotonic()
+            current_real_time = time.monotonic() # Real time used for pacing
             real_delta_time = current_real_time - last_real_time
             last_real_time = current_real_time
             sim_delta_time = real_delta_time * SIMULATION_SPEED_FACTOR
@@ -481,58 +578,39 @@ async def time_manager_task(live_display: Live):
             new_sim_time = current_sim_time + sim_delta_time
             state["world_time"] = new_sim_time
 
-            while schedule and schedule[0][0] <= new_sim_time:
-                completion_time, event_id, event_data = heapq.heappop(schedule)
-                logger.info(f"[TimeManager] Processing scheduled event {event_id} ({event_data.get('type')}) due at {completion_time:.1f}")
+            # --- Process Action Completions Based on Time ---
+            for agent_id, agent_state in state.get("simulacra", {}).items():
+                if agent_state.get("status") == "busy":
+                    action_end_time = agent_state.get("current_action_end_time", -1.0)
+                    if action_end_time <= new_sim_time:
+                        logger.info(f"[TimeManager] Applying completed action effects for {agent_id} at time {new_sim_time:.1f} (due at {action_end_time:.1f}).")
 
-                results = event_data.get("results", {})
-                actor_id_for_memory = event_data.get("actor_id")
-                memory_log_updated = False
+                        # Apply pending results
+                        pending_results = agent_state.get("pending_results", {})
+                        if pending_results:
+                            memory_log_updated = False
+                            for key_path, value in pending_results.items():
+                                success = _update_state_value(state, key_path, value)
+                                if success and key_path == f"simulacra.{agent_id}.memory_log":
+                                    memory_log_updated = True
+                            agent_state["pending_results"] = {} # Clear pending results
 
-                for key_path, value in results.items():
-                    success = _update_state_value(state, key_path, value) # Pass module-level state
-                    if success and actor_id_for_memory and key_path == f"simulacra.{actor_id_for_memory}.memory_log":
-                        memory_log_updated = True
+                            # Prune memory log if it was updated
+                            if memory_log_updated:
+                                if "memory_log" in agent_state:
+                                    current_mem_log = agent_state["memory_log"]
+                                    if isinstance(current_mem_log, list) and len(current_mem_log) > MAX_MEMORY_LOG_ENTRIES:
+                                        agent_state["memory_log"] = current_mem_log[-MAX_MEMORY_LOG_ENTRIES:]
+                                        logger.debug(f"[TimeManager] Pruned memory log for {agent_id} to {MAX_MEMORY_LOG_ENTRIES} entries.")
+                        else:
+                            logger.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
 
-                narrative = event_data.get("narrative")
-                if narrative:
-                    state.setdefault("narrative_log", []).append(f"[T{completion_time:.1f}] {narrative}")
+                        # Set agent to idle
+                        agent_state["status"] = "idle"
+                        logger.info(f"[TimeManager] Set {agent_id} status to idle.")
 
-                # Prune memory log if it was updated
-                if memory_log_updated and actor_id_for_memory:
-                    actor_state_for_mem = get_nested(state, "simulacra", actor_id_for_memory)
-                    if actor_state_for_mem and "memory_log" in actor_state_for_mem:
-                        current_mem_log = actor_state_for_mem["memory_log"]
-                        if isinstance(current_mem_log, list) and len(current_mem_log) > MAX_MEMORY_LOG_ENTRIES:
-                            actor_state_for_mem["memory_log"] = current_mem_log[-MAX_MEMORY_LOG_ENTRIES:]
-                            logger.debug(f"[TimeManager] Pruned memory log for {actor_id_for_memory} to {MAX_MEMORY_LOG_ENTRIES} entries.")
-
-                # Update actor status to idle upon action completion
-                actor_id = event_data.get("actor_id")
-                if actor_id and "simulacra" in state:
-                    actor_sim_state = state["simulacra"].get(actor_id)
-                    if actor_sim_state:
-                        # Check if the completion time matches the expected end time
-                        expected_end_time = get_nested(actor_sim_state, "current_action_end_time", default=-1)
-                        if actor_sim_state.get("status") == "busy" and abs(expected_end_time - completion_time) < 0.01:
-                            actor_sim_state["status"] = "idle"
-                            actor_sim_state["current_action_end_time"] = completion_time # Update to actual completion
-                            logger.info(f"[TimeManager] Set {actor_id} status to idle.")
-                            if narrative:
-                                actor_sim_state["last_observation"] = narrative
-                                logger.info(f"[TimeManager] Stored action narrative in {actor_id}'s last_observation.")
-                        elif actor_sim_state.get("status") == "busy":
-                            logger.warning(f"[TimeManager] Action completion for {actor_id} at {completion_time:.1f} did not match current busy state end time {expected_end_time}. Status left as busy.")
-                        else: # Actor wasn't busy, but action completed (e.g., immediate effect)
-                            logger.debug(f"[TimeManager] Action completion for {actor_id} at {completion_time:.1f} occurred while actor was {actor_sim_state.get('status')}.")
-                            if narrative:
-                                 actor_sim_state["last_observation"] = narrative # Still update observation
-                    else:
-                        logger.warning(f"[TimeManager] Actor state for '{actor_id}' not found for completed event.")
-
-            # --- Revert to updating only the table ---
+            # --- Update Live Display ---
             live_display.update(generate_table())
-            # --- End Change ---
             await asyncio.sleep(UPDATE_INTERVAL)
 
     except asyncio.CancelledError:
@@ -542,9 +620,194 @@ async def time_manager_task(live_display: Live):
     finally:
         logger.info(f"[TimeManager] Loop finished at sim time {state.get('world_time', 0.0):.1f}")
 
+async def interaction_dispatcher_task():
+    """Listens for intents and classifies them before sending to World Engine."""
+    logger.info("[InteractionDispatcher] Task started.")
+    while True:
+        intent_event = None
+        try:
+            intent_event = await event_bus.get()
+            if get_nested(intent_event, "type") != "intent_declared":
+                logger.debug(f"[InteractionDispatcher] Ignoring event type: {get_nested(intent_event, 'type')}")
+                event_bus.task_done()
+                continue
+
+            actor_id = get_nested(intent_event, "actor_id")
+            intent = get_nested(intent_event, "intent")
+            if not actor_id or not intent:
+                logger.warning(f"[InteractionDispatcher] Received invalid intent event: {intent_event}")
+                event_bus.task_done()
+                continue
+
+            target_id = intent.get("target_id")
+            action_type = intent.get("action_type")
+            interaction_class = "environment" # Default
+
+            # Classify interaction
+            if target_id:
+                # Check if target is another Simulacra
+                if target_id in get_nested(state, "simulacra", default={}):
+                    interaction_class = "entity"
+                # Check if target is an interactive object (assuming 'interactive' property exists)
+                elif target_id in get_nested(state, "objects", default={}) and get_nested(state, "objects", target_id, "interactive", default=False):
+                     interaction_class = "entity"
+                # Optional: Consider specific action types that imply entity interaction even without target_id? (e.g., 'shout') - Not implemented here.
+
+            logger.info(f"[InteractionDispatcher] Intent from {actor_id} ({action_type} on {target_id or 'N/A'}) classified as '{interaction_class}'.")
+
+            # Put classified event for World Engine
+            await event_bus.put({"type": "resolve_action_request", "actor_id": actor_id, "intent": intent, "interaction_class": interaction_class})
+            event_bus.task_done()
+            # Yield control to allow other tasks (like World Engine) to potentially grab the event
+            await asyncio.sleep(0)
+
+        except asyncio.CancelledError:
+            logger.info("[InteractionDispatcher] Task cancelled.")
+            if intent_event and event_bus._unfinished_tasks > 0:
+                try: event_bus.task_done()
+                except ValueError: pass
+            break
+        except Exception as e:
+            logger.exception(f"[InteractionDispatcher] Error processing event: {e}")
+            if intent_event and event_bus._unfinished_tasks > 0:
+                try: event_bus.task_done()
+                except ValueError: pass # Avoid error if already done
+
+async def narration_task():
+    """Listens for completed actions on the narration queue and generates stylized narrative."""
+    global live_display_object # <<< ADDED: Access global live display
+    logger.info("[NarrationTask] Task started.")
+
+    if not adk_runner:
+        logger.error("[NarrationTask] Module-level runner not initialized. Task cannot proceed.")
+        return
+    if not narration_agent:
+        logger.error("[NarrationTask] Module-level narration_agent not initialized. Task cannot proceed.")
+        return
+    if not adk_session:
+        logger.error("[NarrationTask] Module-level ADK session not initialized. Task cannot proceed.")
+        return
+
+    session_id_to_use = adk_session.id
+
+    while True:
+        action_event = None
+        try:
+            # <<< MODIFIED: Listen to narration_queue >>>
+            action_event = await narration_queue.get()
+            # No need to check type, assume only valid narration events are put here
+
+            actor_id = get_nested(action_event, "actor_id")
+            intent = get_nested(action_event, "action") # Original intent
+            results = get_nested(action_event, "results", default={}) # Results might still be useful context for narrator
+            outcome_desc = get_nested(action_event, "outcome_description", default="Something happened.")
+            completion_time = get_nested(action_event, "completion_time", default=state.get("world_time", 0.0)) # Use event time if available
+
+            if not actor_id:
+                logger.warning(f"[NarrationTask] Received narration event without actor_id: {action_event}")
+                narration_queue.task_done() # <<< MODIFIED
+                continue
+
+            actor_name = get_nested(state, "simulacra", actor_id, "name", default=actor_id)
+            world_mood = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='neutral_descriptive')
+            # --- MODIFIED: Clean the recent narrative history for the prompt ---
+
+            def clean_history_entry(entry: str) -> str:
+                # Remove timestamp
+                cleaned = re.sub(r'^\[T\d+\.\d+\]\s*', '', entry)
+                # Remove agent identifiers and JSON blocks (basic attempt)
+                cleaned = re.sub(r'\[\w+Agent(?:_sim_\w+)?\] said: ```json.*?```', '', cleaned, flags=re.DOTALL).strip()
+                # Add more specific cleaning rules if needed
+                return cleaned
+
+            raw_recent_narrative = state.get("narrative_log", [])[-5:] # Get last 5 raw entries
+            cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)] # Apply cleaning and filter empty results
+            history_str = "\n".join(cleaned_recent_narrative)
+            # ---
+
+            logger.info(f"[NarrationTask] Generating narrative for {actor_name}'s action completion. Outcome: '{outcome_desc}'")
+
+            # --- Construct Prompt ---
+            intent_json = json.dumps(intent, indent=2)
+            results_json = json.dumps(results, indent=2) # Pass results for context
+            # history_str = "\n".join(recent_narrative) # No longer needed here
+
+            prompt = f"""
+Actor ID: {actor_id}
+Actor Name: {actor_name}
+Original Intent: {intent_json}
+Factual Outcome Description: {outcome_desc}
+State Changes (Results): {results_json}
+Current World Time: {completion_time:.1f}
+World Style/Mood: {world_mood}
+Recent Narrative History (Cleaned):
+{history_str}
+
+Generate the narrative paragraph based on these details and your instructions.
+"""
+            # --- Call Narration LLM ---
+            adk_runner.agent = narration_agent # Set agent before call
+            narrative_text = ""
+            trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
+
+            async for event_llm in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
+                if event_llm.is_final_response() and event_llm.content:
+                    narrative_text = event_llm.content.parts[0].text.strip()
+                    logger.debug(f"NarrationLLM Final Content: {narrative_text[:100]}...")
+                elif event_llm.error_message:
+                    logger.error(f"NarrationLLM Error: {event_llm.error_message}")
+                    narrative_text = f"[{actor_name}'s action resulted in: {outcome_desc}]" # Fallback narrative
+
+            # --- ADDED: Post-process the narrative text ---
+            cleaned_narrative_text = narrative_text
+            if narrative_text:
+                # Attempt to find the actual narrative after the "Input: ..." block
+                # Look for a double newline which often separates the preamble from the actual response
+                parts = narrative_text.split('\n\n', 1)
+                if len(parts) > 1 and "Actor ID:" in parts[0]: # Check if the first part looks like the input block
+                    cleaned_narrative_text = parts[1].strip()
+                else:
+                    # Fallback if split doesn't work as expected, try removing common prefixes
+                    cleaned_narrative_text = re.sub(r'^Input:.*?\n\n', '', narrative_text, flags=re.DOTALL).strip()
+
+                # Replace internal agent name placeholder with actual name
+                internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
+                cleaned_narrative_text = cleaned_narrative_text.replace(internal_agent_name_placeholder, actor_name)
+            # --- END Post-processing ---
+
+            # --- ADDED: Print the generated narrative to the console ---
+            # <<< MODIFIED: Use cleaned_narrative_text >>>
+            if cleaned_narrative_text and live_display_object:
+                live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
+            elif cleaned_narrative_text: # Fallback if live object not ready
+                console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
+            # ---
+
+            # --- Update State ---
+            # <<< MODIFIED: Use cleaned_narrative_text >>>
+            final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
+            state.setdefault("narrative_log", []).append(final_narrative_entry)
+            if actor_id in state.get("simulacra", {}):
+                state["simulacra"][actor_id]["last_observation"] = cleaned_narrative_text # Update agent's observation
+            logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
+            narration_queue.task_done() # <<< MODIFIED
+
+        except asyncio.CancelledError:
+            logger.info("[NarrationTask] Task cancelled.")
+            if action_event and narration_queue._unfinished_tasks > 0: # <<< MODIFIED
+                try: narration_queue.task_done() # <<< MODIFIED
+                except ValueError: pass
+            break
+        except Exception as e:
+            logger.exception(f"[NarrationTask] Error processing event: {e}")
+            if action_event and narration_queue._unfinished_tasks > 0: # <<< MODIFIED
+                try: narration_queue.task_done() # <<< MODIFIED
+                except ValueError: pass
+
 async def world_engine_task_llm():
-    """Listens for intents, calls LLM to resolve, and schedules completions."""
-    global schedule_event_counter, state, schedule # Explicitly mention modification
+    """Listens for action requests, calls LLM to resolve, stores results, and triggers narration."""
+    global state # Explicitly mention modification
+    global live_display_object # <<< ADDED: Access global live display
     # Access module-level components
     logger.info("[WorldEngineLLM] Task started.")
 
@@ -561,207 +824,206 @@ async def world_engine_task_llm():
     session_id_to_use = adk_session.id # Get ID from module-level session
 
     while True:
-        intent_event = None
+        request_event = None # Renamed from intent_event
         actor_id = None
         actor_state_we = {}
-        narrative = "Action failed due to internal error (pre-processing)."
+        outcome_description = "Action failed due to internal error (pre-processing)." # Default outcome desc
 
         try:
-            intent_event = await event_bus.get()
+            request_event = await event_bus.get()
 
-            if get_nested(intent_event, "type") != "intent_declared":
-                logger.debug(f"[WorldEngineLLM] Ignoring event type: {get_nested(intent_event, 'type')}")
+            # --- MODIFIED: Listen for the new event type ---
+            if get_nested(request_event, "type") != "resolve_action_request":
+                logger.debug(f"[WorldEngineLLM] Ignoring event type: {get_nested(request_event, 'type')}")
                 event_bus.task_done()
                 continue
 
-            actor_id = get_nested(intent_event, "actor_id")
-            intent = get_nested(intent_event, "intent")
+            actor_id = get_nested(request_event, "actor_id")
+            intent = get_nested(request_event, "intent")
+            interaction_class = get_nested(request_event, "interaction_class", default="environment") # Get classification
             if not actor_id or not intent:
-                logger.warning(f"[WorldEngineLLM] Received invalid intent event: {intent_event}")
+                logger.warning(f"[WorldEngineLLM] Received invalid action request event: {request_event}")
                 event_bus.task_done()
                 continue
 
-            logger.info(f"[WorldEngineLLM] Received intent from {actor_id}: {intent}")
+            logger.info(f"[WorldEngineLLM] Received '{interaction_class}' action request from {actor_id}: {intent}")
             action_type = intent.get("action_type")
             actor_state_we = get_nested(state, 'simulacra', actor_id, default={})
             actor_name = actor_state_we.get('name', actor_id)
             current_sim_time = state.get("world_time", 0.0)
 
-            # --- Handle 'talk' action specifically (Bypass LLM) ---
-            if action_type == 'talk':
-                target_id = intent.get("target_id")
-                message = intent.get("details", "")
-                target_state = get_nested(state, 'simulacra', target_id) if target_id else None
-                target_name = target_state.get('name', target_id) if target_state else target_id
+            # --- REMOVED: 'talk' action bypass block ---
 
-                is_valid = False
-                if not target_id: narrative = f"{actor_name} tries to talk, but doesn't specify who."
-                elif not target_state: narrative = f"{actor_name} tries to talk to {target_id}, but they don't exist."
-                elif get_nested(actor_state_we, 'location') != get_nested(target_state, 'location'): narrative = f"{actor_name} tries to talk to {target_name}, but they are in different locations."
-                else:
-                    is_valid = True
-                    duration = 5.0 + len(message) * 0.1
-                    results = {f"simulacra.{target_id}.last_observation": f"{actor_name} said to you: \"{message}\""}
-                    narrative = f"{actor_name} says \"{message}\" to {target_name}."
+            # --- Handle ALL actions via LLM ---
+            actor_location_id = get_nested(actor_state_we, "location")
+            location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={}) # Use constants
+            world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={}) # Use constants
+            # narration_style = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='neutral_descriptive') # No longer needed here
 
-                if is_valid:
-                    completion_time = current_sim_time + duration
-                    schedule_event_counter += 1
-                    completion_event = {"type": "action_complete", "actor_id": actor_id, "action": intent, "results": results, "narrative": narrative}
-                    heapq.heappush(schedule, (completion_time, schedule_event_counter, completion_event))
-                    if actor_id in state.get("simulacra", {}):
-                        state["simulacra"][actor_id]["status"] = "busy"
-                        state["simulacra"][actor_id]["current_action_end_time"] = completion_time
-                    # --- Print talk resolution ---
-                    console.print(f"\n[bold blue][World Engine Resolution (Talk) @ {current_sim_time:.1f}s][/bold blue]")
-                    resolution_details = {"valid_action": True, "duration": duration, "results": results, "narrative": narrative}
-                    try:
-                        console.print(json.dumps(resolution_details, indent=2))
-                    except TypeError: # Handle potential non-serializable data if results get complex
-                        console.print(str(resolution_details))
-                    logger.info(f"[WorldEngineLLM] 'talk' Action VALID for {actor_id}. Scheduled completion at {completion_time:.1f}s. Narrative: {narrative}")
-                    # --- REMOVED: Log talk resolution ---
-                else:
-                    logger.info(f"[WorldEngineLLM] 'talk' Action INVALID for {actor_id}. Reason: {narrative}")
-                    if actor_id in state.get("simulacra", {}):
-                        state["simulacra"][actor_id]["last_observation"] = narrative
-                        state["simulacra"][actor_id]["status"] = "idle" # Set back to idle immediately
-                    state.setdefault("narrative_log", []).append(f"[T{current_sim_time:.1f}] {narrative}") # Keep narrative log
-                    # --- Print invalid talk resolution ---
-                    console.print(f"\n[bold blue][World Engine Resolution (Talk) @ {current_sim_time:.1f}s][/bold blue]")
-                    resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "narrative": narrative}
-                    try:
-                        console.print(json.dumps(resolution_details, indent=2))
-                    except TypeError:
-                        console.print(str(resolution_details))
-                    # --- REMOVED: Log invalid talk resolution ---
+            target_id = get_nested(intent, "target_id")
+            # --- MODIFIED: Get target state (could be object OR simulacra) ---
+            target_state_data = {}
+            if target_id:
+                target_state_data = get_nested(state, 'objects', target_id, default={}) or get_nested(state, 'simulacra', target_id, default={})
+            # ---
 
-                event_bus.task_done()
-                continue # Go to next event
+            # --- Simplified TRIGGER TEXT ---
+            intent_json = json.dumps(intent, indent=2)
+            target_state_json = json.dumps(target_state_data, indent=2) if target_state_data else "N/A"
+            location_state_json = json.dumps(location_state_data, indent=2) # Assuming location_state_data is always a dict
+            world_rules_json = json.dumps(world_rules, indent=2)
 
-            # --- Handle other actions via LLM ---
-            else:
-                actor_location_id = get_nested(actor_state_we, "location")
-                location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={}) # Use constants
-                world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={}) # Use constants
-                # --- Get Narration Style ---
-                narration_style = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='neutral_descriptive') # Assuming 'mood' holds the style
-                # ---
-                target_id = get_nested(intent, "target_id")
-                target_object_state = get_nested(state, 'objects', target_id, default={}) if target_id else {}
-                # if action_type == "look_around":
-                #     logger.debug(f"[WorldEngineLLM] Context for 'look_around' at '{actor_location_id}': Description='{location_state_data.get('description', 'N/A')}'")
-                # --- Simplified TRIGGER TEXT ---
-                intent_json = json.dumps(intent, indent=2)
-                prompt = f"Actor: {actor_name} ({actor_id})\nLocation: {actor_location_id}\nTime: {current_sim_time:.1f}\nNarration Style/Mood: {narration_style}\nIntent: {intent_json}\nResolve this intent based on your instructions and the conversation history."
-                # --- END Simplified TRIGGER TEXT ---
+            prompt = f"""
+Actor: {actor_name} ({actor_id})
+Location: {actor_location_id}
+Time: {current_sim_time:.1f}
+Intent: {intent_json}
+Target Entity State ({target_id or 'N/A'}): {target_state_json}
+Location State: {location_state_json}
+World Rules: {world_rules_json}
 
-                logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")
-                adk_runner.agent = world_engine_agent # Set agent before call
-                response_text = ""
-                trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
+Resolve this intent based on your instructions and the provided context.
+"""
+            # --- END Simplified TRIGGER TEXT ---
 
-                async for event_llm in adk_runner.run_async( # Renamed event to event_llm
-                    user_id=USER_ID,
-                    session_id=session_id_to_use,
-                    new_message=trigger_content
-                ):
-                    if event_llm.is_final_response() and event_llm.content:
-                        response_text = event_llm.content.parts[0].text
-                        logger.debug(f"WorldLLM Final Content: {response_text[:100]}...")
-                    elif event_llm.error_message:
-                        logger.error(f"WorldLLM Error: {event_llm.error_message}")
-                        narrative = f"Action failed due to LLM error: {event_llm.error_message}"
-                        break
+            logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")
+            adk_runner.agent = world_engine_agent # Set agent before call
+            response_text = ""
+            trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
 
-                validated_data: Optional[WorldEngineResponse] = None
-                parsed_resolution = None # <<< Added for logging
-                if response_text:
-                    try:
-                        response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
-                        # --- Placeholder Replacement ---
-                        json_str_to_parse = response_text_clean
-                        correct_actor_name = actor_state_we.get('name', actor_id) # e.g., "Eleanor Vance" or fallback "sim_3e912d"
-                        agent_internal_name = f"SimulacraLLM_{actor_id}" # e.g., "SimulacraLLM_sim_3e912d"
-                        json_str_to_parse = json_str_to_parse.replace(agent_internal_name, correct_actor_name)
+            async for event_llm in adk_runner.run_async( # Renamed event to event_llm
+                user_id=USER_ID,
+                session_id=session_id_to_use,
+                new_message=trigger_content
+            ):
+                if event_llm.is_final_response() and event_llm.content:
+                    response_text = event_llm.content.parts[0].text
+                    logger.debug(f"WorldLLM Final Content: {response_text[:100]}...")
+                elif event_llm.error_message:
+                    logger.error(f"WorldLLM Error: {event_llm.error_message}")
+                    outcome_description = f"Action failed due to LLM error: {event_llm.error_message}"
+                    break
 
-                        json_str_to_parse = json_str_to_parse.replace("[Actor Name]", actor_name) # Replaces in the narrative
-                        json_str_to_parse = json_str_to_parse.replace("[ACTOR_ID]", actor_id)
-                        if target_id:
-                             json_str_to_parse = json_str_to_parse.replace("[target_id]", target_id)
-                        if target_object_state:
-                             obj_name = target_object_state.get("name", target_id)
-                             json_str_to_parse = json_str_to_parse.replace("[Object Name]", obj_name)
-                        if target_object_state and target_object_state.get("destination"):
-                             dest_name = target_object_state.get("destination")
-                             json_str_to_parse = json_str_to_parse.replace("[Destination Name]", dest_name)
-                             json_str_to_parse = json_str_to_parse.replace("[Destination]", dest_name)
-                        json_str_to_parse = json_str_to_parse.replace("[Actor Name]", actor_name)
-                        # --- End Placeholder Replacement ---
+            validated_data: Optional[WorldEngineResponse] = None
+            parsed_resolution = None # <<< Added for logging
+            if response_text:
+                try:
+                    response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                    # --- Placeholder Replacement ---
+                    json_str_to_parse = response_text_clean
+                    correct_actor_name = actor_state_we.get('name', actor_id) # e.g., "Eleanor Vance" or fallback "sim_3e912d"
+                    agent_internal_name = f"SimulacraLLM_{actor_id}" # e.g., "SimulacraLLM_sim_3e912d"
+                    json_str_to_parse = json_str_to_parse.replace(agent_internal_name, correct_actor_name)
 
-                        raw_data = json.loads(json_str_to_parse)
-                        parsed_resolution = raw_data # <<< Store raw parsed data for logging
-                        validated_data = WorldEngineResponse.model_validate(raw_data)
-                        logger.debug(f"[WorldEngineLLM] LLM response validated successfully for {actor_id}.")
-                        narrative = validated_data.narrative # Use narrative from validated data
-                        # --- Print Valid LLM Resolution ---
+                    json_str_to_parse = json_str_to_parse.replace("[Actor Name]", actor_name) # Replaces in the narrative
+                    json_str_to_parse = json_str_to_parse.replace("[ACTOR_ID]", actor_id)
+                    if target_id:
+                         json_str_to_parse = json_str_to_parse.replace("[target_id]", target_id)
+                    if target_state_data: # Use combined target_state_data
+                         obj_name = target_state_data.get("name", target_id)
+                         json_str_to_parse = json_str_to_parse.replace("[Object Name]", obj_name)
+                         # --- ADDED: Replace Target Name for 'talk' ---
+                         if action_type == 'talk':
+                             target_name = target_state_data.get("name", target_id)
+                             json_str_to_parse = json_str_to_parse.replace("[Target Name]", target_name)
+                         # ---
+                    # Check for destination specifically on objects (assuming only objects have destinations for now)
+                    target_object_state = get_nested(state, 'objects', target_id, default={}) if target_id else {}
+                    if target_object_state and target_object_state.get("destination"):
+                         dest_name = target_object_state.get("destination")
+                         json_str_to_parse = json_str_to_parse.replace("[Destination Name]", dest_name)
+                         json_str_to_parse = json_str_to_parse.replace("[Destination]", dest_name)
+                    # --- End Placeholder Replacement ---
+
+                    raw_data = json.loads(json_str_to_parse)
+                    parsed_resolution = raw_data # <<< Store raw parsed data for logging
+                    validated_data = WorldEngineResponse.model_validate(raw_data)
+                    logger.debug(f"[WorldEngineLLM] LLM response validated successfully for {actor_id}.")
+                    outcome_description = validated_data.outcome_description # Use outcome_description from validated data
+                    # --- MODIFIED: Use live_display_object.console.print ---
+                    if live_display_object:
+                        live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
+                        try:
+                            live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
+                        except TypeError:
+                            live_display_object.console.print(str(parsed_resolution)) # Fallback
+                    else: # Fallback
                         console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
                         try:
                             console.print(json.dumps(parsed_resolution, indent=2))
                         except TypeError:
-                            console.print(str(parsed_resolution)) # Fallback to string representation
-                        # ---
-                    except json.JSONDecodeError as e:
-                        logger.error(f"[WorldEngineLLM] Failed to decode JSON response for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
-                        narrative = "Action failed due to internal error (JSON decode)."
-                    except ValidationError as e:
-                        logger.error(f"[WorldEngineLLM] Failed to validate LLM response structure for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
-                        narrative = "Action failed due to internal error (invalid structure)."
-                    except Exception as e:
-                         logger.error(f"[WorldEngineLLM] Unexpected error parsing/validating response for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
-                         narrative = "Action failed due to internal error (unexpected)."
-                else:
-                    if not narrative.startswith("Action failed due to LLM error"):
-                        narrative = "Action failed: No response from World Engine LLM."
+                            console.print(str(parsed_resolution))
+                    # ---
+                except json.JSONDecodeError as e:
+                    logger.error(f"[WorldEngineLLM] Failed to decode JSON response for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
+                    outcome_description = "Action failed due to internal error (JSON decode)."
+                except ValidationError as e:
+                    logger.error(f"[WorldEngineLLM] Failed to validate LLM response structure for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
+                    outcome_description = "Action failed due to internal error (invalid structure)."
+                except Exception as e:
+                     logger.error(f"[WorldEngineLLM] Unexpected error parsing/validating response for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
+                     outcome_description = "Action failed due to internal error (unexpected)."
+            else:
+                if not outcome_description.startswith("Action failed due to LLM error"):
+                    outcome_description = "Action failed: No response from World Engine LLM."
 
-                # --- REMOVED: Log LLM resolution (valid or invalid) ---
-                # output_log.append({ ... })
-                # ---
+            # --- REMOVED: Log LLM resolution (valid or invalid) ---
+            # output_log.append({ ... })
+            # ---
 
-                if validated_data and validated_data.valid_action:
-                    completion_time = current_sim_time + validated_data.duration
-                    schedule_event_counter += 1
-                    completion_event = {
-                        "type": "action_complete", "actor_id": actor_id,
-                        "action": intent, "results": validated_data.results,
-                        "narrative": validated_data.narrative # Use validated narrative
-                    }
-                    heapq.heappush(schedule, (completion_time, schedule_event_counter, completion_event))
-                    if actor_id in state.get("simulacra", {}):
-                        state["simulacra"][actor_id]["status"] = "busy"
-                        state["simulacra"][actor_id]["current_action_end_time"] = completion_time
-                    logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Scheduled completion at {completion_time:.1f}s. Narrative: {narrative}")
+            if validated_data and validated_data.valid_action:
+                completion_time = current_sim_time + validated_data.duration
+                # --- MODIFIED: Store results in agent state, put event on narration_queue ---
+                narration_event = {
+                    "type": "action_complete", # Keep type for potential future filtering
+                    "actor_id": actor_id,
+                    "action": intent, # Original intent for narrator context
+                    "results": validated_data.results, # Include results for narrator context
+                    "outcome_description": validated_data.outcome_description, # Pass factual outcome
+                    "completion_time": completion_time # Pass completion time for narrator
+                }
+                if actor_id in state.get("simulacra", {}):
+                    state["simulacra"][actor_id]["status"] = "busy"
+                    state["simulacra"][actor_id]["pending_results"] = validated_data.results # Store results
+                    state["simulacra"][actor_id]["current_action_end_time"] = completion_time
+                    await narration_queue.put(narration_event) # <<< Put on narration queue
+                    logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Stored results, set end time {completion_time:.1f}s. Triggered narration. Outcome: {outcome_description}")
                 else:
-                    # Use narrative from validated_data if available, otherwise use the error narrative
-                    final_narrative = validated_data.narrative if validated_data else narrative
-                    logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_narrative}")
-                    if actor_id in state.get("simulacra", {}):
-                        state["simulacra"][actor_id]["last_observation"] = final_narrative
-                        state["simulacra"][actor_id]["status"] = "idle" # Set back to idle immediately
-                    actor_name_for_log = get_nested(actor_state_we, 'name', default=actor_id)
-                    # --- Print invalid LLM resolution ---
-                    console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
-                    resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "narrative": final_narrative}
+                    logger.error(f"[WorldEngineLLM] Actor {actor_id} not found in state after valid action resolution. Cannot store results or trigger narration.")
+
+            else:
+                # Use outcome_description from validated_data if available, otherwise use the error description
+                final_outcome_desc = validated_data.outcome_description if validated_data else outcome_description
+                logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_outcome_desc}")
+
+                # --- Action failed, update observation immediately with factual outcome ---
+                if actor_id in state.get("simulacra", {}):
+                    state["simulacra"][actor_id]["last_observation"] = final_outcome_desc # Give agent factual failure reason
+                    state["simulacra"][actor_id]["status"] = "idle" # Set back to idle immediately
+                actor_name_for_log = get_nested(state, 'simulacra', actor_id, 'name', default=actor_id) # Fetch name again safely
+                # --- MODIFIED: Use live_display_object.console.print ---
+                # Use final_outcome_desc here
+                resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc}
+                if live_display_object:
+                    live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
                     try:
+                        live_display_object.console.print(json.dumps(resolution_details, indent=2))
+                    except TypeError:
+                        live_display_object.console.print(str(resolution_details))
+                else: # Fallback
+                    console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
+                    try: # Fallback print
                         console.print(json.dumps(resolution_details, indent=2))
                     except TypeError:
                         console.print(str(resolution_details))
-                    # --- (Log is handled by the generic log append above) ---
-                    state.setdefault("narrative_log", []).append(f"[T{current_sim_time:.1f}] {actor_name_for_log}'s action failed: {final_narrative}")
+                # --- (Log is handled by the generic log append above) ---
 
-        except asyncio.CancelledError:
+                # --- Append factual failure to narrative log immediately ---
+                state.setdefault("narrative_log", []).append(f"[T{current_sim_time:.1f}] {actor_name_for_log}'s action failed: {final_outcome_desc}")
+
+        except asyncio.CancelledError: # <<< Added CancelledError handling
             logger.info("[WorldEngineLLM] Task cancelled.")
-            if intent_event and event_bus._unfinished_tasks > 0:
+            if request_event and event_bus._unfinished_tasks > 0:
                 try: event_bus.task_done()
                 except ValueError: pass
             break
@@ -771,11 +1033,13 @@ async def world_engine_task_llm():
                  actor_name_for_log = get_nested(state, 'simulacra', actor_id, 'name', default=actor_id)
                  state.setdefault("narrative_log", []).append(f"[T{state.get('world_time', 0.0):.1f}] {actor_name_for_log}'s action failed unexpectedly: {e}")
                  if actor_id in get_nested(state, "simulacra", default={}):
+                     # Ensure agent is idle and has pending results cleared on unexpected error
                      state["simulacra"][actor_id]["status"] = "idle"
+                     state["simulacra"][actor_id]["pending_results"] = {} # Clear pending results
                      state["simulacra"][actor_id]["last_observation"] = f"Action failed unexpectedly: {e}"
             await asyncio.sleep(5) # Wait before processing next event after error
         finally:
-            if intent_event and event_bus._unfinished_tasks > 0:
+            if request_event and event_bus._unfinished_tasks > 0:
                 try: event_bus.task_done()
                 except ValueError: logger.warning("[WorldEngineLLM] task_done() called too many times.")
                 except Exception as td_e: logger.error(f"[WorldEngineLLM] Error calling task_done(): {td_e}")
@@ -783,6 +1047,7 @@ async def world_engine_task_llm():
 async def simulacra_agent_task_llm(agent_id: str):
     """Represents the thinking and acting loop for a single simulacrum using LLM."""
     global state # Explicitly mention modification
+    global live_display_object # <<< ADDED: Access global live display
     # Access module-level components
     logger.info(f"[{agent_id}] LLM Agent task started.")
 
@@ -831,7 +1096,8 @@ async def simulacra_agent_task_llm(agent_id: str):
                     objects_in_loc_data[obj_id] = {
                         "name": obj_data.get("name", obj_id),
                         "description": obj_data.get("description", ""),
-                        "properties": obj_data.get("properties", [])
+                        "properties": obj_data.get("properties", []),
+                        "interactive": obj_data.get("interactive", False) # Include interactive flag
                     }
             for other_agent_id, other_agent_data in state.get("simulacra", {}).items():
                 if other_agent_id != agent_id and other_agent_data.get("location") == location_id:
@@ -896,18 +1162,34 @@ Based on this state and your goal, follow your instructions (thinking process, o
                    validated_intent = SimulacraIntentResponse.model_validate(raw_data)
                    logger.debug(f"[{agent_name}] LLM response validated successfully.")
 
-                   # --- ADDED: Direct printing ---
-                   console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_time_for_prompt:.1f}s", border_style="dim yellow", expand=False))
-                   intent_dict = {
+                   # --- MODIFIED: Use live_display_object.console.print ---
+                   if live_display_object:
+                       live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_time_for_prompt:.1f}s", border_style="dim yellow", expand=False))
+                       intent_dict = {
+                           "action_type": validated_intent.action_type,
+                           "target_id": validated_intent.target_id,
+                           "details": validated_intent.details
+                       }
+                       live_display_object.console.print(f"\n[bold yellow][{agent_name} Intent @ {current_time_for_prompt:.1f}s][/bold yellow]")
+                       live_display_object.console.print(json.dumps(intent_dict, indent=2))
+                   else: # Fallback if live object not ready
+                       # This fallback might still get overwritten, but it's better than crashing
+                       console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_time_for_prompt:.1f}s", border_style="dim yellow", expand=False))
+                       intent_dict = {
+                           "action_type": validated_intent.action_type,
+                           "target_id": validated_intent.target_id,
+                           "details": validated_intent.details
+                       }
+                       console.print(f"\n[bold yellow][{agent_name} Intent @ {current_time_for_prompt:.1f}s][/bold yellow]")
+                       console.print(json.dumps(intent_dict, indent=2))
+                   # ---
+
+                   # Put intent on the event bus
+                   intent_dict = { # Ensure intent_dict is defined here for the put call
                        "action_type": validated_intent.action_type,
                        "target_id": validated_intent.target_id,
                        "details": validated_intent.details
                    }
-                   console.print(f"\n[bold yellow][{agent_name} Intent @ {current_time_for_prompt:.1f}s][/bold yellow]")
-                   console.print(json.dumps(intent_dict, indent=2))
-                   # --- REMOVED: Log monologue and intent ---
-
-                   # Put intent on the event bus
                    await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": intent_dict})
                    # Update status immediately after putting intent on bus
                    agent_state_sim["status"] = "busy"
@@ -943,17 +1225,22 @@ Based on this state and your goal, follow your instructions (thinking process, o
             try:
                 if agent_id in get_nested(state, "simulacra", default={}):
                     state["simulacra"][agent_id]["status"] = "idle"
+                    state["simulacra"][agent_id]["pending_results"] = {} # Clear pending results on error
                     state["simulacra"][agent_id]["last_observation"] = f"Encountered unexpected error: {e}"
             except Exception as state_err:
                  logger.error(f"[{agent_name}] Failed to update state after error: {state_err}")
             await asyncio.sleep(10) # Wait longer after an error
 
 # --- Main Execution Logic ---
+# ... other code from simulation_async.py ...
+
 async def run_simulation(instance_uuid_arg: Optional[str] = None):
     """Sets up ADK and runs all concurrent tasks."""
     # Declare modification of module-level variables <<< Added adk_memory_service >>>
     global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
     global world_engine_agent, simulacra_agents, state
+    global live_display_object # <<< ADDED: Declare global modification
+    global narration_agent # <<< ADDED
 
     console.rule("[bold green]Starting Async Simulation[/]")
 
@@ -990,9 +1277,25 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
             state_file_path = potential_state_path
             console.print(f"Targeting specified instance state file: {state_file_path}")
         else:
-            logger.error(f"State file not found for specified UUID: {instance_uuid_arg} at {potential_state_path}")
-            console.print(f"[bold red]Error:[/bold red] State file for specified UUID '{instance_uuid_arg}' not found.")
-            sys.exit(1)
+            # --- MODIFICATION START: Create new state if specified UUID not found ---
+            logger.warning(f"State file not found for specified UUID: {instance_uuid_arg} at {potential_state_path}. Creating a new blank state with this UUID.")
+            world_instance_uuid = instance_uuid_arg # Use the specified UUID
+            state_file_path = potential_state_path
+
+            # Create the blank state dictionary using the helper function
+            initial_state = create_blank_simulation_state(world_instance_uuid)
+
+            # Save the new blank state file
+            try:
+                save_json_file(state_file_path, initial_state) # Use save_json_file helper
+                logger.info(f"Successfully created and saved new blank state file: {state_file_path}")
+                loaded_state_data = initial_state # Use the newly created state directly
+                console.print(f"Created new blank state file: {state_file_path}")
+            except Exception as e:
+                logger.error(f"Failed to create or save new state file {state_file_path}: {e}", exc_info=True)
+                console.print(f"[bold red]Error:[/bold red] Failed to create state file '{state_file_path}'. Check logs. Error: {e}")
+                sys.exit(1)
+            # --- MODIFICATION END ---
     else:
         logger.info("No instance UUID specified, attempting to load the latest state file.")
         latest_state_file = find_latest_simulation_state_file(STATE_DIR)
@@ -1008,38 +1311,62 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
                 console.print(f"[bold red]Error:[/bold red] Could not determine UUID from latest state file '{os.path.basename(latest_state_file)}'. Exiting.")
                 sys.exit(1)
         else:
-            logger.error("No instance UUID specified and no existing state files found.")
-            console.print(f"[bold red]Error:[/bold red] No simulation state files found in '{STATE_DIR}'.")
-            console.print("Please run 'setup_simulation.py' first or specify an instance UUID.")
+            # --- MODIFICATION START: Create new state if no UUID specified AND no files found ---
+            logger.warning("No instance UUID specified and no existing state files found. Creating a new blank state.")
+            new_uuid = str(uuid.uuid4()) # Generate a completely new UUID
+            world_instance_uuid = new_uuid
+            state_file_path = os.path.join(STATE_DIR, f"simulation_state_{new_uuid}.json")
+
+            # Create the blank state dictionary
+            initial_state = create_blank_simulation_state(world_instance_uuid)
+
+            # Save the new blank state file
+            try:
+                save_json_file(state_file_path, initial_state) # Use save_json_file helper
+                logger.info(f"Successfully created and saved new blank state file: {state_file_path}")
+                loaded_state_data = initial_state # Use the newly created state directly
+                console.print(f"Created new blank state file: {state_file_path}")
+            except Exception as e:
+                logger.error(f"Failed to create or save new state file {state_file_path}: {e}", exc_info=True)
+                console.print(f"[bold red]Error:[/bold red] Failed to create state file '{state_file_path}'. Check logs. Error: {e}")
+                sys.exit(1)
+            # --- MODIFICATION END ---
+
+    # --- Load Simulation State (if not already loaded from creation) ---
+    if loaded_state_data is None: # Only load if we didn't just create it
+        try:
+            logger.info(f"Attempting to load state file: {state_file_path}")
+            loaded_state_data = load_json_file(state_file_path)
+            if loaded_state_data is None:
+                 raise FileNotFoundError(f"State file found but failed to load content: {state_file_path}")
+
+            uuid_from_state = loaded_state_data.get("world_instance_uuid")
+            if not uuid_from_state:
+                logger.critical(f"State file {state_file_path} is missing 'world_instance_uuid'. Cannot proceed.")
+                console.print(f"[bold red]Error:[/bold red] State file is missing the 'world_instance_uuid' key.")
+                sys.exit(1)
+            if uuid_from_state != world_instance_uuid:
+                logger.critical(f"UUID mismatch! Filename/Arg suggested '{world_instance_uuid}', but state file contains '{uuid_from_state}'.")
+                console.print(f"[bold red]Error:[/bold red] UUID mismatch between state file content ('{uuid_from_state}') and expected UUID ('{world_instance_uuid}').")
+                sys.exit(1)
+
+            logger.info(f"Successfully loaded and verified simulation state for UUID: {world_instance_uuid}")
+            console.print(f"State File Loaded: {state_file_path}")
+            # state = loaded_state_data # Assign loaded data to module-level state (done below)
+
+        except Exception as e:
+            logger.critical(f"Failed to load simulation instance state from {state_file_path}: {e}", exc_info=True)
+            console.print(f"[bold red]Error:[/bold red] Failed to load simulation state file '{state_file_path}'. Check logs. Error: {e}")
             sys.exit(1)
 
-    # --- Load Simulation State ---
-    try:
-        logger.info(f"Attempting to load state file: {state_file_path}")
-        loaded_state_data = load_json_file(state_file_path)
-        if loaded_state_data is None:
-             raise FileNotFoundError(f"State file found but failed to load content: {state_file_path}")
-
-        uuid_from_state = loaded_state_data.get("world_instance_uuid")
-        if not uuid_from_state:
-            logger.critical(f"State file {state_file_path} is missing 'world_instance_uuid'. Cannot proceed.")
-            console.print(f"[bold red]Error:[/bold red] State file is missing the 'world_instance_uuid' key.")
-            sys.exit(1)
-        if uuid_from_state != world_instance_uuid:
-            logger.critical(f"UUID mismatch! Filename/Arg suggested '{world_instance_uuid}', but state file contains '{uuid_from_state}'.")
-            console.print(f"[bold red]Error:[/bold red] UUID mismatch between state file content ('{uuid_from_state}') and expected UUID ('{world_instance_uuid}').")
-            sys.exit(1)
-
-        logger.info(f"Successfully loaded and verified simulation state for UUID: {world_instance_uuid}")
-        console.print(f"State File Loaded: {state_file_path}")
-        state = loaded_state_data # Assign loaded data to module-level state
-
-    except Exception as e:
-        logger.critical(f"Failed to load simulation instance state from {state_file_path}: {e}", exc_info=True)
-        console.print(f"[bold red]Error:[/bold red] Failed to load simulation state file '{state_file_path}'. Check logs. Error: {e}")
+    # --- Assign to global state and ensure structure ---
+    if loaded_state_data is None:
+        logger.critical("Failed to load or create simulation state. Cannot proceed.")
+        console.print("[bold red]Error:[/bold red] Could not obtain simulation state.")
         sys.exit(1)
 
-    # --- Ensure State Structure ---
+    state = loaded_state_data # Assign loaded or created data to module-level state
+
     logger.info("Ensuring essential state structure...")
     state_modified = ensure_state_structure(state) # Pass module-level state
     if state_modified:
@@ -1147,34 +1474,6 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
                 state.setdefault(SIMULACRA_PROFILES_KEY, {}).setdefault(sim_id, {})[HOME_LOCATION_KEY] = final_home_location
                 state_modified_during_init = True
 
-
-
-            # --- ADDED: Add Persona/Life Summary to Memory Service ---
-            # if adk_memory_service: # Check if memory service is initialized
-            #     try:
-            #         # Format persona data into a single string for memory
-            #         persona_text = f"My Background ({persona.get('Name', sim_id)}):\n"
-            #         persona_text += json.dumps(persona, indent=2, default=str) # Convert dict to string
-
-            #         # Create a dummy session and event for this agent's memory
-            #         memory_session_id = f"memory_init_{sim_id}"
-            #         memory_user_id = sim_id # Use sim_id as user_id for memory scoping
-            #         memory_event = genai_types.Content(parts=[genai_types.Part(text=persona_text)], role="model") # Use 'model' role as if system provided it
-            #         dummy_session = Session(
-            #             app_name=APP_NAME,
-            #             user_id=memory_user_id,
-            #             id=memory_session_id,
-            #             events=[memory_event] # Initialize session with the event
-            #         )
-            #         # Add the dummy session to memory
-            #         adk_memory_service.add_session_to_memory(dummy_session)
-            #         logger.info(f"Added persona/life summary for {sim_id} to Memory Service.")
-
-            #     except Exception as mem_add_e:
-            #         logger.error(f"Failed to add persona for {sim_id} to Memory Service: {mem_add_e}", exc_info=True)
-            # else:
-            #      logger.warning("Memory Service not initialized, cannot add persona to memory.")
-            # --- END ADDED ---
             # --- MODIFIED: Conditional Initial Observation Injection ---
             loaded_last_observation = profile.get("last_observation", "Just arrived.")
             default_observation = "Just arrived."
@@ -1201,7 +1500,8 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
                 "current_action_end_time": state.get('world_time', 0.0), # Initialize based on current time
                 "goal": profile.get("goal", persona.get("Initial_Goal", "Determine your own long term goals.")),
                 "last_observation": final_last_observation, # Use the determined observation
-                "memory_log": profile.get("memory_log", []) # Load existing memory log
+                "memory_log": profile.get("memory_log", []), # Load existing memory log
+                "pending_results": {} # Initialize pending results store
             }
             final_active_sim_ids.append(sim_id)
             logger.info(f"Populated runtime state for simulacrum: {sim_id}")
@@ -1241,6 +1541,9 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     world_engine_agent = create_world_engine_llm_agent()
     logger.info(f"World Engine Agent '{world_engine_agent.name}' created.")
 
+    narration_agent = create_narration_llm_agent() # <<< ADDED
+    logger.info(f"Narration Agent '{narration_agent.name}' created.")
+
     simulacra_agents = {} # Clear just in case
     for sim_id in final_active_sim_ids:
         sim_state_data = state.get("simulacra", {}).get(sim_id, {})
@@ -1266,9 +1569,12 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     try:
         # --- Revert Live initialization ---
         with Live(generate_table(), console=console, refresh_per_second=1.0/UPDATE_INTERVAL, vertical_overflow="visible") as live:
+            live_display_object = live # <<< ADDED: Assign to global variable
             # Pass the live display object to the time manager
             tasks.append(asyncio.create_task(time_manager_task(live_display=live), name="TimeManager"))
-            tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
+            tasks.append(asyncio.create_task(interaction_dispatcher_task(), name="InteractionDispatcher"))
+            tasks.append(asyncio.create_task(narration_task(), name="NarrationTask")) # Listens to narration_queue
+            tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine")) # Listens to event_bus
 
             for sim_id in final_active_sim_ids:
                 tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id), name=f"Simulacra_{sim_id}"))
@@ -1344,5 +1650,3 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
             console.print("[yellow]State dictionary is empty.[/yellow]")
 
         console.rule("[bold green]Simulation Shutdown Complete[/]")
-
-# Note: The entry point (__main__) is now in main_async.py

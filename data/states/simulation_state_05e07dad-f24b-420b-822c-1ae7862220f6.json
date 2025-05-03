@@ -1,11 +1,36 @@
 {
   "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6",
-  "location_details": {},
-  "objects": {},
-  "active_simulacra_ids": [
-    "sim_662862"
-  ],
-  "world_time": 99.46399999999473,
+  "location_details": {
+    "At home": {
+      "name": "At home",
+      "description": "You are at home. It's a cozy place with familiar surroundings. There's a door leading out.",
+      "objects_present": ["light_switch_home_1"],
+      "connected_locations": [
+        {
+          "direction": "out the door",
+          "location_id": "Hallway"
+        }
+      ]
+    },
+    "Hallway": {
+      "name": "Hallway",
+      "description": "A narrow hallway outside your home. Another door leads back inside.",
+      "objects_present": [],
+      "connected_locations": [
+        {
+          "direction": "back inside",
+          "location_id": "At home"
+        }
+      ]
+    }
+  },
+  "objects": {
+    "wall_clue_1": {
+      "revealed_message": "DO NOT TRUST THE DOCTOR"
+    }
+  },
+  "active_simulacra_ids": ["sim_662862"],
+  "world_time": 162.49980000001597,
   "narrative_log": [],
   "simulacra": {
     "sim_662862": {
@@ -51,18 +76,19 @@
       },
       "location": "At home",
       "home_location": "At home",
-      "status": "idle",
-      "current_action_end_time": 99.46399999999473,
+      "status": "busy",
+      "current_action_end_time": 165.5686000000118,
       "goal": "Determine your own long term goals.",
       "last_observation": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside.",
-      "memory_log": []
+      "memory_log": [],
+      "pending_results": {}
     }
   },
   "current_world_state": {
     "location_details": {
       "At home": {
         "name": "At home",
-        "description": "You are at home. It's a cozy place with familiar surroundings.",
+        "description": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside.",
         "objects_present": [],
         "connected_locations": []
       }
@@ -113,7 +139,19 @@
         "Past_Traumas": null
       },
       "current_location": "At home",
-      "home_location": "At home"
+      "home_location": "At home",
+      "last_observation": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside."
+    }
+  },
+  "npcs": {},
+  "location": {
+    "Location_912": {
+      "objects": {
+        "wall_clue_1": {
+          "description": "A faint message scratched into the wall beneath the peeling wallpaper.",
+          "revealable": true
+        }
+      }
     }
   }
 }
