@@ -8,14 +8,7 @@ import string # Added for sim_id generation
 from datetime import datetime
 from typing import Optional # Added for type hinting
 
-# --- Import the generator function ---
-# Ensure this path is correct relative to your project structure
-try:
-    from src.generation.life_generator import generate_new_simulacra_background
-except ImportError:
-    print("ERROR: Could not import 'generate_new_simulacra_background'.")
-    print("Ensure 'src/generation/life_generator.py' exists and is importable.")
-    generate_new_simulacra_background = None # Set to None to prevent runtime errors later
+from src.generation.life_generator import generate_new_simulacra_background
 
 # --- Rich Console ---
 from rich.console import Console
@@ -300,4 +293,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"A critical error occurred during setup: {e}", exc_info=True)
         console.print(f"\n[bold red]A critical error occurred:[/bold red] {e}")
-

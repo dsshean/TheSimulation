@@ -1,6 +1,7 @@
 # src/simulation_async.py - Core Simulation Logic
 
 import asyncio
+import glob
 import heapq
 import json
 import logging
@@ -11,35 +12,32 @@ import string  # For default sim_id generation if needed
 import sys
 import time
 import uuid
-import glob
-# from collections import deque  # <<< REMOVED
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai  # For direct API config
-# --- ADK Imports ---
 from google.adk.agents import LlmAgent
-from google.adk.memory import InMemoryMemoryService # <<< Added MemoryService
+from google.adk.memory import InMemoryMemoryService  # <<< Added MemoryService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
-from google.adk.tools import load_memory, FunctionTool
+from google.adk.tools import FunctionTool, load_memory
 from google.genai import types as genai_types  # Renamed to avoid conflict
-# --- Pydantic Validation ---
 from pydantic import (BaseModel, Field, ValidationError, ValidationInfo,
                       field_validator)
-# --- Rich Imports ---
 from rich.console import Console
-# from rich.layout import Layout  # REMOVED
 from rich.live import Live
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text  # Keep Text for potential use in direct prints
+
 console = Console()
 
-from src.loop_utils import (load_or_initialize_simulation, save_json_file, get_nested,
-                         load_json_file)
+from src.loop_utils import (get_nested, load_json_file,
+                            load_or_initialize_simulation,
+                            save_json_file)
+from src.state_loader import parse_location_string 
 
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
 
@@ -105,17 +103,6 @@ LOCATION_KEY = "location"
 DEFAULT_HOME_LOCATION_NAME = "At home"
 DEFAULT_HOME_DESCRIPTION = "You are at home. It's a cozy place with familiar surroundings."
 
-# --- REMOVED Initialization Functions (Moved to loop_utils.py) ---
-# create_blank_simulation_state
-# load_json_file
-# save_json_file
-# find_latest_simulation_state_file
-# ensure_state_structure
-
-# --- Helper Functions (Integrated from main_async2.py) ---
-
-# get_nested is now imported from loop_utils
-
 def _update_state_value(target_state: Dict[str, Any], key_path: str, value: Any):
     """Safely updates a nested value in the state dictionary."""
     try:
@@ -144,7 +131,6 @@ def _update_state_value(target_state: Dict[str, Any], key_path: str, value: Any)
         return False
 
 # --- Pydantic Models (Integrated from main_async2.py) ---
-
 class WorldEngineResponse(BaseModel):
     valid_action: bool
     duration: float = Field(ge=0.0)
@@ -175,7 +161,6 @@ class SimulacraIntentResponse(BaseModel):
     details: str = ""
 
 # --- Agent Definitions (Integrated from main_async2.py) ---
-
 def create_simulacra_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
     """Creates the LLM agent representing the character."""
     agent_name = f"SimulacraLLM_{sim_id}"
@@ -225,7 +210,7 @@ Your goal is to make believable, engaging choices based on your personality, sit
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
-        tools=[load_memory], # <<< Added load_memory tool
+        tools=[load_memory],
         instruction=instruction,
         description=f"LLM Simulacra agent for {persona_name}."
     )
@@ -342,10 +327,6 @@ You are the Narrator for **TheSimulation**. Your role is to weave the factual ou
         description="LLM Narrator: Generates stylized narrative based on factual action outcomes and world mood."
     )
 
-# --- Task Functions (Integrated from main_async2.py) ---
-# These functions now rely on module-level variables like `state`, `schedule`, `event_bus`,
-# `adk_runner`, `adk_session`, `world_engine_agent`, `simulacra_agents`.
-
 def generate_table() -> Table:
     """Generates the Rich table for live display based on the module-level state."""
     # Access module-level state directly
@@ -407,9 +388,6 @@ def generate_table() -> Table:
     log_display = "\n".join(get_nested(state, 'narrative_log', default=[])[-6:])
     table.add_row("Narrative Log", log_display)
     return table
-
-# --- Function to Generate Output Panel ---
-# <<< REMOVED generate_output_panel function >>>
 
 async def time_manager_task(live_display: Live):
     """Advances time, applies completed action effects, and updates display."""
@@ -607,7 +585,6 @@ Generate the narrative paragraph based on these details and your instructions.
                     logger.error(f"NarrationLLM Error: {event_llm.error_message}")
                     narrative_text = f"[{actor_name}'s action resulted in: {outcome_desc}]" # Fallback narrative
 
-            # --- ADDED: Post-process the narrative text ---
             cleaned_narrative_text = narrative_text
             if narrative_text:
                 # Attempt to find the actual narrative after the "Input: ..." block
@@ -622,18 +599,10 @@ Generate the narrative paragraph based on these details and your instructions.
                 # Replace internal agent name placeholder with actual name
                 internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
                 cleaned_narrative_text = cleaned_narrative_text.replace(internal_agent_name_placeholder, actor_name)
-            # --- END Post-processing ---
-
-            # --- ADDED: Print the generated narrative to the console ---
-            # <<< MODIFIED: Use cleaned_narrative_text >>>
             if cleaned_narrative_text and live_display_object:
                 live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
             elif cleaned_narrative_text: # Fallback if live object not ready
                 console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
-            # ---
-
-            # --- Update State ---
-            # <<< MODIFIED: Use cleaned_narrative_text >>>
             final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
             state.setdefault("narrative_log", []).append(final_narrative_entry)
             if actor_id in state.get("simulacra", {}):
@@ -815,10 +784,6 @@ Resolve this intent based on your instructions and the provided context.
             else:
                 if not outcome_description.startswith("Action failed due to LLM error"):
                     outcome_description = "Action failed: No response from World Engine LLM."
-
-            # --- REMOVED: Log LLM resolution (valid or invalid) ---
-            # output_log.append({ ... })
-            # ---
 
             if validated_data and validated_data.valid_action:
                 completion_time = current_sim_time + validated_data.duration
@@ -1083,7 +1048,11 @@ Based on this state and your goal, follow your instructions (thinking process, o
 # --- Main Execution Logic ---
 # ... other code from simulation_async.py ...
 
-async def run_simulation(instance_uuid_arg: Optional[str] = None):
+async def run_simulation(
+    instance_uuid_arg: Optional[str] = None,
+    location_override_arg: Optional[str] = None, # <-- Added
+    mood_override_arg: Optional[str] = None      # <-- Added
+    ):
     """Sets up ADK and runs all concurrent tasks."""
     # Declare modification of module-level variables <<< Added adk_memory_service >>>
     global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
@@ -1116,9 +1085,6 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     # --- Load State using function from loop_utils ---
     loaded_state_data, state_file_path = load_or_initialize_simulation(instance_uuid_arg)
 
-    # --- REMOVED: Redundant logic block for determining UUID and state file path ---
-    # --- REMOVED: Redundant logic block for loading state file ---
-
     # --- Check if loading succeeded and assign to global state ---
     if loaded_state_data is None:
         logger.critical("Failed to load or create simulation state. Cannot proceed.")
@@ -1127,8 +1093,38 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     state = loaded_state_data # Assign loaded or created data to module-level state
 
     # Structure is ensured within load_or_initialize_simulation
-    # --- REMOVED: Logic block for ensuring structure (now handled in loop_utils) ---
     world_instance_uuid = state.get("world_instance_uuid") # Get UUID from loaded state
+
+    if location_override_arg:
+        try:
+            logger.info(f"Applying location override: '{location_override_arg}'")
+            parsed_override_loc = parse_location_string(location_override_arg)
+            # Update the location within the world template details
+            state.setdefault(WORLD_TEMPLATE_DETAILS_KEY, {}).setdefault(LOCATION_KEY, {})
+            state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]['city'] = parsed_override_loc.get('city')
+            state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]['state'] = parsed_override_loc.get('state')
+            state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]['country'] = parsed_override_loc.get('country')
+            logger.info(f"World location overridden in template details: {state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]}")
+            console.print(f"Location overridden to: [yellow]{location_override_arg}[/yellow]")
+        except Exception as e:
+            logger.error(f"Failed to apply location override: {e}", exc_info=True)
+            console.print(f"[red]Error applying location override: {e}[/red]")
+
+    if mood_override_arg:
+        try:
+            mood_override = mood_override_arg.strip().lower()
+            logger.info(f"Applying initial mood override '{mood_override}' to all simulacra.")
+            applied_count = 0
+            # Iterate through active IDs and update the runtime state
+            for sim_id in state.get(ACTIVE_SIMULACRA_IDS_KEY, []):
+                if sim_id in state.get("simulacra", {}):
+                    state["simulacra"][sim_id]["current_mood"] = mood_override
+                    applied_count += 1
+            logger.info(f"Applied mood override to {applied_count} simulacra runtime states.")
+            console.print(f"Initial mood for all {applied_count} simulacra set to: [yellow]{mood_override}[/yellow]")
+        except Exception as e:
+            logger.error(f"Failed to apply mood override: {e}", exc_info=True)
+            console.print(f"[red]Error applying mood override: {e}[/red]")
 
     # --- Verify Simulacra & Populate Runtime State ---
     console.rule("[cyan]Verifying Simulacra & Populating Runtime State[/cyan]")

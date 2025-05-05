@@ -11,7 +11,11 @@ load_dotenv()
 from rich.console import Console
 console = Console()
 # Ensure src directory is in Python path or use relative import if appropriate
-from src.simulation_async import run_simulation, APP_NAME # Import APP_NAME too
+try:
+    from src.simulation_async import run_simulation, APP_NAME # Import APP_NAME too
+except ImportError as e:
+    print(f"ERROR: Could not import from src.simulation_async: {e}")
+    sys.exit(1)
 
 # --- Logging Setup ---
 # Keep basic logging setup here at the entry point
@@ -20,7 +24,7 @@ logging.basicConfig(
     level=logging.DEBUG, # Set to DEBUG to capture all logs
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     filename=log_filename,
-    filemode='w'
+    filemode='w' # Overwrite log file on each run
 )
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING) # Show warnings and above on console
@@ -39,20 +43,39 @@ if __name__ == "__main__":
         help="Specify the UUID of the simulation instance to load. If omitted, the latest instance is loaded.",
         default=None
     )
+    # --- ADDED: Override Arguments ---
+    parser.add_argument(
+        "--override-location", type=str,
+        help="Override the primary location (e.g., 'London, UK', 'Mars Colony 7').",
+        default=None
+    )
+    parser.add_argument(
+        "--override-mood", type=str,
+        help="Override the initial mood for ALL simulacra (e.g., 'happy', 'anxious').",
+        default=None
+    )
+    # --- END ADDED ---
     args = parser.parse_args()
 
     try:
         if sys.platform == "win32":
              # This policy might be needed on Windows for Rich Live display
              asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        asyncio.run(run_simulation(instance_uuid_arg=args.instance_uuid))
+        # --- MODIFIED: Pass override arguments to run_simulation ---
+        asyncio.run(run_simulation(
+            instance_uuid_arg=args.instance_uuid,
+            location_override_arg=args.override_location,
+            mood_override_arg=args.override_mood
+        ))
+        # --- END MODIFIED ---
     except KeyboardInterrupt:
         logger.warning("Simulation interrupted by user.")
         console.print("\n[orange_red1]Simulation interrupted.[/]")
     except Exception as e:
         logger.critical(f"An unexpected error occurred in main execution block: {e}", exc_info=True)
         console.print(f"[bold red]An unexpected error occurred:[/bold red]")
-        console.print_exception(show_locals=False)
+        console.print_exception(show_locals=False) # Show traceback using Rich
     finally:
-        logging.shutdown()
+        logging.shutdown() # Ensure logs are flushed
         console.print("Application finished.")
+

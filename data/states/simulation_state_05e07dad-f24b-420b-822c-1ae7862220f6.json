@@ -12,8 +12,11 @@
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
-  "world_time": 0.0,
-  "narrative_log": [],
+  "world_time": 3.295299999997946,
+  "narrative_log": [
+    "[T2.2] Eleanor's gaze sweeps across the room, taking in every detail. It's a slow, deliberate assessment, a habit ingrained from years of navigating treacherous social landscapes.",
+    "[T5.3] Eleanor's gaze sweeps across the room, taking in every detail. It's a slow, deliberate assessment, a habit ingrained from years of navigating treacherous social landscapes. Now, she delves inward, a familiar furrow deepening between her brows as she attempts to untangle the threads of her recent past, searching for the goal that has brought her to this place."
+  ],
   "simulacra": {
     "sim_3e912d": {
       "id": "sim_3e912d",
@@ -58,10 +61,10 @@
       },
       "location": "Asheville",
       "home_location": "Asheville",
-      "status": "idle",
-      "current_action_end_time": 0.0,
+      "status": "busy",
+      "current_action_end_time": 5.332799999997952,
       "goal": "Determine long term goals.",
-      "last_observation": "You find yourself in Asheville.",
+      "last_observation": "Eleanor's gaze sweeps across the room, taking in every detail. It's a slow, deliberate assessment, a habit ingrained from years of navigating treacherous social landscapes. Now, she delves inward, a familiar furrow deepening between her brows as she attempts to untangle the threads of her recent past, searching for the goal that has brought her to this place.",
       "memory_log": [],
       "pending_results": {}
     }
