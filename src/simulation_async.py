@@ -1,7 +1,6 @@
 # src/simulation_async.py - Core Simulation Logic
 
 import asyncio
-import glob
 import heapq
 import json
 import logging
@@ -12,6 +11,7 @@ import string  # For default sim_id generation if needed
 import sys
 import time
 import uuid
+import glob
 # from collections import deque  # <<< REMOVED
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -38,10 +38,11 @@ from rich.table import Table
 from rich.text import Text  # Keep Text for potential use in direct prints
 console = Console()
 
-# --- Logging Setup (from main_async.py, adjusted) ---
+from src.loop_utils import (load_or_initialize_simulation, save_json_file, get_nested,
+                         load_json_file)
+
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
 
-# --- Configuration (Directly in script or from .env) ---
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -63,14 +64,14 @@ MAX_MEMORY_LOG_ENTRIES = 500 # Max total memories stored per agent
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # Project Root
-STATE_DIR = os.path.join(BASE_DIR, "data", "states")
-LIFE_SUMMARY_DIR = os.path.join(BASE_DIR, "data", "life_summaries")
-WORLD_CONFIG_DIR = os.path.join(BASE_DIR, "data")
+# STATE_DIR, LIFE_SUMMARY_DIR, WORLD_CONFIG_DIR are now primarily used in loop_utils
+STATE_DIR = os.path.join(BASE_DIR, "data", "states") # Keep for final save path construction
+LIFE_SUMMARY_DIR = os.path.join(BASE_DIR, "data", "life_summaries") # Keep for verification logic
 
 # Ensure directories exist (redundant with main_async.py but safe)
-os.makedirs(STATE_DIR, exist_ok=True)
+# os.makedirs(STATE_DIR, exist_ok=True) # Handled in loop_utils
 os.makedirs(LIFE_SUMMARY_DIR, exist_ok=True)
-os.makedirs(WORLD_CONFIG_DIR, exist_ok=True)
+# os.makedirs(WORLD_CONFIG_DIR, exist_ok=True) # Handled in loop_utils
 
 # --- Core Components (Module Scope) ---
 event_bus = asyncio.Queue() # For intent -> dispatcher -> world engine
@@ -92,10 +93,11 @@ narration_agent: Optional[LlmAgent] = None
 simulacra_agents: Dict[str, LlmAgent] = {}
 
 # --- State Keys ---
-WORLD_STATE_KEY = "current_world_state"
-ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
-LOCATION_DETAILS_KEY = "location_details"
-SIMULACRA_PROFILES_KEY = "simulacra_profiles"
+# Moved state keys to loop_utils where loading happens
+WORLD_STATE_KEY = "current_world_state" # Keep for runtime access
+ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids" # Keep for runtime access
+LOCATION_DETAILS_KEY = "location_details" # Keep for runtime access
+SIMULACRA_PROFILES_KEY = "simulacra_profiles" # Keep for runtime access
 CURRENT_LOCATION_KEY = "current_location"
 HOME_LOCATION_KEY = "home_location"
 WORLD_TEMPLATE_DETAILS_KEY = "world_template_details"
@@ -103,169 +105,16 @@ LOCATION_KEY = "location"
 DEFAULT_HOME_LOCATION_NAME = "At home"
 DEFAULT_HOME_DESCRIPTION = "You are at home. It's a cozy place with familiar surroundings."
 
-def create_blank_simulation_state(new_uuid: str) -> Dict[str, Any]:
-    """Creates a dictionary representing a minimal blank simulation state."""
-    logger.info(f"Generating blank state structure for new UUID: {new_uuid}")
-    return {
-      "world_instance_uuid": new_uuid,
-      "location_details": {
-        "limbo": {
-          "name": "Limbo",
-          "description": "An empty, featureless starting point.",
-          "objects_present": [],
-          "connected_locations": []
-        }
-      },
-      "objects": {},
-      "active_simulacra_ids": [],
-      "world_time": 0.0,
-      "narrative_log": [],
-      "simulacra": {},
-      "npcs": {},
-      "current_world_state": {
-        "location_details": {
-           "limbo": {
-              "name": "Limbo",
-              "description": "An empty, featureless starting point.",
-              "objects_present": [],
-              "connected_locations": []
-           }
-        }
-      },
-      "world_template_details": {
-        "description": "Initial Blank State",
-        "rules": {}
-      },
-      "simulacra_profiles": {}
-    }
-# --- Initialization Functions (Integrated from main_async2.py) ---
-
-def load_json_file(path: str, default: Optional[Any] = None) -> Optional[Any]:
-    """Loads JSON from a file, returning default if file not found or invalid."""
-    if not os.path.exists(path):
-        logger.debug(f"File not found: {path}. Returning default.")
-        return default
-    try:
-        with open(path, "r", encoding='utf-8') as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        logger.error(f"Error decoding JSON from file: {path}. Returning default.")
-        return default
-    except Exception as e:
-        logger.error(f"Error loading file {path}: {e}. Returning default.")
-        return default
-
-def save_json_file(path: str, data: Any):
-    """Saves data to a JSON file, creating directories if needed."""
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
-        logger.info(f"Saved data to {path}")
-    except Exception as e:
-        logger.error(f"Error saving file {path}: {e}")
-        raise
-
-def find_latest_simulation_state_file(state_dir: str = STATE_DIR) -> Optional[str]:
-    """Finds the most recently modified simulation state file."""
-    try:
-        os.makedirs(state_dir, exist_ok=True)
-        state_file_pattern = os.path.join(state_dir, "simulation_state_*.json")
-        list_of_files = glob.glob(state_file_pattern)
-        if not list_of_files:
-            logger.info(f"No existing simulation state files found in {state_dir}.")
-            return None
-        latest_file = max(list_of_files, key=os.path.getmtime)
-        logger.info(f"Found latest simulation state file: {latest_file}")
-        return latest_file
-    except Exception as e:
-        logger.error(f"Error finding latest state file in {state_dir}: {e}")
-        return None
-
-def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
-    """Checks and adds missing essential keys/structures to a state dictionary."""
-    modified = False
-    if not isinstance(state_dict, dict): return False
-
-    if ACTIVE_SIMULACRA_IDS_KEY not in state_dict:
-        state_dict[ACTIVE_SIMULACRA_IDS_KEY] = []
-        logger.warning(f"Added missing '{ACTIVE_SIMULACRA_IDS_KEY}' key.")
-        modified = True
-
-    if WORLD_STATE_KEY not in state_dict:
-        state_dict[WORLD_STATE_KEY] = {}
-        logger.warning(f"Added missing '{WORLD_STATE_KEY}' key structure.")
-        modified = True
-
-    world_state_dict = state_dict.get(WORLD_STATE_KEY, {})
-    if not isinstance(world_state_dict, dict):
-        state_dict[WORLD_STATE_KEY] = {}
-        world_state_dict = state_dict[WORLD_STATE_KEY]
-        modified = True
-
-    if LOCATION_DETAILS_KEY not in world_state_dict:
-        world_state_dict[LOCATION_DETAILS_KEY] = {}
-        logger.warning(f"Added missing '{LOCATION_DETAILS_KEY}' key to '{WORLD_STATE_KEY}'.")
-        modified = True
-
-    if SIMULACRA_PROFILES_KEY not in state_dict:
-        state_dict[SIMULACRA_PROFILES_KEY] = {}
-        logger.warning(f"Added missing '{SIMULACRA_PROFILES_KEY}' key.")
-        modified = True
-
-    if "narrative_log" not in state_dict:
-        state_dict["narrative_log"] = []
-        logger.warning("Added missing 'narrative_log' key.")
-        modified = True
-    elif not isinstance(state_dict["narrative_log"], list):
-        state_dict["narrative_log"] = []
-        logger.warning("Corrected 'narrative_log' key to be a list.")
-        modified = True
-
-    if "objects" not in state_dict:
-        state_dict["objects"] = {}
-        logger.warning("Added missing 'objects' key.")
-        modified = True
-    elif not isinstance(state_dict["objects"], dict):
-        state_dict["objects"] = {}
-        logger.warning("Corrected 'objects' key to be a dict.")
-        modified = True
-
-    if WORLD_TEMPLATE_DETAILS_KEY not in state_dict:
-        state_dict[WORLD_TEMPLATE_DETAILS_KEY] = {"description": "Default", "rules": {}}
-        logger.warning(f"Added missing '{WORLD_TEMPLATE_DETAILS_KEY}' key.")
-        modified = True
-    elif not isinstance(state_dict[WORLD_TEMPLATE_DETAILS_KEY], dict):
-        state_dict[WORLD_TEMPLATE_DETAILS_KEY] = {"description": "Default", "rules": {}}
-        logger.warning(f"Corrected '{WORLD_TEMPLATE_DETAILS_KEY}' key to be a dict.")
-        modified = True
-
-    # Ensure 'simulacra' state section exists
-    if "simulacra" not in state_dict:
-        state_dict["simulacra"] = {}
-        logger.warning("Added missing 'simulacra' key.")
-        modified = True
-    elif not isinstance(state_dict["simulacra"], dict):
-        state_dict["simulacra"] = {}
-        logger.warning("Corrected 'simulacra' key to be a dict.")
-        modified = True
-
-    return modified
+# --- REMOVED Initialization Functions (Moved to loop_utils.py) ---
+# create_blank_simulation_state
+# load_json_file
+# save_json_file
+# find_latest_simulation_state_file
+# ensure_state_structure
 
 # --- Helper Functions (Integrated from main_async2.py) ---
 
-def get_nested(data: Dict, *keys: str, default: Any = None) -> Any:
-    """Safely retrieve nested dictionary values."""
-    current = data
-    for key in keys:
-        if isinstance(current, dict):
-            current = current.get(key)
-        elif isinstance(current, list) and isinstance(key, int):
-            try:
-                current = current[key]
-            except IndexError: return default
-        else: return default
-    return current if current is not None else default
+# get_nested is now imported from loop_utils
 
 def _update_state_value(target_state: Dict[str, Any], key_path: str, value: Any):
     """Safely updates a nested value in the state dictionary."""
@@ -579,7 +428,7 @@ async def time_manager_task(live_display: Live):
             state["world_time"] = new_sim_time
 
             # --- Process Action Completions Based on Time ---
-            for agent_id, agent_state in state.get("simulacra", {}).items():
+            for agent_id, agent_state in list(state.get("simulacra", {}).items()):
                 if agent_state.get("status") == "busy":
                     action_end_time = agent_state.get("current_action_end_time", -1.0)
                     if action_end_time <= new_sim_time:
@@ -709,7 +558,7 @@ async def narration_task():
                 continue
 
             actor_name = get_nested(state, "simulacra", actor_id, "name", default=actor_id)
-            world_mood = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='neutral_descriptive')
+            world_mood = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='Slice of Life')
             # --- MODIFIED: Clean the recent narrative history for the prompt ---
 
             def clean_history_entry(entry: str) -> str:
@@ -1264,119 +1113,22 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     console.print(Panel(f"[[bold yellow]{APP_NAME}[/]] - Initializing Simulation State...", title="Startup", border_style="blue"))
     logger.info("Starting simulation initialization.")
 
-    world_instance_uuid: Optional[str] = None
-    state_file_path: Optional[str] = None
-    loaded_state_data: Optional[Dict[str, Any]] = None
+    # --- Load State using function from loop_utils ---
+    loaded_state_data, state_file_path = load_or_initialize_simulation(instance_uuid_arg)
 
-    # --- Determine Instance UUID and State File Path ---
-    if instance_uuid_arg:
-        logger.info(f"Attempting to load specified instance UUID: {instance_uuid_arg}")
-        potential_state_path = os.path.join(STATE_DIR, f"simulation_state_{instance_uuid_arg}.json")
-        if os.path.exists(potential_state_path):
-            world_instance_uuid = instance_uuid_arg
-            state_file_path = potential_state_path
-            console.print(f"Targeting specified instance state file: {state_file_path}")
-        else:
-            # --- MODIFICATION START: Create new state if specified UUID not found ---
-            logger.warning(f"State file not found for specified UUID: {instance_uuid_arg} at {potential_state_path}. Creating a new blank state with this UUID.")
-            world_instance_uuid = instance_uuid_arg # Use the specified UUID
-            state_file_path = potential_state_path
+    # --- REMOVED: Redundant logic block for determining UUID and state file path ---
+    # --- REMOVED: Redundant logic block for loading state file ---
 
-            # Create the blank state dictionary using the helper function
-            initial_state = create_blank_simulation_state(world_instance_uuid)
-
-            # Save the new blank state file
-            try:
-                save_json_file(state_file_path, initial_state) # Use save_json_file helper
-                logger.info(f"Successfully created and saved new blank state file: {state_file_path}")
-                loaded_state_data = initial_state # Use the newly created state directly
-                console.print(f"Created new blank state file: {state_file_path}")
-            except Exception as e:
-                logger.error(f"Failed to create or save new state file {state_file_path}: {e}", exc_info=True)
-                console.print(f"[bold red]Error:[/bold red] Failed to create state file '{state_file_path}'. Check logs. Error: {e}")
-                sys.exit(1)
-            # --- MODIFICATION END ---
-    else:
-        logger.info("No instance UUID specified, attempting to load the latest state file.")
-        latest_state_file = find_latest_simulation_state_file(STATE_DIR)
-        if latest_state_file:
-            state_file_path = latest_state_file
-            match = re.search(r"simulation_state_([a-f0-9\-]+)\.json", os.path.basename(latest_state_file))
-            if match:
-                world_instance_uuid = match.group(1)
-                logger.info(f"Found latest state file: {latest_state_file} (UUID from filename: {world_instance_uuid})")
-                console.print(f"Loading latest instance state file: {state_file_path}")
-            else:
-                logger.error(f"Could not extract UUID from latest state file name: {latest_state_file}")
-                console.print(f"[bold red]Error:[/bold red] Could not determine UUID from latest state file '{os.path.basename(latest_state_file)}'. Exiting.")
-                sys.exit(1)
-        else:
-            # --- MODIFICATION START: Create new state if no UUID specified AND no files found ---
-            logger.warning("No instance UUID specified and no existing state files found. Creating a new blank state.")
-            new_uuid = str(uuid.uuid4()) # Generate a completely new UUID
-            world_instance_uuid = new_uuid
-            state_file_path = os.path.join(STATE_DIR, f"simulation_state_{new_uuid}.json")
-
-            # Create the blank state dictionary
-            initial_state = create_blank_simulation_state(world_instance_uuid)
-
-            # Save the new blank state file
-            try:
-                save_json_file(state_file_path, initial_state) # Use save_json_file helper
-                logger.info(f"Successfully created and saved new blank state file: {state_file_path}")
-                loaded_state_data = initial_state # Use the newly created state directly
-                console.print(f"Created new blank state file: {state_file_path}")
-            except Exception as e:
-                logger.error(f"Failed to create or save new state file {state_file_path}: {e}", exc_info=True)
-                console.print(f"[bold red]Error:[/bold red] Failed to create state file '{state_file_path}'. Check logs. Error: {e}")
-                sys.exit(1)
-            # --- MODIFICATION END ---
-
-    # --- Load Simulation State (if not already loaded from creation) ---
-    if loaded_state_data is None: # Only load if we didn't just create it
-        try:
-            logger.info(f"Attempting to load state file: {state_file_path}")
-            loaded_state_data = load_json_file(state_file_path)
-            if loaded_state_data is None:
-                 raise FileNotFoundError(f"State file found but failed to load content: {state_file_path}")
-
-            uuid_from_state = loaded_state_data.get("world_instance_uuid")
-            if not uuid_from_state:
-                logger.critical(f"State file {state_file_path} is missing 'world_instance_uuid'. Cannot proceed.")
-                console.print(f"[bold red]Error:[/bold red] State file is missing the 'world_instance_uuid' key.")
-                sys.exit(1)
-            if uuid_from_state != world_instance_uuid:
-                logger.critical(f"UUID mismatch! Filename/Arg suggested '{world_instance_uuid}', but state file contains '{uuid_from_state}'.")
-                console.print(f"[bold red]Error:[/bold red] UUID mismatch between state file content ('{uuid_from_state}') and expected UUID ('{world_instance_uuid}').")
-                sys.exit(1)
-
-            logger.info(f"Successfully loaded and verified simulation state for UUID: {world_instance_uuid}")
-            console.print(f"State File Loaded: {state_file_path}")
-            # state = loaded_state_data # Assign loaded data to module-level state (done below)
-
-        except Exception as e:
-            logger.critical(f"Failed to load simulation instance state from {state_file_path}: {e}", exc_info=True)
-            console.print(f"[bold red]Error:[/bold red] Failed to load simulation state file '{state_file_path}'. Check logs. Error: {e}")
-            sys.exit(1)
-
-    # --- Assign to global state and ensure structure ---
+    # --- Check if loading succeeded and assign to global state ---
     if loaded_state_data is None:
         logger.critical("Failed to load or create simulation state. Cannot proceed.")
         console.print("[bold red]Error:[/bold red] Could not obtain simulation state.")
         sys.exit(1)
-
     state = loaded_state_data # Assign loaded or created data to module-level state
 
-    logger.info("Ensuring essential state structure...")
-    state_modified = ensure_state_structure(state) # Pass module-level state
-    if state_modified:
-        logger.info("State structure updated. Saving state file.")
-        try:
-            save_json_file(state_file_path, state) # Save module-level state
-            logger.info(f"State saved to {state_file_path} after ensuring structure.")
-        except Exception as save_e:
-             logger.error(f"Failed to save state update after ensuring structure: {save_e}")
-             console.print(f"[bold red]Error:[/bold red] Failed to save state update. Check logs.")
+    # Structure is ensured within load_or_initialize_simulation
+    # --- REMOVED: Logic block for ensuring structure (now handled in loop_utils) ---
+    world_instance_uuid = state.get("world_instance_uuid") # Get UUID from loaded state
 
     # --- Verify Simulacra & Populate Runtime State ---
     console.rule("[cyan]Verifying Simulacra & Populating Runtime State[/cyan]")
@@ -1384,7 +1136,7 @@ async def run_simulation(instance_uuid_arg: Optional[str] = None):
     verified_active_sim_ids: List[str] = []
 
     life_summary_pattern_instance = os.path.join(LIFE_SUMMARY_DIR, f"life_summary_*_{world_instance_uuid}.json")
-    available_summary_files = glob.glob(life_summary_pattern_instance)
+    available_summary_files = glob.glob(life_summary_pattern_instance) # Need glob here for verification
     available_sim_ids_from_files = set()
     valid_summary_files_map = {}
     for filepath in available_summary_files:

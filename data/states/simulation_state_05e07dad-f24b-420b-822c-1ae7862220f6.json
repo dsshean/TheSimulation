@@ -1,157 +1,137 @@
 {
   "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6",
   "location_details": {
-    "At home": {
-      "name": "At home",
-      "description": "You are at home. It's a cozy place with familiar surroundings. There's a door leading out.",
-      "objects_present": ["light_switch_home_1"],
-      "connected_locations": [
-        {
-          "direction": "out the door",
-          "location_id": "Hallway"
-        }
-      ]
-    },
-    "Hallway": {
-      "name": "Hallway",
-      "description": "A narrow hallway outside your home. Another door leads back inside.",
+    "Asheville": {
+      "name": "Asheville",
+      "description": "The real world in Asheville, NC, United States. Standard physics apply.",
       "objects_present": [],
-      "connected_locations": [
-        {
-          "direction": "back inside",
-          "location_id": "At home"
-        }
-      ]
+      "connected_locations": []
     }
   },
-  "objects": {
-    "wall_clue_1": {
-      "revealed_message": "DO NOT TRUST THE DOCTOR"
-    }
-  },
-  "active_simulacra_ids": ["sim_662862"],
-  "world_time": 162.49980000001597,
+  "objects": {},
+  "active_simulacra_ids": [
+    "sim_3e912d"
+  ],
+  "world_time": 0.0,
   "narrative_log": [],
   "simulacra": {
-    "sim_662862": {
-      "id": "sim_662862",
-      "name": "Eleanor Vance",
+    "sim_3e912d": {
+      "id": "sim_3e912d",
+      "name": "Eleanor Hayes",
       "persona": {
-        "Name": "Eleanor Vance",
-        "Age": 33,
+        "Name": "Eleanor Hayes",
+        "Age": 29,
         "Occupation": "Brewery Tour Guide",
         "Current_location": "Asheville, NC",
         "Personality_Traits": [
+          "Enthusiastic",
           "Outgoing",
-          "Friendly",
           "Knowledgeable",
           "Patient",
-          "Enthusiastic"
+          "Adaptable"
         ],
         "Birthplace": "Charlotte, NC",
-        "Birthdate": "1991-07-15",
-        "Birthtime": "08:30",
-        "Education": "Bachelor of Arts in History, UNC Asheville",
-        "Physical_Appearance": "Average height, with curly auburn hair, green eyes, and a smattering of freckles. Often seen wearing comfortable, casual clothing suitable for walking tours.",
-        "Hobbies": "Hiking, reading historical fiction, exploring local breweries, volunteering at the animal shelter.",
-        "Skills": "Public speaking, historical knowledge, beer tasting, first aid, excellent customer service.",
+        "Birthdate": "1995-07-15",
+        "Birthtime": "14:30",
+        "Education": "Bachelor of Arts in History",
+        "Physical_Appearance": "5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.",
+        "Hobbies": "Hiking, trying new craft beers, reading local history, volunteering at the animal shelter",
+        "Skills": "Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville",
         "Languages": "English",
-        "Health_Status": "Generally healthy, occasional seasonal allergies.",
-        "Family_Background": "Grew up in a middle-class family in Charlotte. Her parents are retired teachers. She has one younger brother who lives in Raleigh.",
-        "Life_Goals": "To become a certified Cicerone, travel to Europe to explore beer cultures, and eventually start her own brewery or pub.",
-        "Notable_Achievements": "Graduated cum laude from UNC Asheville, won 'Employee of the Month' at the brewery twice.",
-        "Fears": "Public speaking failures, disappointing her parents, not achieving her career goals.",
-        "Strengths": "Enthusiasm, strong communication skills, historical knowledge, adaptability.",
-        "Weaknesses": "Can be overly critical of herself, tends to overcommit, struggles with saying no.",
+        "Health_Status": "Generally healthy, occasional allergies",
+        "Family_Background": "Middle-class family, parents still living in Charlotte, one younger brother.",
+        "Life_Goals": "To become a local history expert and potentially open a small historical tour business.",
+        "Notable_Achievements": "Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.",
+        "Fears": "Heights, public speaking failures, not being able to achieve her goals",
+        "Strengths": "Strong communication skills, historical knowledge, adaptability",
+        "Weaknesses": "Can be overly critical of herself, sometimes struggles to say no.",
         "Ethnicity": "Caucasian",
         "Religion": null,
-        "Political_Views": "Left-leaning, advocates for environmental protection and social justice.",
-        "Favorite_Foods": "Craft burgers, gourmet cheese plates, anything with avocados.",
-        "Favorite_Music": "Indie folk, Americana, bluegrass.",
-        "Favorite_Books": "Historical fiction, biographies, books about beer and brewing.",
-        "Favorite_Movies": "Documentaries, comedies, classic films.",
-        "Pet_Peeves": "People being rude to service staff, littering, close-mindedness.",
-        "Dreams": "To own a successful brewery that is known for its innovative beers and sustainable practices.",
+        "Political_Views": "Liberal",
+        "Favorite_Foods": "Anything from local Asheville restaurants, especially farm-to-table cuisine.",
+        "Favorite_Music": "Indie rock, bluegrass, local Asheville bands",
+        "Favorite_Books": "Local history books, historical fiction",
+        "Favorite_Movies": "Documentaries, comedies",
+        "Pet_Peeves": "Rude tourists, littering, traffic congestion",
+        "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "location": "At home",
-      "home_location": "At home",
-      "status": "busy",
-      "current_action_end_time": 165.5686000000118,
-      "goal": "Determine your own long term goals.",
-      "last_observation": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside.",
+      "location": "Asheville",
+      "home_location": "Asheville",
+      "status": "idle",
+      "current_action_end_time": 0.0,
+      "goal": "Determine long term goals.",
+      "last_observation": "You find yourself in Asheville.",
       "memory_log": [],
       "pending_results": {}
     }
   },
+  "npcs": {},
   "current_world_state": {
     "location_details": {
-      "At home": {
-        "name": "At home",
-        "description": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside.",
+      "Asheville": {
+        "name": "Asheville",
+        "description": "The real world in Asheville, NC, United States. Standard physics apply.",
         "objects_present": [],
         "connected_locations": []
       }
     }
   },
   "world_template_details": {
-    "description": "Default",
-    "rules": {}
+    "description": "The real world in Asheville, NC, United States. Standard physics apply.",
+    "rules": {
+      "allow_teleportation": false,
+      "time_progression_rate": 1.0,
+      "weather_effects_travel": true,
+      "historical_date": null
+    },
+    "mood": "neutral_descriptive"
   },
   "simulacra_profiles": {
-    "sim_662862": {
+    "sim_3e912d": {
       "persona_details": {
-        "Name": "Eleanor Vance",
-        "Age": 33,
+        "Name": "Eleanor Hayes",
+        "Age": 29,
         "Occupation": "Brewery Tour Guide",
         "Current_location": "Asheville, NC",
         "Personality_Traits": [
+          "Enthusiastic",
           "Outgoing",
-          "Friendly",
           "Knowledgeable",
           "Patient",
-          "Enthusiastic"
+          "Adaptable"
         ],
         "Birthplace": "Charlotte, NC",
-        "Birthdate": "1991-07-15",
-        "Birthtime": "08:30",
-        "Education": "Bachelor of Arts in History, UNC Asheville",
-        "Physical_Appearance": "Average height, with curly auburn hair, green eyes, and a smattering of freckles. Often seen wearing comfortable, casual clothing suitable for walking tours.",
-        "Hobbies": "Hiking, reading historical fiction, exploring local breweries, volunteering at the animal shelter.",
-        "Skills": "Public speaking, historical knowledge, beer tasting, first aid, excellent customer service.",
+        "Birthdate": "1995-07-15",
+        "Birthtime": "14:30",
+        "Education": "Bachelor of Arts in History",
+        "Physical_Appearance": "5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.",
+        "Hobbies": "Hiking, trying new craft beers, reading local history, volunteering at the animal shelter",
+        "Skills": "Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville",
         "Languages": "English",
-        "Health_Status": "Generally healthy, occasional seasonal allergies.",
-        "Family_Background": "Grew up in a middle-class family in Charlotte. Her parents are retired teachers. She has one younger brother who lives in Raleigh.",
-        "Life_Goals": "To become a certified Cicerone, travel to Europe to explore beer cultures, and eventually start her own brewery or pub.",
-        "Notable_Achievements": "Graduated cum laude from UNC Asheville, won 'Employee of the Month' at the brewery twice.",
-        "Fears": "Public speaking failures, disappointing her parents, not achieving her career goals.",
-        "Strengths": "Enthusiasm, strong communication skills, historical knowledge, adaptability.",
-        "Weaknesses": "Can be overly critical of herself, tends to overcommit, struggles with saying no.",
+        "Health_Status": "Generally healthy, occasional allergies",
+        "Family_Background": "Middle-class family, parents still living in Charlotte, one younger brother.",
+        "Life_Goals": "To become a local history expert and potentially open a small historical tour business.",
+        "Notable_Achievements": "Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.",
+        "Fears": "Heights, public speaking failures, not being able to achieve her goals",
+        "Strengths": "Strong communication skills, historical knowledge, adaptability",
+        "Weaknesses": "Can be overly critical of herself, sometimes struggles to say no.",
         "Ethnicity": "Caucasian",
         "Religion": null,
-        "Political_Views": "Left-leaning, advocates for environmental protection and social justice.",
-        "Favorite_Foods": "Craft burgers, gourmet cheese plates, anything with avocados.",
-        "Favorite_Music": "Indie folk, Americana, bluegrass.",
-        "Favorite_Books": "Historical fiction, biographies, books about beer and brewing.",
-        "Favorite_Movies": "Documentaries, comedies, classic films.",
-        "Pet_Peeves": "People being rude to service staff, littering, close-mindedness.",
-        "Dreams": "To own a successful brewery that is known for its innovative beers and sustainable practices.",
+        "Political_Views": "Liberal",
+        "Favorite_Foods": "Anything from local Asheville restaurants, especially farm-to-table cuisine.",
+        "Favorite_Music": "Indie rock, bluegrass, local Asheville bands",
+        "Favorite_Books": "Local history books, historical fiction",
+        "Favorite_Movies": "Documentaries, comedies",
+        "Pet_Peeves": "Rude tourists, littering, traffic congestion",
+        "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "current_location": "At home",
-      "home_location": "At home",
-      "last_observation": "You slowly wake up in your familiar bed. Sunlight streams through the window, and you can hear birds chirping outside."
-    }
-  },
-  "npcs": {},
-  "location": {
-    "Location_912": {
-      "objects": {
-        "wall_clue_1": {
-          "description": "A faint message scratched into the wall beneath the peeling wallpaper.",
-          "revealable": true
-        }
-      }
+      "current_location": "Asheville",
+      "home_location": "Asheville",
+      "last_observation": "You find yourself in Asheville.",
+      "goal": "Determine long term goals.",
+      "memory_log": []
     }
   }
 }
