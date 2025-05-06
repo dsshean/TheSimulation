@@ -92,6 +92,13 @@ The `main_async.py` script starts the simulation process
 python main_async.py
 ```
 
+**Important**
+Ugly hack for now - Update the
+
+world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home"
+
+to set what kind of world it is.
+
 This will:
 
 Load the API key from .env.
