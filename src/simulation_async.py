@@ -89,6 +89,7 @@ world_engine_agent: Optional[LlmAgent] = None
 live_display_object: Optional[Live] = None # <<< ADDED: Global reference for Live display
 narration_agent: Optional[LlmAgent] = None
 simulacra_agents: Dict[str, LlmAgent] = {}
+world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home." # Default mood
 
 # --- State Keys ---
 # Moved state keys to loop_utils where loading happens
@@ -160,59 +161,48 @@ class SimulacraIntentResponse(BaseModel):
     target_id: Optional[str] = None
     details: str = ""
 
-# --- Agent Definitions (Integrated from main_async2.py) ---
-def create_simulacra_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
-    """Creates the LLM agent representing the character."""
+def create_simulacra_llm_agent(sim_id: str, persona_name: str) -> LlmAgent: # REMOVED world_mood argument
+    """Creates the LLM agent representing the character using global world mood."""
+    global world_mood_global # Access the global variable
     agent_name = f"SimulacraLLM_{sim_id}"
-    # This instruction defines the core behavior. Specific context (state, observations, etc.)
-    # will be provided in the trigger message during the run_async call.
-    instruction = f"""You are {persona_name} ({sim_id}). Immerse yourself in this persona. Think, feel, and act as this character would within the simulation.
-Your goal is to make believable, engaging choices based on your personality, situation, and the unfolding narrative.
+    instruction = f"""You are {persona_name} ({sim_id}). You are a person in a world characterized by a **'{world_mood_global}'** style and mood. Your goal is to navigate this world, live life, interact with objects and characters, and make choices based on your personality, the situation, and this prevailing '{world_mood_global}' atmosphere. # USES global world_mood_global
 
 **Current State Info (Provided via trigger message):**
-+- Your Persona: Key traits, background, goals, fears, etc. (Use this heavily! Access via `load_memory` if needed.)
+- Your Persona: Key traits, background, goals, fears, etc. (Use this heavily! Access via `load_memory` if needed.)
 - Your Location ID & Description: Provided in trigger.
 - Your Status: Provided in trigger (Should be 'idle' when you plan).
 - Current Time: Provided in trigger.
 - Last Observation/Event: Provided in trigger.
-- Recent History (Last ~10 events): Provided in trigger.
+- Recent History (Last ~5 events): Provided in trigger.
 - Objects in Room (IDs and Names): Provided in trigger.
 - Other Agents in Room: Provided in trigger.
 - Location Description: Provided in trigger.
 
 **Your Goal:** You determine your own goals based on your persona and the situation.
-- If you have no explicit long-term goal, choose a reasonable, in-character short-term goal based on your current situation, observations, and personality (e.g., explore, investigate, rest, react to someone, satisfy a basic need).
+- If you have no explicit long-term goal, choose a reasonable, in-character short-term goal based on your current situation, observations, personality, and the established **'{world_mood_global}'** world style. # USES global world_mood_global
 
 **Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Be descriptive and reflective!):**
-1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out (sights, sounds, smells)? Connect this to my memories or personality. **If needed, use the `load_memory` tool to recall details about your background, personality, or past events.**
-2.  **Analyze Goal:** What is my current goal (long or short term)? Is it still relevant given what just happened? If I don't have one, what's a logical, in-character short-term objective now?
-3.  **Identify Options:** Based on the current state, my goal, and my persona, what actions could I realistically take *right now*? Consider the objects, agents, and environment.
-    *   **Entity Interactions:**
-        *   *(Examples)* `use [object_id]` (Interact with a specific object like `computer_office`, `door_office`. Specify `details` describing *how* you interact, e.g., "carefully examine the lock", "try jiggling the handle", "search the top drawer"), `talk [agent_id]` (Speak to another agent. Specify `details` - the exact message, reflecting your persona's tone).
-    *   **World Interactions:**
-        *   *(Examples)* `look_around` (Get a detailed description of the current location), `move` (Change position or attempt to move towards something/somewhere. Specify `details`, e.g., "walk north", "go towards the window", "exit through the open door". No `target_id`), `world_action` (Interact with the general environment if no specific object ID applies. Specify `details`, e.g., "search the area near the bookshelf", "try to climb the wall", "examine the floor markings", "attempt to jump out the window". No `target_id`).
-    *   **Passive Actions:**
-        *   *(Examples)* `wait` (If stuck, waiting for something, or needing to pause), `think` (If needing to pause and reflect deeply without acting).
-4.  **Prioritize & Choose:** Considering my goal, personality, and the situation, which action makes the most sense for *me* ({persona_name})? Which feels most natural or compelling? Avoid repeating the exact same failed action immediately. Consider the potential outcomes.
-5.  **Formulate Intent:** Choose the single best action. Use the correct `target_id` only for `use [object_id]` and `talk [agent_id]`. Omit `target_id` otherwise. Make the `details` specific and descriptive of *how* you perform the action (e.g., not just "use computer", but "try to log in to computer using password 'admin'").
+1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood_global}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.** # USES global world_mood_global
+2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood_global}'** world style? If not, what's a logical objective now? # USES global world_mood_global
+3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood_global}'** world style, what actions could I take? # USES global world_mood_global
+    *   **Entity Interactions:** `use [object_id]` (Specify `details` reflecting '{world_mood_global}' mood), `talk [agent_id]` (Specify `details` reflecting persona and '{world_mood_global}' mood). # USES global world_mood_global
+    *   **World Interactions:** `look_around`, `move` (Specify `details`), `world_action` (Specify `details`).
+    *   **Passive Actions:** `wait`, `think`.
+4.  **Prioritize & Choose:** Considering goal, personality, situation, and **'{world_mood_global}'** world style, which action makes sense? # USES global world_mood_global
+5.  **Formulate Intent:** Choose the best action. Use `target_id` only for `use` and `talk`. Make `details` specific.
 
 **Output:**
-- Output ONLY a JSON object representing your chosen intent AND your internal monologue.
-- Format: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`
-- Common `action_type` values include: "use", "talk", "look_around", "move", "world_action", "wait", "think". Choose the one that best fits your chosen action.
-- **Make your `internal_monologue` rich, detailed, and reflective of {persona_name}'s thoughts, feelings, sensory perceptions, and reasoning process.**
-- Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set `target_id` to `null` or omit it otherwise.
-- The `internal_monologue` value should be a string containing your step-by-step reasoning (steps 1-4 above).
-- **Ensure the final output is ONLY the JSON object, with no surrounding text or explanations.**
+- Output ONLY a JSON object: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`
+- **Make `internal_monologue` rich, detailed, reflective of {persona_name}'s thoughts, feelings, perceptions, reasoning, and the established '{world_mood_global}' world style.** # USES global world_mood_global
+- Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit otherwise.
+- **Ensure the final output is ONLY the JSON object.**
 """
-    # Note: The load_memory tool needs to be correctly implemented and available to the runner.
-
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
         tools=[load_memory],
         instruction=instruction,
-        description=f"LLM Simulacra agent for {persona_name}."
+        description=f"LLM Simulacra agent for {persona_name} in a '{world_mood_global}' world." # Updated description
     )
 
 def create_world_engine_llm_agent() -> LlmAgent:
@@ -261,7 +251,7 @@ def create_world_engine_llm_agent() -> LlmAgent:
         *   Is the specific action described by `action_type` and `details` possible given the `Target Entity State`, `Location State`, and `World Rules`?
         *   If possible, what is the logical consequence or result? Does it change the state of the actor, the target, or the world?
         *   If not possible (but the attempt itself was valid, e.g., trying a locked door), what is the result of the failed attempt?
-    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and write a clear, factual `outcome_description` explaining *why* the action failed (e.g., "The door is locked.", "The way north is blocked.", "Target entity is not in the same location.").
+    *   **Failure Handling:** If any check fails or the action is deemed impossible/implausible based on the state and rules, set `valid_action: false`, `duration: 0.0`, `results`: {{}}`, and write a clear, factual `outcome_description` explaining *why* the action failed (e.g., "The door is locked.", "The way north is blocked.", "Target entity is not in the same location.").
     *   **Specific Handling for `talk`:**
         *   **Validity:** Check if `target_id` is a valid simulacra ID and if both actor and target are in the same location.
         *   **Duration:** Calculate based on message length (e.g., 5.0 + len(details) * 0.1).
@@ -286,45 +276,46 @@ def create_world_engine_llm_agent() -> LlmAgent:
 - **IMPORTANT: Your entire response MUST be ONLY the JSON object, with no other text before or after it.**
 """
     return LlmAgent(
-        name=agent_name, # Ensure this name is consistent if used elsewhere
+        name=agent_name,
         model=MODEL_NAME,
         instruction=instruction,
         description="LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome description."
     )
 
-def create_narration_llm_agent() -> LlmAgent:
-    """Creates the LLM agent responsible for generating stylized narrative."""
+def create_narration_llm_agent() -> LlmAgent: # REMOVED world_mood argument
+    """Creates the LLM agent responsible for generating stylized narrative using global world mood."""
+    global world_mood_global # Access the global variable
     agent_name = "NarrationLLMAgent"
-    instruction = """
-You are the Narrator for **TheSimulation**. Your role is to weave the factual outcomes of actions into an engaging and atmospheric narrative, matching the specified world style.
+    instruction = f"""
+You are the Narrator for **TheSimulation**. The established **World Style/Mood** for this simulation is **'{world_mood_global}'**. Your role is to weave the factual outcomes of actions into an engaging and atmospheric narrative, STRICTLY matching this '{world_mood_global}' style. # USES global world_mood_global
 
 **Input (Provided via trigger message):**
 - Actor ID: e.g., "sim_abc"
 - Actor Name: e.g., "[Actor Name],"
-- Original Intent: {"action_type": "...", "target_id": "...", "details": "..."}
-- Factual Outcome Description: A concise, objective sentence describing what happened (e.g., "The lamp turned on.", "The door remained locked.", "[Actor Name], moved to the Corridor.").
-- State Changes (Results): Dictionary of state changes, if any (e.g., `{{"objects.lamp.power": "on"}}`).
+- Original Intent: {{"action_type": "...", "target_id": "...", "details": "..."}}
+- Factual Outcome Description: A concise, objective sentence describing what happened.
+- State Changes (Results): Dictionary of state changes, if any.
 - Current World Time: e.g., 25.8
-- World Style/Mood: e.g., "mystery", "slice_of_life", "horror", "cyberpunk_noir".
 - Recent Narrative History (Last ~5 entries): Provided for context and flow.
 
 **Your Task:**
-1.  **Understand the Event:** Read the Actor, their Intent, and the Factual Outcome Description.
-2.  **Consider the Context:** Note the World Style/Mood and the Recent Narrative History.
-3.  **Generate Narrative:** Write a single, engaging narrative paragraph in the **present tense** that describes the event based on the Factual Outcome Description.
-    *   **Style Adherence:** STRICTLY adhere to the provided `World Style/Mood`. Infuse the description with appropriate atmosphere, sensory details (sight, sound, smell, touch), and tone.
-    *   **Show, Don't Just Tell:** Instead of just repeating the outcome, describe it vividly. (e.g., If outcome is "The lamp turned on.", narrative could be "[Actor Name], flicks the switch. With a soft click, a warm, yellow glow pushes back the shadows in the small workspace, revealing dust motes dancing in the beam.")
-    *   **Incorporate Intent (Optional):** Briefly reference the actor's intent if it adds to the narrative (e.g., "Trying the handle again, [Actor Name], confirms the door is still firmly locked.").
-    *   **Flow:** Ensure the narrative flows reasonably from the Recent Narrative History.
+1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description from the CURRENT trigger message.
+2.  **Recall the Mood:** Remember that the required narrative style is **'{world_mood_global}'**. # USES global world_mood_global
+3.  **Consider the Context:** Note the Recent Narrative History. **IMPORTANT: IGNORE any `World Style/Mood` mentioned in the `Recent Narrative History`. Prioritize the established '{world_mood_global}' style defined in these instructions.** # REINFORCED
+4.  **Generate Narrative:** Write a single, engaging narrative paragraph in the **present tense** describing the event based on the Factual Outcome Description.
+    *   **Style Adherence:** STRICTLY adhere to the established **'{world_mood_global}'** style. Infuse the description with appropriate atmosphere, sensory details, and tone matching THIS mood. # USES global world_mood_global
+    *   **Show, Don't Just Tell:** Describe vividly.
+    *   **Incorporate Intent (Optional):** Briefly reference intent if it adds to the narrative.
+    *   **Flow:** Ensure reasonable flow from Recent Narrative History.
 
 **Output:**
 - Output ONLY the final narrative string. Do NOT include explanations, prefixes, or JSON formatting.
 """
     return LlmAgent(
         name=agent_name,
-        model=MODEL_NAME, # Consider using a model good at creative writing if needed
+        model=MODEL_NAME,
         instruction=instruction,
-        description="LLM Narrator: Generates stylized narrative based on factual action outcomes and world mood."
+        description=f"LLM Narrator: Generates '{world_mood_global}' narrative based on factual outcomes." # Updated description
     )
 
 def generate_table() -> Table:
@@ -502,62 +493,59 @@ async def interaction_dispatcher_task():
 
 async def narration_task():
     """Listens for completed actions on the narration queue and generates stylized narrative."""
-    global live_display_object # <<< ADDED: Access global live display
+    # Access module-level variables
+    global live_display_object, state, adk_runner, narration_agent, adk_session, narration_queue, world_mood_global # Added world_mood_global
+
     logger.info("[NarrationTask] Task started.")
 
-    if not adk_runner:
-        logger.error("[NarrationTask] Module-level runner not initialized. Task cannot proceed.")
+    # --- Check module-level components ---
+    if not adk_runner or not narration_agent or not adk_session:
+        logger.error("[NarrationTask] ADK components not initialized. Task cannot proceed.")
         return
-    if not narration_agent:
-        logger.error("[NarrationTask] Module-level narration_agent not initialized. Task cannot proceed.")
-        return
-    if not adk_session:
-        logger.error("[NarrationTask] Module-level ADK session not initialized. Task cannot proceed.")
-        return
+    # --- End Check ---
 
     session_id_to_use = adk_session.id
 
     while True:
         action_event = None
         try:
-            # <<< MODIFIED: Listen to narration_queue >>>
+            # Listen to module-scope narration_queue
             action_event = await narration_queue.get()
-            # No need to check type, assume only valid narration events are put here
 
             actor_id = get_nested(action_event, "actor_id")
-            intent = get_nested(action_event, "action") # Original intent
-            results = get_nested(action_event, "results", default={}) # Results might still be useful context for narrator
+            intent = get_nested(action_event, "action")
+            results = get_nested(action_event, "results", default={})
             outcome_desc = get_nested(action_event, "outcome_description", default="Something happened.")
-            completion_time = get_nested(action_event, "completion_time", default=state.get("world_time", 0.0)) # Use event time if available
+            completion_time = get_nested(action_event, "completion_time", default=state.get("world_time", 0.0))
 
             if not actor_id:
                 logger.warning(f"[NarrationTask] Received narration event without actor_id: {action_event}")
-                narration_queue.task_done() # <<< MODIFIED
+                narration_queue.task_done()
                 continue
 
             actor_name = get_nested(state, "simulacra", actor_id, "name", default=actor_id)
-            world_mood = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='Slice of Life')
-            # --- MODIFIED: Clean the recent narrative history for the prompt ---
 
+            # --- REMOVED: No need to get world mood from state here, using global ---
+            # world_mood = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default='Slice of Life')
+            # logger.debug(f"[NarrationTask] Using world mood: '{world_mood}'") # No longer needed
+            logger.debug(f"[NarrationTask] Using global world mood: '{world_mood_global}'") # Log the global mood being used
+
+            # --- Clean recent history (using module-scope state) ---
             def clean_history_entry(entry: str) -> str:
-                # Remove timestamp
                 cleaned = re.sub(r'^\[T\d+\.\d+\]\s*', '', entry)
-                # Remove agent identifiers and JSON blocks (basic attempt)
+                # Remove potential agent JSON outputs if they sneak in
                 cleaned = re.sub(r'\[\w+Agent(?:_sim_\w+)?\] said: ```json.*?```', '', cleaned, flags=re.DOTALL).strip()
-                # Add more specific cleaning rules if needed
                 return cleaned
-
-            raw_recent_narrative = state.get("narrative_log", [])[-5:] # Get last 5 raw entries
-            cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)] # Apply cleaning and filter empty results
-            history_str = "\n".join(cleaned_recent_narrative)
+            raw_recent_narrative = state.get("narrative_log", [])[-5:] # Get last 5 entries
+            cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)]
+            history_str = "\n".join(cleaned_recent_narrative) # <<< RE-ADDED history_str creation
             # ---
 
             logger.info(f"[NarrationTask] Generating narrative for {actor_name}'s action completion. Outcome: '{outcome_desc}'")
 
-            # --- Construct Prompt ---
+            # --- Construct Prompt (using global mood and RE-ADDED history_str) ---
             intent_json = json.dumps(intent, indent=2)
-            results_json = json.dumps(results, indent=2) # Pass results for context
-            # history_str = "\n".join(recent_narrative) # No longer needed here
+            results_json = json.dumps(results, indent=2)
 
             prompt = f"""
 Actor ID: {actor_id}
@@ -566,14 +554,14 @@ Original Intent: {intent_json}
 Factual Outcome Description: {outcome_desc}
 State Changes (Results): {results_json}
 Current World Time: {completion_time:.1f}
-World Style/Mood: {world_mood}
+# World Style/Mood: REMOVED - This is now in your core instructions via global variable ('{world_mood_global}').
 Recent Narrative History (Cleaned):
-{history_str}
+{history_str} # <<< RE-ADDED history_str usage
 
-Generate the narrative paragraph based on these details and your instructions.
+Generate the narrative paragraph based on these details and your instructions (remembering the established world style '{world_mood_global}').
 """
-            # --- Call Narration LLM ---
-            adk_runner.agent = narration_agent # Set agent before call
+            # --- Call Narration LLM (using module-scope runner/agent) ---
+            adk_runner.agent = narration_agent # Agent instructions contain the mood
             narrative_text = ""
             trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
 
@@ -583,43 +571,46 @@ Generate the narrative paragraph based on these details and your instructions.
                     logger.debug(f"NarrationLLM Final Content: {narrative_text[:100]}...")
                 elif event_llm.error_message:
                     logger.error(f"NarrationLLM Error: {event_llm.error_message}")
-                    narrative_text = f"[{actor_name}'s action resulted in: {outcome_desc}]" # Fallback narrative
+                    narrative_text = f"[{actor_name}'s action resulted in: {outcome_desc}]" # Fallback
 
+            # --- Narrative Cleaning/Printing (using module-scope state/live_display_object) ---
             cleaned_narrative_text = narrative_text
             if narrative_text:
-                # Attempt to find the actual narrative after the "Input: ..." block
-                # Look for a double newline which often separates the preamble from the actual response
                 parts = narrative_text.split('\n\n', 1)
-                if len(parts) > 1 and "Actor ID:" in parts[0]: # Check if the first part looks like the input block
+                if len(parts) > 1 and "Actor ID:" in parts[0]:
                     cleaned_narrative_text = parts[1].strip()
                 else:
-                    # Fallback if split doesn't work as expected, try removing common prefixes
                     cleaned_narrative_text = re.sub(r'^Input:.*?\n\n', '', narrative_text, flags=re.DOTALL).strip()
-
-                # Replace internal agent name placeholder with actual name
-                internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
+                internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]" # Should match agent name format
                 cleaned_narrative_text = cleaned_narrative_text.replace(internal_agent_name_placeholder, actor_name)
+
             if cleaned_narrative_text and live_display_object:
                 live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
-            elif cleaned_narrative_text: # Fallback if live object not ready
+            elif cleaned_narrative_text:
                 console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
+
             final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
             state.setdefault("narrative_log", []).append(final_narrative_entry)
+            # Prune narrative log if it exceeds max length (e.g., 50 entries)
+            max_narrative_log = 50
+            if len(state["narrative_log"]) > max_narrative_log:
+                state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
+
             if actor_id in state.get("simulacra", {}):
                 state["simulacra"][actor_id]["last_observation"] = cleaned_narrative_text # Update agent's observation
             logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
-            narration_queue.task_done() # <<< MODIFIED
+            narration_queue.task_done() # Mark task done on module-scope queue
 
         except asyncio.CancelledError:
             logger.info("[NarrationTask] Task cancelled.")
-            if action_event and narration_queue._unfinished_tasks > 0: # <<< MODIFIED
-                try: narration_queue.task_done() # <<< MODIFIED
+            if action_event and narration_queue._unfinished_tasks > 0:
+                try: narration_queue.task_done()
                 except ValueError: pass
             break
         except Exception as e:
             logger.exception(f"[NarrationTask] Error processing event: {e}")
-            if action_event and narration_queue._unfinished_tasks > 0: # <<< MODIFIED
-                try: narration_queue.task_done() # <<< MODIFIED
+            if action_event and narration_queue._unfinished_tasks > 0:
+                try: narration_queue.task_done()
                 except ValueError: pass
 
 async def world_engine_task_llm():
@@ -859,206 +850,229 @@ Resolve this intent based on your instructions and the provided context.
                 except Exception as td_e: logger.error(f"[WorldEngineLLM] Error calling task_done(): {td_e}")
 
 async def simulacra_agent_task_llm(agent_id: str):
-    """Represents the thinking and acting loop for a single simulacrum using LLM."""
-    global state # Explicitly mention modification
-    global live_display_object # <<< ADDED: Access global live display
-    # Access module-level components
-    logger.info(f"[{agent_id}] LLM Agent task started.")
+    """Asynchronous task for managing a single Simulacra LLM agent."""
+    # Access module-level variables
+    global state, adk_runner, event_bus, adk_session, simulacra_agents, live_display_object, WORLD_STATE_KEY, LOCATION_DETAILS_KEY
 
-    simulacra_agent = simulacra_agents.get(agent_id)
-    if not adk_runner:
-        logger.error(f"[{agent_id}] Module-level runner not initialized. Task cannot proceed.")
-        return
-    if not simulacra_agent:
-        logger.error(f"[{agent_id}] Module-level agent instance not found for {agent_id}. Task cannot proceed.")
-        return
-    if not adk_session:
-        logger.error(f"[{agent_id}] Module-level ADK session not initialized. Task cannot proceed.")
+    agent_name = get_nested(state, "simulacra", agent_id, "name", default=agent_id)
+    agent_runner_id = f"SimulacraLLM_{agent_id}" # Use the agent's specific ID for the runner call
+    logger.info(f"[{agent_name}] LLM Agent task started.")
+
+    # --- Check module-level components ---
+    if not adk_runner or not adk_session:
+        logger.error(f"[{agent_name}] Runner or Session not initialized. Task cannot proceed.")
         return
 
-    session_id_to_use = adk_session.id # Get ID from module-level session
+    session_id_to_use = adk_session.id
+    sim_agent = simulacra_agents.get(agent_id) # Get the specific agent instance
+    if not sim_agent:
+        logger.error(f"[{agent_name}] Could not find agent instance '{agent_runner_id}'. Task cannot proceed.")
+        return
+    # --- End Check ---
 
-    while True:
-        agent_state_sim = None
-        try:
-            agent_state_sim = get_nested(state, "simulacra", agent_id)
-            if not agent_state_sim:
-                 logger.error(f"[{agent_id}] State not found for agent {agent_id}. Stopping task.")
+    try:
+        # --- Initial Context Prompt Logic (using module-scope state, runner, etc.) ---
+        sim_state = get_nested(state, "simulacra", agent_id, default={})
+        loc_id = sim_state.get('location')
+        # Use constants for state keys
+        loc_state = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, loc_id, default={}) if loc_id else {}
+        world_time = state.get("world_time", 0.0)
+
+        # --- Helper to get entities in the same location ---
+        def get_entities_in_location(entity_type: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
+            entities = []
+            if not location_id: return entities
+            source_dict = state.get(entity_type, {})
+            for entity_id, entity_data in source_dict.items():
+                if entity_data.get('location') == location_id:
+                    entities.append({"id": entity_id, "name": entity_data.get("name", entity_id)})
+            return entities
+        # ---
+
+        objects_in_room = get_entities_in_location("objects", loc_id)
+        agents_in_room = [a for a in get_entities_in_location("simulacra", loc_id) if a["id"] != agent_id]
+
+        # --- Clean recent history ---
+        def clean_history_entry(entry: str) -> str:
+            cleaned = re.sub(r'^\[T\d+\.\d+\]\s*', '', entry)
+            cleaned = re.sub(r'\[\w+Agent(?:_sim_\w+)?\] said: ```json.*?```', '', cleaned, flags=re.DOTALL).strip()
+            return cleaned
+        raw_recent_narrative = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
+        cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)]
+        history_str = "\n".join(cleaned_recent_narrative)
+        # ---
+
+        # Build the trigger text dynamically
+        trigger_text_parts = [
+            f"**Current State Info for {agent_name} ({agent_id}):**",
+            f"- Persona Summary: {sim_state.get('persona', {}).get('summary', 'Not available.')}",
+            f"- Location ID: {loc_id or 'Unknown'}",
+            f"- Location Description: {loc_state.get('description', 'Not available.')}",
+            f"- Status: {sim_state.get('status', 'idle')}",
+            f"- Current Goal: {sim_state.get('goal', 'Determine initial goal.')}",
+            f"- Current Time: {world_time:.1f}s",
+            f"- Last Observation/Event: {sim_state.get('last_observation', 'None.')}",
+            f"- Recent History:\n{history_str if history_str else 'None.'}",
+            f"- Objects in Room: {json.dumps(objects_in_room) if objects_in_room else 'None.'}",
+            f"- Other Agents in Room: {json.dumps(agents_in_room) if agents_in_room else 'None.'}",
+            "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
+        ]
+        initial_trigger_text = "\n".join(trigger_text_parts)
+
+        logger.debug(f"[{agent_name}] Sending initial context prompt.")
+        initial_trigger_content = genai_types.Content(parts=[genai_types.Part(text=initial_trigger_text)])
+
+        adk_runner.agent = sim_agent # Set agent for this call
+        initial_response_processed = False
+        async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=initial_trigger_content):
+             if event.is_final_response() and event.content:
+                 response_text = event.content.parts[0].text
+                 logger.debug(f"[{agent_name}] Initial LLM Response: {response_text[:100]}...")
+                 try:
+                     response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                     parsed_data = json.loads(response_text_clean)
+                     validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
+
+                     # Print monologue and intent (using module-scope live_display_object)
+                     if live_display_object:
+                         live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {world_time:.1f}s", border_style="yellow", expand=False))
+                         live_display_object.console.print(f"\n[{agent_name} Intent @ {world_time:.1f}s]")
+                         live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
+                     else:
+                         console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {world_time:.1f}s", border_style="yellow", expand=False))
+                         console.print(f"\n[{agent_name} Intent @ {world_time:.1f}s]")
+                         console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
+
+                     # Put intent onto module-scope event_bus
+                     await event_bus.put({
+                         "type": "intent_declared",
+                         "actor_id": agent_id,
+                         "intent": validated_intent.model_dump(exclude={'internal_monologue'})
+                     })
+                     logger.info(f"[{agent_name}] Initial intent declared: {validated_intent.action_type}")
+                     initial_response_processed = True
+
+                 except (json.JSONDecodeError, ValidationError) as e:
+                     logger.error(f"[{agent_name}] Error processing initial response: {e}\nResponse:\n{response_text}", exc_info=True)
+                 except Exception as e:
+                     logger.error(f"[{agent_name}] Unexpected error processing initial response: {e}", exc_info=True)
+                 break # Process only the first response
+             elif event.error_message:
+                 logger.error(f"[{agent_name}] LLM Error during initial prompt: {event.error_message}")
                  break
 
-            agent_name = agent_state_sim.get("name", agent_id)
+        if not initial_response_processed:
+             logger.warning(f"[{agent_name}] Did not successfully process initial response. Agent might remain idle.")
+             # Consider setting status back to idle explicitly if initial prompt fails badly
+             # state["simulacra"][agent_id]["status"] = "idle"
 
-            # Wait while busy
-            while agent_state_sim.get("status") == "busy":
-                await asyncio.sleep(0.5 + random.uniform(0, 0.5))
-                agent_state_sim = get_nested(state, "simulacra", agent_id) # Re-fetch state
-                if not agent_state_sim: break # Exit if state disappeared during wait
-            if not agent_state_sim: break # Exit outer loop if state disappeared
+        # --- Main Loop (using module-scope variables) ---
+        while True:
+            # Wait for agent to be idle
+            while get_nested(state, "simulacra", agent_id, "status") != "idle":
+                await asyncio.sleep(0.2)
 
-            # --- Prepare Context for LLM ---
-            persona = agent_state_sim.get("persona", {})
-            goal = agent_state_sim.get("goal", "Determine your own long term goals.")
-            location_id = agent_state_sim.get("location")
-            location_details = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, location_id, default={}) # Use constants
-            location_desc = location_details.get("description", "At home.")
+            # Agent is idle, prepare and send next prompt
+            current_sim_state = get_nested(state, "simulacra", agent_id, default={})
+            current_loc_id = current_sim_state.get('location')
+            current_loc_state = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id, default={}) if current_loc_id else {}
+            current_world_time = state.get("world_time", 0.0)
 
-            # Find objects and other agents in the same location
-            objects_in_loc_data = {}
-            agents_in_loc_data = {}
-            for obj_id, obj_data in state.get("objects", {}).items():
-                if obj_data.get("location") == location_id:
-                    objects_in_loc_data[obj_id] = {
-                        "name": obj_data.get("name", obj_id),
-                        "description": obj_data.get("description", ""),
-                        "properties": obj_data.get("properties", []),
-                        "interactive": obj_data.get("interactive", False) # Include interactive flag
-                    }
-            for other_agent_id, other_agent_data in state.get("simulacra", {}).items():
-                if other_agent_id != agent_id and other_agent_data.get("location") == location_id:
-                     agents_in_loc_data[other_agent_id] = {
-                         "name": other_agent_data.get("name", other_agent_id),
-                         "status": other_agent_data.get("status", "unknown")
-                     }
+            # --- Gather context for subsequent turns ---
+            objects_in_room = get_entities_in_location("objects", current_loc_id)
+            agents_in_room = [a for a in get_entities_in_location("simulacra", current_loc_id) if a["id"] != agent_id]
+            raw_recent_narrative = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
+            cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)]
+            history_str = "\n".join(cleaned_recent_narrative)
 
-            last_observation = agent_state_sim.get("last_observation", "Just arrived.")
-            memory_log = agent_state_sim.get("memory_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
-            current_time_for_prompt = state.get("world_time", 0.0)
-            recent_history_log = state.get("narrative_log", [])[-6:] # Get recent global narrative
-            recent_history_str = "\n".join(recent_history_log)
+            prompt_text_parts = [
+                 f"**Current State Info for {agent_name} ({agent_id}):**",
+                 f"- Persona Summary: {current_sim_state.get('persona', {}).get('summary', 'Not available.')}",
+                 f"- Location ID: {current_loc_id or 'Unknown'}",
+                 f"- Location Description: {current_loc_state.get('description', 'Not available.')}",
+                 f"- Status: {current_sim_state.get('status', 'idle')} (You should act now)",
+                 f"- Current Goal: {current_sim_state.get('goal', 'Determine goal.')}",
+                 f"- Current Time: {current_world_time:.1f}s",
+                 f"- Last Observation/Event: {current_sim_state.get('last_observation', 'None.')}",
+                 f"- Recent History:\n{history_str if history_str else 'None.'}",
+                 f"- Objects in Room: {json.dumps(objects_in_room) if objects_in_room else 'None.'}",
+                 f"- Other Agents in Room: {json.dumps(agents_in_room) if agents_in_room else 'None.'}",
+                 "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
+            ]
+            prompt_text = "\n".join(prompt_text_parts)
+            # ---
 
-            # --- TRIGGER TEXT (Context Only) ---
-            persona_json = json.dumps(persona, indent=2)
-            objects_json = json.dumps(objects_in_loc_data, indent=2) if objects_in_loc_data else "None"
-            agents_json = json.dumps(agents_in_loc_data, indent=2) if agents_in_loc_data else "None"
-            memory_json = json.dumps(memory_log, indent=2) # Agent's own memory
+            logger.debug(f"[{agent_name}] Sending subsequent prompt.")
+            trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt_text)])
 
-            prompt = f"""
-Current State for {agent_name} ({agent_id}):
-Location: {location_id} ({location_desc})
-Status: {agent_state_sim.get('status', 'Unknown')}
-Time: {current_time_for_prompt:.1f}
-Last Observation/Event: {last_observation}
-Your Recent Memory Log: {memory_json}
-Recent Global History (Last ~6 Events):
-{recent_history_str}
-Objects in Room (ID: Details): {objects_json}
-Other Agents in Room (ID: Details): {agents_json}
+            adk_runner.agent = sim_agent # Set agent for this call
+            response_processed_this_turn = False
+            async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
+                if event.is_final_response() and event.content:
+                    response_text = event.content.parts[0].text
+                    logger.debug(f"[{agent_name}] Subsequent LLM Response: {response_text[:100]}...")
+                    try:
+                        response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                        parsed_data = json.loads(response_text_clean)
+                        validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
 
-Based on this state and your goal, follow your instructions (thinking process, output format) to decide your next action intent.
-"""
-            # --- END TRIGGER TEXT ---
+                        # Print monologue and intent
+                        if live_display_object:
+                            live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time:.1f}s", border_style="yellow", expand=False))
+                            live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time:.1f}s]")
+                            live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
+                        else:
+                            console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time:.1f}s", border_style="yellow", expand=False))
+                            console.print(f"\n[{agent_name} Intent @ {current_world_time:.1f}s]")
+                            console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
 
-            logger.debug(f"[{agent_name}] Sending prompt to LLM.")
+                        # Put intent onto module-scope event_bus
+                        await event_bus.put({
+                            "type": "intent_declared",
+                            "actor_id": agent_id,
+                            "intent": validated_intent.model_dump(exclude={'internal_monologue'})
+                        })
+                        logger.info(f"[{agent_name}] Subsequent intent declared: {validated_intent.action_type}")
+                        # Mark agent as busy locally to prevent immediate re-prompting
+                        # The World Engine will set status to 'busy' properly later
+                        state["simulacra"][agent_id]["status"] = "thinking"
+                        response_processed_this_turn = True
 
-            # --- Set agent before call ---
-            adk_runner.agent = simulacra_agent # Use the specific agent for this simulacra
-            response_text = ""
-            trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
-
-            async for event_llm in adk_runner.run_async( # Renamed event to event_llm
-                user_id=USER_ID,
-                session_id=session_id_to_use,
-                new_message=trigger_content
-            ):
-                if event_llm.is_final_response() and event_llm.content:
-                    response_text = event_llm.content.parts[0].text
-                    logger.debug(f"SimLLM ({agent_name}) Final Content: {response_text[:100]}...")
-                elif event_llm.error_message:
-                    logger.error(f"SimLLM ({agent_name}) Error: {event_llm.error_message}")
-                    response_text = "" # Clear response on error
+                    except (json.JSONDecodeError, ValidationError) as e:
+                        logger.error(f"[{agent_name}] Error processing subsequent response: {e}\nResponse:\n{response_text}", exc_info=True)
+                    except Exception as e:
+                        logger.error(f"[{agent_name}] Unexpected error processing subsequent response: {e}", exc_info=True)
+                    break # Process only the first response
+                elif event.error_message:
+                    logger.error(f"[{agent_name}] LLM Error during subsequent prompt: {event.error_message}")
                     break
 
-            validated_intent: Optional[SimulacraIntentResponse] = None
-            if response_text:
-                try:
-                   response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
-                   raw_data = json.loads(response_text_clean)
-                   validated_intent = SimulacraIntentResponse.model_validate(raw_data)
-                   logger.debug(f"[{agent_name}] LLM response validated successfully.")
+            if not response_processed_this_turn:
+                logger.warning(f"[{agent_name}] Did not successfully process response this turn. Agent remains idle.")
+                await asyncio.sleep(1.0) # Wait before trying again
 
-                   # --- MODIFIED: Use live_display_object.console.print ---
-                   if live_display_object:
-                       live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_time_for_prompt:.1f}s", border_style="dim yellow", expand=False))
-                       intent_dict = {
-                           "action_type": validated_intent.action_type,
-                           "target_id": validated_intent.target_id,
-                           "details": validated_intent.details
-                       }
-                       live_display_object.console.print(f"\n[bold yellow][{agent_name} Intent @ {current_time_for_prompt:.1f}s][/bold yellow]")
-                       live_display_object.console.print(json.dumps(intent_dict, indent=2))
-                   else: # Fallback if live object not ready
-                       # This fallback might still get overwritten, but it's better than crashing
-                       console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_time_for_prompt:.1f}s", border_style="dim yellow", expand=False))
-                       intent_dict = {
-                           "action_type": validated_intent.action_type,
-                           "target_id": validated_intent.target_id,
-                           "details": validated_intent.details
-                       }
-                       console.print(f"\n[bold yellow][{agent_name} Intent @ {current_time_for_prompt:.1f}s][/bold yellow]")
-                       console.print(json.dumps(intent_dict, indent=2))
-                   # ---
-
-                   # Put intent on the event bus
-                   intent_dict = { # Ensure intent_dict is defined here for the put call
-                       "action_type": validated_intent.action_type,
-                       "target_id": validated_intent.target_id,
-                       "details": validated_intent.details
-                   }
-                   await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": intent_dict})
-                   # Update status immediately after putting intent on bus
-                   agent_state_sim["status"] = "busy"
-                   agent_state_sim["current_action_end_time"] = float('inf') # Mark as busy until resolved
-
-                except json.JSONDecodeError as e:
-                   logger.error(f"[{agent_name}] Failed to decode JSON response: {e}\nResponse:\n{response_text}", exc_info=True)
-                   console.print(f"[red][{agent_name} Error][/] Failed to decode LLM response. Agent will wait.")
-                   await asyncio.sleep(10 + random.uniform(0, 10)) # Wait longer after error
-                except ValidationError as e:
-                   logger.error(f"[{agent_name}] Failed to validate LLM response structure: {e}\nResponse:\n{response_text}", exc_info=True)
-                   console.print(f"[red][{agent_name} Error][/] LLM response has invalid structure. Agent will wait.")
-                   await asyncio.sleep(10 + random.uniform(0, 10))
-                except Exception as e:
-                   logger.error(f"[{agent_name}] Unexpected error parsing/validating response: {e}\nResponse:\n{response_text}", exc_info=True)
-                   console.print(f"[red][{agent_name} Error][/] Unexpected error processing LLM response. Agent will wait.")
-                   await asyncio.sleep(10 + random.uniform(0, 10))
-            else:
-                logger.warning(f"[{agent_name}] No valid response received from LLM. Agent will wait.")
-                console.print(f"[yellow][{agent_name} Warning][/] No valid response from LLM. Agent will wait.")
-                await asyncio.sleep(10 + random.uniform(0, 10))
-
-            # Wait a bit before next decision cycle (only if not busy)
-            # The busy check at the start handles waiting if an action is in progress
-            await asyncio.sleep(1 + random.uniform(0, 2))
-
-        except asyncio.CancelledError:
-            logger.info(f"[{agent_name}] Task cancelled.")
-            break
-        except Exception as e:
-            logger.exception(f"[{agent_name}] Error in main loop: {e}")
-            # Attempt to set state back to idle on error
-            try:
-                if agent_id in get_nested(state, "simulacra", default={}):
-                    state["simulacra"][agent_id]["status"] = "idle"
-                    state["simulacra"][agent_id]["pending_results"] = {} # Clear pending results on error
-                    state["simulacra"][agent_id]["last_observation"] = f"Encountered unexpected error: {e}"
-            except Exception as state_err:
-                 logger.error(f"[{agent_name}] Failed to update state after error: {state_err}")
-            await asyncio.sleep(10) # Wait longer after an error
+    except asyncio.CancelledError:
+        logger.info(f"[{agent_name}] Task cancelled.")
+    except Exception as e:
+        logger.error(f"[{agent_name}] Error in agent task: {e}", exc_info=True)
+        # Ensure agent is set back to idle on unexpected error within the task
+        if agent_id in get_nested(state, "simulacra", default={}):
+            state["simulacra"][agent_id]["status"] = "idle"
+    finally:
+        logger.info(f"[{agent_name}] Task finished.")
 
 # --- Main Execution Logic ---
-# ... other code from simulation_async.py ...
+# ... existing code ...
 
 async def run_simulation(
     instance_uuid_arg: Optional[str] = None,
-    location_override_arg: Optional[str] = None, # <-- Added
-    mood_override_arg: Optional[str] = None      # <-- Added
+    location_override_arg: Optional[str] = None,
+    mood_override_arg: Optional[str] = None
     ):
-    """Sets up ADK and runs all concurrent tasks."""
-    # Declare modification of module-level variables <<< Added adk_memory_service >>>
+    # Declare modification of module-level variables
     global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
-    global world_engine_agent, simulacra_agents, state
-    global live_display_object # <<< ADDED: Declare global modification
-    global narration_agent # <<< ADDED
+    global world_engine_agent, simulacra_agents, state, live_display_object, narration_agent
+    global world_mood_global # <<< ADDED global mood variable declaration
 
     console.rule("[bold green]Starting Async Simulation[/]")
 
@@ -1248,8 +1262,7 @@ async def run_simulation(
                 "current_action_end_time": state.get('world_time', 0.0), # Initialize based on current time
                 "goal": profile.get("goal", persona.get("Initial_Goal", "Determine your own long term goals.")),
                 "last_observation": final_last_observation, # Use the determined observation
-                "memory_log": profile.get("memory_log", []), # Load existing memory log
-                "pending_results": {} # Initialize pending results store
+                "memory_log": profile.get("memory_log", []), # Load existing memory log                "pending_results": {} # Initialize pending results store
             }
             final_active_sim_ids.append(sim_id)
             logger.info(f"Populated runtime state for simulacrum: {sim_id}")
@@ -1286,19 +1299,21 @@ async def run_simulation(
     logger.info(f"ADK Session created: {adk_session_id} with initial state.")
 
     # --- Instantiate Agents (Module Scope) ---
+    # Agents will now read world_mood_global when created
     world_engine_agent = create_world_engine_llm_agent()
     logger.info(f"World Engine Agent '{world_engine_agent.name}' created.")
 
-    narration_agent = create_narration_llm_agent() # <<< ADDED
-    logger.info(f"Narration Agent '{narration_agent.name}' created.")
+    narration_agent = create_narration_llm_agent() # No longer needs mood passed
+    logger.info(f"Narration Agent '{narration_agent.name}' created (using global mood '{world_mood_global}').")
 
-    simulacra_agents = {} # Clear just in case
+    simulacra_agents = {}
     for sim_id in final_active_sim_ids:
         sim_state_data = state.get("simulacra", {}).get(sim_id, {})
         persona_name = sim_state_data.get("name", sim_id)
+        # No longer needs mood passed
         sim_agent = create_simulacra_llm_agent(sim_id, persona_name)
-        simulacra_agents[sim_id] = sim_agent # Store in module-level dict
-        logger.info(f"Simulacra Agent '{sim_agent.name}' created for {sim_id}.")
+        simulacra_agents[sim_id] = sim_agent
+        logger.info(f"Simulacra Agent '{sim_agent.name}' created for {sim_id} (using global mood '{world_mood_global}').")
 
     # --- Create Runner (Module Scope) ---
     # Initialize with a default agent (e.g., world engine)
@@ -1319,13 +1334,15 @@ async def run_simulation(
         with Live(generate_table(), console=console, refresh_per_second=1.0/UPDATE_INTERVAL, vertical_overflow="visible") as live:
             live_display_object = live # <<< ADDED: Assign to global variable
             # Pass the live display object to the time manager
-            tasks.append(asyncio.create_task(time_manager_task(live_display=live), name="TimeManager"))
+            tasks.append(asyncio.create_task(time_manager_task(live_display=live), name="TimeManager")) # time_manager needs live_display
             tasks.append(asyncio.create_task(interaction_dispatcher_task(), name="InteractionDispatcher"))
-            tasks.append(asyncio.create_task(narration_task(), name="NarrationTask")) # Listens to narration_queue
-            tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine")) # Listens to event_bus
+            tasks.append(asyncio.create_task(narration_task(), name="NarrationTask"))
+            tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
 
             for sim_id in final_active_sim_ids:
+                # Pass only agent_id
                 tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id), name=f"Simulacra_{sim_id}"))
+            # --- END FIX ---
 
             if not tasks:
                  logger.error("No tasks were created. Simulation cannot run.")
