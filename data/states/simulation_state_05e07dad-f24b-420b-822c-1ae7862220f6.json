@@ -14,25 +14,36 @@
         "brewing": false,
         "coffee_level": "low"
       }
+    },
+    "coffee_maker": {
+      "state": "done"
+    },
+    "cabinet": {
+      "contents": "mug"
     }
   },
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
-  "world_time": 117.78139999997964,
+  "world_time": 535.6017000001265,
   "narrative_log": [
-    "[T59.4] You find yourself in Asheville, at home in bed as you woke up in the morning.",
-    "[T64.4] Eleanor Hayes looks around, but nothing of particular interest is apparent.",
-    "[T63.5] Eleanor Hayes waits, pausing to consider her surroundings.",
-    "[T63.6] Eleanor Hayes's action failed: The way [details] is blocked or does not exist.",
-    "[T65.9] Eleanor Hayes waits, pausing to consider her surroundings. A planned movement is blocked. She looks around again, but the immediate area still presents nothing of particular note.",
-    "[T75.2] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins.",
-    "[T70.3] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee.",
-    "[T85.5] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee. As the rich aroma of coffee begins to permeate the air, the cool glass of the smartphone is pulled from the pocket, its screen illuminating with the promise of news and notifications.",
-    "[T95.6] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee. As the rich aroma of coffee begins to permeate the air, the cool glass of the smartphone is pulled from the pocket, its screen illuminating with the promise of news and notifications. Now, phone laid aside, the rich, dark scent of brewing coffee is the only focus, a moment of quiet anticipation in the familiar morning routine.",
-    "[T102.8] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee. As the rich aroma of coffee begins to permeate the air, the cool glass of the smartphone is pulled from the pocket, its screen illuminating with the promise of news and notifications. Now, phone laid aside, the rich, dark scent of brewing coffee is the only focus, a moment of quiet anticipation in the familiar morning routine. With a final sputter and hiss, the brewing ceases, and the rich, dark liquid gurgles into the waiting mug.",
-    "[T112.9] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee. As the rich aroma of coffee begins to permeate the air, the cool glass of the smartphone is pulled from the pocket, its screen illuminating with the promise of news and notifications. Now, phone laid aside, the rich, dark scent of brewing coffee is the only focus, a moment of quiet anticipation in the familiar morning routine. With a final sputter and hiss, the brewing ceases, and the rich, dark liquid gurgles into the waiting mug. Coffee in hand, there's a gentle shift in weight as a path is traced toward the kitchen table, where the promise of a quiet seat awaits.",
-    "[T128.1] The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee. As the rich aroma of coffee begins to permeate the air, the cool glass of the smartphone is pulled from the pocket, its screen illuminating with the promise of news and notifications. Now, phone laid aside, the rich, dark scent of brewing coffee is the only focus, a moment of quiet anticipation in the familiar morning routine. With a final sputter and hiss, the brewing ceases, and the rich, dark liquid gurgles into the waiting mug. Coffee in hand, there's a gentle shift in weight as a path is traced toward the kitchen table, where the promise of a quiet seat awaits. The first sip warms from the inside out, a comforting jolt to the system, as eyes drift towards the window, seeking a glimpse of the world outside."
+    "[T127.1] The bedroom is quiet as I take a moment to look around. Soft morning light streams in through the window, illuminating the neatly made bed. The door is an obvious exit to the hallway. I also notice the dresser against the wall, and the small desk tucked away in the corner.",
+    "[T130.2] I leave the bedroom, stepping out into the hallway.",
+    "[T135.3] Standing in the hallway, I take in my surroundings. The space is narrow and dimly lit, stretching out before me. To the north, I can see it opens up into what looks like a living area. Several closed doors line the south side of the hallway. A faint humming sound drifts from the north, possibly from an appliance.",
+    "[T139.5] I head north, moving from the dimly lit hallway into the brighter living room.",
+    "[T144.6] The living room is spacious and welcoming. A comfortable couch sits invitingly, and a television is mounted on the wall. Sunlight streams in through a large window on the west wall. To the east, an open doorway clearly reveals the kitchen. A dining table sits in the center of the room.",
+    "[T146.6] I move quickly towards the open doorway to the east, stepping into the kitchen.",
+    "[T151.8] The kitchen is clean and well-organized. My eyes are immediately drawn to the coffee maker sitting on the counter, right next to a promising bag of coffee beans. The refrigerator hums quietly in the corner, a familiar and comforting sound. A window overlooks the backyard.",
+    "[T331.9] I reach for the coffee maker and start the brewing process. The machine whirs to life, and soon the rich, familiar aroma of coffee begins to fill the kitchen.",
+    "[T334.0] The brewing coffee gurgles softly as I stand and consider the day ahead. A multitude of possibilities swim through my mind.",
+    "[T335.1] I try to sift through my memories, searching for any recent plans or intentions that might help guide my day. The aroma of coffee continues to permeate the air, a comforting backdrop to my mental search.",
+    "[T337.3] A blank slate of a day stretches before me. Since my memory offers no guidance, I realize a quick weather check is in order before I can really start making plans. The coffee maker continues its rhythmic gurgling as I consider the possibilities.",
+    "[T342.5] I turn to the kitchen window and look out. The sky is a brilliant, cloudless blue, and the sun is shining brightly. A gentle breeze rustles the leaves on the trees in the backyard, painting a picture of a perfect morning.",
+    "[T372.5] A walk is definitely in order. I stand patiently, the promise of sunshine and fresh air mingling with the rich aroma of brewing coffee, as I wait for the final drops to drip into the carafe.",
+    "[T377.7] I reach for the kitchen cabinet, open it, and retrieve a mug. Its familiar weight feels comforting in my hand as the coffee maker sputters, signaling the end of its brewing cycle.",
+    "[T387.8] I carefully pour the freshly brewed coffee into the mug, the dark liquid swirling and releasing an even more intense aroma. Steam rises, gently warming my face.",
+    "[T987.9] With the mug of coffee in hand, I set off towards the park. The warmth of the mug is a welcome sensation as I step out of the kitchen and begin the walk, the anticipation of fresh air and sunshine fueling my steps.",
+    "[T1082.2] I arrive at the park."
   ],
   "simulacra": {
     "sim_3e912d": {
@@ -76,17 +87,23 @@
         "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "location": "Asheville",
+      "location": "kitchen",
       "home_location": "Asheville",
       "status": "busy",
-      "current_action_end_time": 128.08609999998237,
+      "current_action_end_time": 1082.1814000001332,
       "goal": "Determine long term goals.",
-      "last_observation": "The familiar whir of the coffee machine fills the kitchen as it springs to life. A comforting, low rumble vibrates through the countertop as the brewing begins. The cupboard door opens with a soft creak, and a weighty ceramic mug is lifted from its shelf, ready to receive the soon-to-be-brewed coffee. As the rich aroma of coffee begins to permeate the air, the cool glass of the smartphone is pulled from the pocket, its screen illuminating with the promise of news and notifications. Now, phone laid aside, the rich, dark scent of brewing coffee is the only focus, a moment of quiet anticipation in the familiar morning routine. With a final sputter and hiss, the brewing ceases, and the rich, dark liquid gurgles into the waiting mug. Coffee in hand, there's a gentle shift in weight as a path is traced toward the kitchen table, where the promise of a quiet seat awaits. The first sip warms from the inside out, a comforting jolt to the system, as eyes drift towards the window, seeking a glimpse of the world outside.",
+      "last_observation": "I arrive at the park.",
       "memory_log": [],
-      "pending_results": {}
+      "pending_results": {
+        "simulacra.sim_3e912d.location": "park"
+      },
+      "last_interjection_sim_time": 482.11730000013875,
+      "current_action_description": "Action: interrupt_agent_with_observation - Details: A faint, high-pitched whine emanates from a passing electric vehicle.",
+      "inventory": "mug_with_coffee"
     },
     "Eleanor Hayes": {
-      "location": "kitchen_table_7890"
+      "location": "kitchen_table_7890",
+      "last_interjection_sim_time": 0.0
     }
   },
   "npcs": {},

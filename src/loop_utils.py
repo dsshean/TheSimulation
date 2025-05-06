@@ -401,6 +401,12 @@ def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
         template_details["mood"] = default_mood
         logger.warning(f"Added missing 'mood' key to '{WORLD_TEMPLATE_DETAILS_KEY}' with default value '{default_mood}'.")
         modified = True
+    
+    # Ensure last_interjection_sim_time for each simulacra
+    for sim_id, sim_data in state_dict.get("simulacra", {}).items():
+        if isinstance(sim_data, dict) and "last_interjection_sim_time" not in sim_data:
+            sim_data["last_interjection_sim_time"] = 0.0
+            modified = True
     # --- END ADDED ---
 
     return modified
