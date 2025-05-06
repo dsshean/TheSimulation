@@ -21,7 +21,8 @@ from google.adk.memory import InMemoryMemoryService  # <<< Added MemoryService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
 from google.adk.tools import FunctionTool, load_memory
-from google.genai import types as genai_types  # Renamed to avoid conflict
+from google.adk.tools import google_search # <<< Import the google_search tool
+from google.genai import types as genai_types
 from pydantic import (BaseModel, Field, ValidationError, ValidationInfo,
                       field_validator)
 from rich.console import Console
@@ -49,7 +50,8 @@ except ImportError:
     logger.info("dotenv not installed, ensure GOOGLE_API_KEY is set in environment.")
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
-MODEL_NAME = os.getenv("MODEL_GEMINI_PRO", "gemini-2.0-flash") # Use PRO or FLASH
+MODEL_NAME = os.getenv("MODEL_GEMINI_PRO", "gemini-1.5-flash-latest") # Use PRO or FLASH
+SEARCH_AGENT_MODEL_NAME = os.getenv("SEARCH_AGENT_MODEL_NAME", "gemini-1.5-pro-latest") # Model for the dedicated search agent, ensure compatibility with google_search (e.g., "gemini-1.5-pro-latest" or "gemini-2.0-flash")
 APP_NAME = "TheSimulationAsync" # Consistent App Name
 USER_ID = "player1"
 
@@ -71,6 +73,11 @@ PROB_INTERJECT_AS_NARRATIVE = float(os.getenv("PROB_INTERJECT_AS_NARRATIVE", 0.0
 # PROB_INTERJECT_AS_WORLD_EVENT will be the remainder (1.0 - PROB_INTERJECT_AS_SELF_REFLECTION - PROB_INTERJECT_AS_NARRATIVE)
 
 AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS = float(os.getenv("AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS", 0.5)) # How often (real time) agent task polls state when busy
+
+# --- World Information Gatherer Parameters ---
+WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS = float(os.getenv("WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS", 3600.0)) # e.g., every 1 simulation hour
+SIMPLE_TIMER_INTERJECTION_INTERVAL_SIM_SECONDS = float(os.getenv("SIMPLE_TIMER_INTERJECTION_INTERVAL_SIM_SECONDS", 3600.0)) # e.g., every 1 sim hour for simple timer interjections
+MAX_WORLD_FEED_ITEMS = int(os.getenv("MAX_WORLD_FEED_ITEMS", 5)) # Max number of news/pop culture items to keep per category
 
 
 # --- Paths ---
@@ -98,6 +105,9 @@ world_engine_agent: Optional[LlmAgent] = None
 live_display_object: Optional[Live] = None # <<< ADDED: Global reference for Live display
 narration_agent: Optional[LlmAgent] = None
 simulacra_agents: Dict[str, LlmAgent] = {}
+search_llm_agent: Optional[LlmAgent] = None # Dedicated agent for google_search
+search_agent_runner: Optional[Runner] = None # Dedicated runner for the search agent
+search_agent_session_id: Optional[str] = None # Dedicated session ID for the search agent
 world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home." # Default mood
 
 # --- State Keys ---
@@ -182,6 +192,7 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
 - Recent History (Last ~{MEMORY_LOG_CONTEXT_LENGTH} events).
 - Objects in Room (IDs and Names).
 - Other Agents in Room.
+- Current World Feeds (Weather, News Headlines - if available and relevant to your thoughts).
 
 **Your Goal:** You determine your own goals based on your persona and the situation.
 
@@ -229,6 +240,7 @@ def create_world_engine_llm_agent() -> LlmAgent:
 - Target Entity State (if applicable)
 - Location State
 - World Rules
+- World Feeds (Weather, recent major news - for environmental context)
 
 **Your Task:**
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
@@ -291,6 +303,7 @@ You are the Narrator for **TheSimulation**. The established **World Style/Mood**
 - Factual Outcome Description
 - State Changes (Results)
 - Current World Time
+- Current World Feeds (Weather, recent major news - for subtle background flavor)
 - Recent Narrative History (Last ~5 entries)
 
 **Your Task:**
@@ -313,6 +326,21 @@ You are the Narrator for **TheSimulation**. The established **World Style/Mood**
         description=f"LLM Narrator: Generates '{world_mood_global}' narrative based on factual outcomes."
     )
 
+def create_search_llm_agent() -> LlmAgent:
+    """Creates a dedicated LLM agent for performing Google searches."""
+    agent_name = "SearchLLMAgent"
+    # IMPORTANT: Ensure SEARCH_AGENT_MODEL_NAME is compatible with the google_search tool.
+    # Per ADK docs, Gemini 2 models are compatible (e.g., "gemini-1.5-pro-latest" or the example "gemini-2.0-flash").
+    instruction = """You are a search assistant. Your task is to find relevant information on the internet using Google Search based on the user's query.
+Return the raw search results. The user will then process these results.
+"""
+    return LlmAgent(
+        name=agent_name,
+        model=SEARCH_AGENT_MODEL_NAME, # Use a model compatible with google_search
+        tools=[google_search],
+        instruction=instruction,
+        description="Dedicated LLM Agent for performing Google Searches."
+    )
 def generate_table() -> Table:
     """Generates the Rich table for live display based on the module-level state."""
     table = Table(title=f"Simulation State @ {state.get('world_time', 0.0):.2f}s",
@@ -379,6 +407,20 @@ def generate_table() -> Table:
             truncated_log_entries.append(entry)
     log_display = "\n".join(truncated_log_entries)
     table.add_row("Narrative Log", log_display)
+
+    # Display World Feeds
+    weather_feed = get_nested(state, 'world_feeds', 'weather', 'condition', default='N/A')
+    news_updates = get_nested(state, 'world_feeds', 'news_updates', default=[])
+    pop_culture_updates = get_nested(state, 'world_feeds', 'pop_culture_updates', default=[])
+
+    news_headlines_display = [item.get('headline', 'N/A') for item in news_updates[:3]] # Show up to 3 news headlines
+    pop_culture_headline_display = pop_culture_updates[0].get('headline', 'N/A') if pop_culture_updates else 'N/A'
+
+    table.add_row("--- World Feeds ---", "---")
+    table.add_row("  Weather", weather_feed)
+    for i, headline in enumerate(news_headlines_display):
+        table.add_row(f"  News {i+1}", headline[:70] + "..." if len(headline) > 70 else headline)
+    table.add_row(f"  Pop Culture", pop_culture_headline_display[:70] + "..." if len(pop_culture_headline_display) > 70 else pop_culture_headline_display)
     return table
 
 async def time_manager_task(live_display: Live):
@@ -717,14 +759,12 @@ Resolve this intent based on your instructions and the provided context.
                     "results": validated_data.results,
                     "outcome_description": validated_data.outcome_description,
                     "completion_time": completion_time,
-                    # Store current action description for reflection
                     "current_action_description": f"Action: {intent.get('action_type', 'unknown')} - Details: {intent.get('details', 'N/A')[:100]}"
                 }
                 if actor_id in state.get("simulacra", {}):
                     state["simulacra"][actor_id]["status"] = "busy"
                     state["simulacra"][actor_id]["pending_results"] = validated_data.results
                     state["simulacra"][actor_id]["current_action_end_time"] = completion_time
-                    # Store current_action_description in agent's state
                     state["simulacra"][actor_id]["current_action_description"] = narration_event["current_action_description"]
                     await narration_queue.put(narration_event)
                     logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Stored results, set end time {completion_time:.1f}s. Triggered narration. Outcome: {outcome_description}")
@@ -774,12 +814,15 @@ async def generate_llm_interjection_detail(
     agent_name_for_prompt: str,
     agent_current_action_desc: str,
     interjection_category: str, # "narrative" or "world_event"
-    world_mood: str
+    world_mood: str,
+    # Pass the global search_agent_runner and search_agent_session_id
+    global_search_agent_runner: Optional[Runner] = None, # Renamed for clarity
+    search_agent_session_id: Optional[str] = None
 ) -> str:
     """Generates a brief interjection detail using an LLM."""
     try:
         # Validate probabilities for interjection types
-        if PROB_INTERJECT_AS_SELF_REFLECTION + PROB_INTERJECT_AS_NARRATIVE > 1.0:
+        if PROB_INTERJECT_AS_SELF_REFLECTION + PROB_INTERJECT_AS_NARRATIVE > 1.01: # Allow for slight float inaccuracies
             logger.warning(
                 f"Sum of PROB_INTERJECT_AS_SELF_REFLECTION ({PROB_INTERJECT_AS_SELF_REFLECTION}) and "
                 f"PROB_INTERJECT_AS_NARRATIVE ({PROB_INTERJECT_AS_NARRATIVE}) exceeds 1.0. "
@@ -797,6 +840,25 @@ Output ONLY the single, short, descriptive sentence of this event. Example: "A w
 Keep it concise and impactful.
 """
         elif interjection_category == "world_event":
+            if global_search_agent_runner and search_agent_session_id: # Use passed global runner
+                try:
+                    search_query = "latest brief world news update"
+                    search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
+                    raw_search_results_text = ""
+                    async for event in global_search_agent_runner.run_async(user_id=USER_ID, session_id=search_agent_session_id, new_message=search_trigger_content):
+                        if event.is_final_response() and event.content and event.content.parts:
+                            raw_search_results_text = event.content.parts[0].text
+                            break
+                    
+                    if raw_search_results_text:
+                        summarization_model = genai.GenerativeModel(MODEL_NAME)
+                        summarization_prompt = f"Given this raw search result: '{raw_search_results_text[:500]}...'\nCreate a very short, impactful, one-sentence news flash suitable for a brief interjection for {agent_name_for_prompt}. Example: 'A news alert flashes on a nearby screen: Major international agreement reached.'"
+                        summary_response = await summarization_model.generate_content_async(summarization_prompt)
+                        if summary_response.text:
+                            return summary_response.text.strip()
+                except Exception as search_interject_e:
+                    logger.error(f"Error using search for world_event interjection: {search_interject_e}")
+            # Fallback to LLM invention if search fails or not available
             prompt_text = f"""
 Agent {agent_name_for_prompt} is currently: "{agent_current_action_desc}".
 The general world mood is: "{world_mood}".
@@ -814,9 +876,241 @@ Keep it concise and impactful.
         logger.error(f"Error generating LLM interjection detail: {e}", exc_info=True)
         return "A fleeting distraction crosses your mind." # Fallback
 
+async def generate_simulated_world_feed_content(
+    category: str, # "weather", "world_news", "regional_news", "local_news", "pop_culture"
+    simulation_time: float,
+    location_context: str, # e.g., "Cityville, StateXYZ, CountryABC"
+    world_mood: str,
+    # Pass the global search_agent_runner and search_agent_session_id
+    global_search_agent_runner: Optional[Runner] = None, # Renamed for clarity
+    search_agent_session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Simulates fetching world feed content using an LLM.
+    Returns a dictionary structured for that category.
+    """
+    try:
+        model = genai.GenerativeModel(MODEL_NAME)
+        llm_for_summarization = genai.GenerativeModel(MODEL_NAME)
+        prompt_text = f"Current simulation time: {simulation_time:.0f} seconds. Location context: {location_context}. World Mood: {world_mood}.\n"
+        output_format_note = "Respond ONLY with a JSON object matching the specified format."
+        response_obj = None # Initialize to handle cases where it might not be set
+
+        # Determine if we should fetch real data or generate fictional data
+        world_type = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'world_type', default="fictional")
+        sub_genre = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'sub_genre', default="turn_based")
+        use_real_feeds = world_type == "real" and sub_genre == "realtime"
+
+        if category == "weather":
+            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+                search_query = f"current weather in {location_context}"
+                logger.info(f"[WorldInfoGatherer] Attempting REAL weather search for '{location_context}' with query: '{search_query}'")
+                search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
+                raw_search_results_text = ""
+                search_tool_called_successfully = False # Flag to check if search actually ran
+                async for event in global_search_agent_runner.run_async(user_id=USER_ID, session_id=search_agent_session_id, new_message=search_trigger_content):
+                    logger.debug(f"[WorldInfoGatherer_SearchEvent_Weather] Event ID: {event.id}, Author: {event.author}, Type: {event.type}")
+                    if event.content and event.content.parts:
+                        for i_part, part in enumerate(event.content.parts):
+                            logger.debug(f"[WorldInfoGatherer_SearchEvent_Weather] Part {i_part}: {part}")
+                            if part.text:
+                                raw_search_results_text += part.text + "\n"
+                                search_tool_called_successfully = True
+                    if event.is_final_response():
+                        logger.debug(f"[WorldInfoGatherer_SearchEvent_Weather] Final event for weather search.")
+                        break
+                
+                if search_tool_called_successfully and raw_search_results_text.strip():
+                    logger.info(f"[WorldInfoGatherer] REAL weather search for '{location_context}' returned (first 500 chars): {raw_search_results_text.strip()[:500]}")
+                    summarization_prompt = f"Based on this weather information: '{raw_search_results_text.strip()[:1000]}...'\nExtract the current weather condition, temperature in Celsius (as an integer), and a short forecast. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\nIf temperature is in Fahrenheit, convert it to Celsius. If exact data is missing, make a plausible estimation based on the text. {output_format_note}"
+                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
+                else: 
+                    logger.warning(f"[WorldInfoGatherer] REAL weather search for '{location_context}' yielded no usable text results or tool not called. Falling back to LLM invention.")
+                    prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
+            else: 
+                if use_real_feeds: 
+                    logger.warning(f"[WorldInfoGatherer] Intended REAL weather for '{location_context}' but search runner/session not available. Falling back to LLM invention.")
+                prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
+        
+        elif category == "world_news":
+            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+                search_query = "diverse top world news headlines (e.g., politics, social issues, environment, major international events)"
+                logger.info(f"[WorldInfoGatherer] Attempting REAL search for '{category}' with query: '{search_query}'")
+                search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
+                raw_search_results_text = ""
+                search_tool_called_successfully = False
+                async for event in global_search_agent_runner.run_async(user_id=USER_ID, session_id=search_agent_session_id, new_message=search_trigger_content):
+                    logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Event ID: {event.id}, Author: {event.author}, Type: {event.type}")
+                    if event.content and event.content.parts:
+                        for i_part, part in enumerate(event.content.parts):
+                            logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Part {i_part}: {part}")
+                            if part.text: raw_search_results_text += part.text + "\n"; search_tool_called_successfully = True
+                    if event.is_final_response(): break
+                
+                if search_tool_called_successfully and raw_search_results_text.strip():
+                    logger.info(f"[WorldInfoGatherer] Search for '{category}' returned raw results (first 500 chars): {raw_search_results_text.strip()[:500]}")
+                    summarization_prompt = f"Based on these search results: '{raw_search_results_text.strip()[:1000]}...'\nProvide a single, very concise news headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
+                else: 
+                    logger.warning(f"[WorldInfoGatherer] REAL search for '{category}' yielded no usable text results or tool not called. Falling back to LLM invention.")
+                    prompt_text += f"Generate a plausible, concise world news headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+            else:
+                if use_real_feeds:
+                    logger.warning(f"[WorldInfoGatherer] Intended REAL search for '{category}' but search runner/session not available. Falling back to LLM invention.")
+                prompt_text += f"Generate a plausible, concise world news headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+        
+        elif category == "regional_news":
+            country = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'country', default="").strip()
+            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+                search_query = f"top national news headlines for {country}" if country else f"top regional news headlines for {location_context}"
+                logger.info(f"[WorldInfoGatherer] Attempting REAL search for '{category}' with query: '{search_query}'")
+                search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
+                raw_search_results_text = ""
+                search_tool_called_successfully = False
+                async for event in global_search_agent_runner.run_async(user_id=USER_ID, session_id=search_agent_session_id, new_message=search_trigger_content):
+                    logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Event ID: {event.id}, Author: {event.author}, Type: {event.type}")
+                    if event.content and event.content.parts:
+                        for i_part, part in enumerate(event.content.parts):
+                            logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Part {i_part}: {part}")
+                            if part.text: raw_search_results_text += part.text + "\n"; search_tool_called_successfully = True
+                    if event.is_final_response(): break
+
+                if search_tool_called_successfully and raw_search_results_text.strip():
+                    logger.info(f"[WorldInfoGatherer] Search for '{category}' returned raw results (first 500 chars): {raw_search_results_text.strip()[:500]}")
+                    summarization_prompt = f"Based on these national/regional news search results for '{country if country else location_context}': '{raw_search_results_text.strip()[:1000]}...'\nProvide a single, very concise news headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
+                else:
+                    logger.warning(f"[WorldInfoGatherer] REAL search for '{category}' yielded no usable text results or tool not called. Falling back to LLM invention.")
+                    prompt_text += f"Generate a plausible, concise regional news headline and summary relevant to {location_context}. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+            else:
+                if use_real_feeds:
+                    logger.warning(f"[WorldInfoGatherer] Intended REAL search for '{category}' but search runner/session not available. Falling back to LLM invention.")
+                prompt_text += f"Generate a plausible, concise regional news headline and summary relevant to {location_context}. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+
+        elif category == "local_news":
+            city = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'city', default="").strip()
+            state_province = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'state', default="").strip()
+            local_search_term = f"{city}, {state_province}" if city and state_province else city or "current location"
+            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+                search_query = f"local news headlines for {local_search_term}"
+                logger.info(f"[WorldInfoGatherer] Attempting REAL search for '{category}' with query: '{search_query}'")
+                search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
+                raw_search_results_text = ""
+                search_tool_called_successfully = False
+                async for event in global_search_agent_runner.run_async(user_id=USER_ID, session_id=search_agent_session_id, new_message=search_trigger_content):
+                    logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Event ID: {event.id}, Author: {event.author}, Type: {event.type}")
+                    if event.content and event.content.parts:
+                        for i_part, part in enumerate(event.content.parts):
+                            logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Part {i_part}: {part}")
+                            if part.text: raw_search_results_text += part.text + "\n"; search_tool_called_successfully = True
+                    if event.is_final_response(): break
+                
+                if search_tool_called_successfully and raw_search_results_text.strip():
+                    logger.info(f"[WorldInfoGatherer] Search for '{category}' returned raw results (first 500 chars): {raw_search_results_text.strip()[:500]}")
+                    summarization_prompt = f"Based on these local news search results for {local_search_term}: '{raw_search_results_text.strip()[:1000]}...'\nProvide a single, very concise news headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
+                else:
+                    logger.warning(f"[WorldInfoGatherer] REAL search for '{category}' yielded no usable text results or tool not called. Falling back to LLM invention.")
+                    prompt_text += f"Generate a plausible, concise local news headline and summary for {location_context}. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+            else:
+                if use_real_feeds:
+                    logger.warning(f"[WorldInfoGatherer] Intended REAL search for '{category}' but search runner/session not available. Falling back to LLM invention.")
+                prompt_text += f"Generate a plausible, concise local news headline and summary for {location_context}. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+
+        elif category == "pop_culture":
+            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+                country = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'country', default="").strip()
+                pop_culture_region = f"{country} " if country else ""
+                search_query = f"latest {pop_culture_region}pop culture trends and entertainment news headlines (e.g., movies, music, viral trends)"
+                logger.info(f"[WorldInfoGatherer] Attempting REAL search for '{category}' with query: '{search_query}'")
+                search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
+                raw_search_results_text = ""
+                search_tool_called_successfully = False
+                async for event in global_search_agent_runner.run_async(user_id=USER_ID, session_id=search_agent_session_id, new_message=search_trigger_content):
+                    logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Event ID: {event.id}, Author: {event.author}, Type: {event.type}")
+                    if event.content and event.content.parts:
+                        for i_part, part in enumerate(event.content.parts):
+                            logger.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Part {i_part}: {part}")
+                            if part.text: raw_search_results_text += part.text + "\n"; search_tool_called_successfully = True
+                    if event.is_final_response(): break
+
+                if search_tool_called_successfully and raw_search_results_text.strip():
+                    logger.info(f"[WorldInfoGatherer] Search for '{category}' returned raw results (first 500 chars): {raw_search_results_text.strip()[:500]}")
+                    summarization_prompt = f"Based on these {pop_culture_region}pop culture search results: '{raw_search_results_text.strip()[:1000]}...'\nProvide a single, very concise pop culture headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
+                else:
+                    logger.warning(f"[WorldInfoGatherer] REAL search for '{category}' yielded no usable text results or tool not called. Falling back to LLM invention.")
+                    prompt_text += f"Generate a plausible, concise pop culture news headline and summary (e.g., movies, music, trends). Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+            else:
+                if use_real_feeds:
+                    logger.warning(f"[WorldInfoGatherer] Intended REAL search for '{category}' but search runner/session not available. Falling back to LLM invention.")
+                prompt_text += f"Generate a plausible, concise pop culture news headline and summary (e.g., movies, music, trends). Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+        else:
+            return {"error": "Unknown category"}
+
+        if not (response_obj and response_obj.text): # If response_obj wasn't set by search logic, use the fallback prompt_text
+            response_obj = await model.generate_content_async(prompt_text)
+
+        response_text = response_obj.text.strip() if response_obj and response_obj.text else "{}"
+        response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text, flags=re.MULTILINE)
+        
+        try:
+            data = json.loads(response_text_clean)
+            data["timestamp"] = simulation_time
+            data["source_category"] = category
+            return data
+        except json.JSONDecodeError:
+            logger.error(f"Failed to decode JSON for {category} from LLM: {response_text_clean}")
+            return {"error": f"JSON decode error for {category}", "raw_response": response_text_clean, "timestamp": simulation_time, "source_category": category}
+
+    except Exception as e:
+        logger.error(f"Error generating LLM world feed for {category}: {e}", exc_info=True)
+        return {"error": f"LLM generation error for {category}", "timestamp": simulation_time, "source_category": category}
+
+async def world_info_gatherer_task():
+    """Periodically fetches/generates world information and updates the state."""
+    global state, world_mood_global, search_agent_runner, search_agent_session_id # Use global search runner and session
+    logger.info("[WorldInfoGatherer] Task started.")
+    await asyncio.sleep(10) # Initial delay
+
+    while True:
+        try:
+            current_sim_time = state.get("world_time", 0.0)
+            location_info_parts = [
+                get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'city', default="Unknown City"),
+                get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'state', default="Unknown State"),
+                get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, 'country', default="Unknown Country")
+            ]
+            location_context_str = ", ".join(filter(None, location_info_parts)) or "an unspecified location"
+
+            logger.info(f"[WorldInfoGatherer] Updating world feeds at sim_time {current_sim_time:.1f} for location: {location_context_str}")
+            _update_state_value(state, 'world_feeds.last_update_sim_time', current_sim_time)
+            
+            weather_data = await generate_simulated_world_feed_content("weather", current_sim_time, location_context_str, world_mood_global, global_search_agent_runner=search_agent_runner, search_agent_session_id=search_agent_session_id)
+            _update_state_value(state, 'world_feeds.weather', weather_data)
+            news_categories = ["world_news", "regional_news", "local_news", "pop_culture"]
+            for news_cat in news_categories:
+                news_item = await generate_simulated_world_feed_content(news_cat, current_sim_time, location_context_str, world_mood_global, global_search_agent_runner=search_agent_runner, search_agent_session_id=search_agent_session_id)
+                feed_key = "news_updates" if "news" in news_cat else "pop_culture_updates"
+                current_feed = get_nested(state, 'world_feeds', feed_key, default=[])
+                current_feed.insert(0, news_item)
+                _update_state_value(state, f'world_feeds.{feed_key}', current_feed[-MAX_WORLD_FEED_ITEMS:])
+
+            logger.info(f"[WorldInfoGatherer] World feeds updated. Next check in {WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS} sim_seconds.")
+            next_run_sim_time = current_sim_time + WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS
+            while state.get("world_time", 0.0) < next_run_sim_time:
+                await asyncio.sleep(UPDATE_INTERVAL * 5)
+
+        except asyncio.CancelledError:
+            logger.info("[WorldInfoGatherer] Task cancelled.")
+            break
+        except Exception as e:
+            logger.exception(f"[WorldInfoGatherer] Error: {e}")
+            await asyncio.sleep(60)
+
 async def simulacra_agent_task_llm(agent_id: str):
     """Asynchronous task for managing a single Simulacra LLM agent."""
-    global state, adk_runner, event_bus, adk_session, simulacra_agents, live_display_object, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, world_mood_global
+    global state, adk_runner, event_bus, adk_session, simulacra_agents, live_display_object, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, world_mood_global, search_agent_runner, search_agent_session_id
 
     agent_name = get_nested(state, "simulacra", agent_id, "name", default=agent_id)
     logger.info(f"[{agent_name}] LLM Agent task started.")
@@ -835,8 +1129,11 @@ async def simulacra_agent_task_llm(agent_id: str):
         sim_state_init = get_nested(state, "simulacra", agent_id, default={})
         if "last_interjection_sim_time" not in sim_state_init:
             _update_state_value(state, f"simulacra.{agent_id}.last_interjection_sim_time", 0.0)
+        # Initialize next_simple_timer_interjection_sim_time if not present
+        if "next_simple_timer_interjection_sim_time" not in sim_state_init:
+            _update_state_value(state, f"simulacra.{agent_id}.next_simple_timer_interjection_sim_time", 0.0) # Fire early on first run
 
-        # Initial prompt if agent is idle at start (or after an error recovery)
+
         if get_nested(state, "simulacra", agent_id, "status") == "idle":
             current_sim_state_init = get_nested(state, "simulacra", agent_id, default={})
             current_loc_id_init = current_sim_state_init.get('location')
@@ -857,6 +1154,9 @@ async def simulacra_agent_task_llm(agent_id: str):
             raw_recent_narrative_init = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
             cleaned_recent_narrative_init = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative_init]
             history_str_init = "\n".join(cleaned_recent_narrative_init)
+            weather_summary = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+            latest_news_headlines = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:2]]
+            news_summary = " ".join(h for h in latest_news_headlines if h) or "No major news."
 
             prompt_text_parts_init = [
                  f"**Current State Info for {agent_name} ({agent_id}):**",
@@ -864,6 +1164,8 @@ async def simulacra_agent_task_llm(agent_id: str):
                  f"- Location ID: {current_loc_id_init or 'Unknown'}",
                  f"- Location Description: {current_loc_state_init.get('description', 'Not available.')}",
                  f"- Status: {current_sim_state_init.get('status', 'idle')} (You should act now)",
+                 f"- Current Weather: {weather_summary}",
+                 f"- Recent News Snippet: {news_summary}",
                  f"- Current Goal: {current_sim_state_init.get('goal', 'Determine goal.')}",
                  f"- Current Time: {current_world_time_init:.1f}s",
                  f"- Last Observation/Event: {current_sim_state_init.get('last_observation', 'None.')}",
@@ -888,7 +1190,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                             live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
                             live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
                         await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
-                        _update_state_value(state, f"simulacra.{agent_id}.status", "thinking") # Mark as thinking
+                        _update_state_value(state, f"simulacra.{agent_id}.status", "thinking")
                     except (json.JSONDecodeError, ValidationError) as e_init:
                         logger.error(f"[{agent_name}] Error processing initial response: {e_init}\nResponse:\n{response_text}", exc_info=True)
                     break
@@ -896,13 +1198,40 @@ async def simulacra_agent_task_llm(agent_id: str):
                     logger.error(f"[{agent_name}] LLM Error during initial prompt: {event.error_message}")
                     break
 
-
         next_interjection_check_sim_time = state.get("world_time", 0.0) + AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS
         while True:
             await asyncio.sleep(AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS)
             current_sim_time_busy_loop = state.get("world_time", 0.0)
             agent_state_busy_loop = get_nested(state, "simulacra", agent_id, default={})
             current_status_busy_loop = agent_state_busy_loop.get("status")
+
+            # --- New Simple Timer-Based Interjection Logic ---
+            # This check happens regardless of agent's current status (idle, busy, thinking)
+            next_simple_interjection_time = agent_state_busy_loop.get("next_simple_timer_interjection_sim_time", float('inf')) # Default to infinity if somehow missing
+            last_general_interjection_time = agent_state_busy_loop.get("last_interjection_sim_time", 0.0)
+            general_cooldown_passed_for_simple_timer = (current_sim_time_busy_loop - last_general_interjection_time) >= INTERJECTION_COOLDOWN_SIM_SECONDS
+
+            if current_sim_time_busy_loop >= next_simple_interjection_time and general_cooldown_passed_for_simple_timer:
+                logger.info(f"[{agent_name}] Simple timer interjection triggered at {current_sim_time_busy_loop:.1f}s.")
+                
+                # For this timer, let's make it a "world_event_interjection"
+                interjection_details = await generate_llm_interjection_detail(
+                    agent_name_for_prompt=agent_name,
+                    agent_current_action_desc=agent_state_busy_loop.get("current_action_description", "their current activity"),
+                    interjection_category="world_event_interjection",
+                    world_mood=world_mood_global,
+                    global_search_agent_runner=search_agent_runner,
+                    search_agent_session_id=search_agent_session_id
+                )
+                logger.info(f"[{agent_name}] Simple Timer Interjection (World Event): {interjection_details}")
+                
+                await event_bus.put({
+                    "type": "intent_declared", "actor_id": agent_id,
+                    "intent": {"action_type": "interrupt_agent_with_observation", "details": interjection_details}
+                })
+                _update_state_value(state, f"simulacra.{agent_id}.status", "thinking") # Agent will process this observation
+                _update_state_value(state, f"simulacra.{agent_id}.next_simple_timer_interjection_sim_time", current_sim_time_busy_loop + SIMPLE_TIMER_INTERJECTION_INTERVAL_SIM_SECONDS)
+                _update_state_value(state, f"simulacra.{agent_id}.last_interjection_sim_time", current_sim_time_busy_loop) # Update general cooldown
 
             if current_status_busy_loop == "idle":
                 logger.debug(f"[{agent_name}] Status is idle. Proceeding to plan next action.")
@@ -923,6 +1252,9 @@ async def simulacra_agent_task_llm(agent_id: str):
                 raw_recent_narrative = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
                 cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
                 history_str = "\n".join(cleaned_recent_narrative)
+                weather_summary_loop = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+                latest_news_headlines_loop = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:2]]
+                news_summary_loop = " ".join(h for h in latest_news_headlines_loop if h) or "No major news."
 
                 prompt_text_parts = [
                      f"**Current State Info for {agent_name} ({agent_id}):**",
@@ -930,6 +1262,8 @@ async def simulacra_agent_task_llm(agent_id: str):
                      f"- Location ID: {current_loc_id or 'Unknown'}",
                      f"- Location Description: {current_loc_state.get('description', 'Not available.')}",
                      f"- Status: {agent_state_busy_loop.get('status', 'idle')} (You should act now)",
+                     f"- Current Weather: {weather_summary_loop}",
+                     f"- Recent News Snippet: {news_summary_loop}",
                      f"- Current Goal: {agent_state_busy_loop.get('goal', 'Determine goal.')}",
                      f"- Current Time: {current_sim_time_busy_loop:.1f}s",
                      f"- Last Observation/Event: {agent_state_busy_loop.get('last_observation', 'None.')}",
@@ -1022,7 +1356,9 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                             agent_name_for_prompt=agent_name,
                             agent_current_action_desc=agent_state_busy_loop.get("current_action_description", "what you are doing"),
                             interjection_category="narrative" if interjection_type == "narrative_interjection" else "world_event",
-                            world_mood=world_mood_global
+                            world_mood=world_mood_global,
+                            global_search_agent_runner=search_agent_runner, # Pass global search runner
+                            search_agent_session_id=search_agent_session_id # Pass global search session ID
                         )
                         logger.info(f"[{agent_name}] {interjection_type.replace('_', ' ').title()}: {interjection_details}")
                         await event_bus.put({ "type": "intent_declared", "actor_id": agent_id,
@@ -1034,7 +1370,7 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
     except Exception as e:
         logger.error(f"[{agent_name}] Error in agent task: {e}", exc_info=True)
         if agent_id in get_nested(state, "simulacra", default={}):
-            _update_state_value(state, f"simulacra.{agent_id}.status", "idle") # Use helper
+            _update_state_value(state, f"simulacra.{agent_id}.status", "idle")
     finally:
         logger.info(f"[{agent_name}] Task finished.")
 
@@ -1045,7 +1381,7 @@ async def run_simulation(
     ):
     global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
     global world_engine_agent, simulacra_agents, state, live_display_object, narration_agent
-    global world_mood_global
+    global world_mood_global, search_llm_agent, search_agent_runner, search_agent_session_id # Add search components to global
 
     console.rule("[bold green]Starting Async Simulation[/]")
     adk_memory_service = InMemoryMemoryService()
@@ -1089,8 +1425,8 @@ async def run_simulation(
 
     if mood_override_arg:
         try:
-            mood_override = mood_override_arg.strip() # Keep case from user
-            world_mood_global = mood_override # Set the global mood
+            mood_override = mood_override_arg.strip()
+            world_mood_global = mood_override
             logger.info(f"Global world mood overridden to '{world_mood_global}'. This will affect new agent instantiations.")
             console.print(f"Global world mood set to: [yellow]{world_mood_global}[/yellow]")
         except Exception as e:
@@ -1223,6 +1559,21 @@ async def run_simulation(
         session_service=adk_session_service, memory_service=adk_memory_service
     )
     logger.info(f"ADK Runner initialized with default agent '{world_engine_agent.name}'.")
+    
+    # --- Initialize Dedicated Search Agent, Runner, and Session ---
+    search_llm_agent = create_search_llm_agent()
+    logger.info(f"Search Agent '{search_llm_agent.name}' created with model '{SEARCH_AGENT_MODEL_NAME}'. Ensure this model supports the google_search tool.")
+    
+    search_agent_session_id = f"world_feed_search_session_{world_instance_uuid}"
+    adk_session_service.create_session(app_name=APP_NAME + "_Search", user_id=USER_ID, session_id=search_agent_session_id) # Create the session
+    logger.info(f"ADK Session for Search Agent created: {search_agent_session_id}")
+    
+    search_agent_runner = Runner(
+        agent=search_llm_agent, app_name=APP_NAME + "_Search",
+        session_service=adk_session_service
+    )
+    logger.info(f"Dedicated Runner for Search Agent '{search_llm_agent.name}' initialized.")
+    # --- End Search Agent Setup ---
 
     tasks = []
     final_state_path = os.path.join(STATE_DIR, f"simulation_state_{world_instance_uuid}.json")
@@ -1234,6 +1585,7 @@ async def run_simulation(
             tasks.append(asyncio.create_task(interaction_dispatcher_task(), name="InteractionDispatcher"))
             tasks.append(asyncio.create_task(narration_task(), name="NarrationTask"))
             tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
+            tasks.append(asyncio.create_task(world_info_gatherer_task(), name="WorldInfoGatherer"))
             for sim_id in final_active_sim_ids:
                 tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id), name=f"Simulacra_{sim_id}"))
 

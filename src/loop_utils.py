@@ -407,6 +407,9 @@ def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
         if isinstance(sim_data, dict) and "last_interjection_sim_time" not in sim_data:
             sim_data["last_interjection_sim_time"] = 0.0
             modified = True
+        if isinstance(sim_data, dict) and "next_simple_timer_interjection_sim_time" not in sim_data:
+            sim_data["next_simple_timer_interjection_sim_time"] = 0.0 # Fire early on first load
+            modified = True
     # --- END ADDED ---
 
     return modified
@@ -551,27 +554,48 @@ def load_or_initialize_simulation(instance_uuid_arg: Optional[str]) -> Tuple[Opt
         # Populate from world_config (use defaults if world_config is empty)
         loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["description"] = world_config.get("description", "Default World")
         loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["rules"] = world_config.get("rules", {})
+        
+        # Explicitly copy world_type, sub_genre, and location details from the top level of world_config
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["world_type"] = world_config.get("world_type", "real")
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["sub_genre"] = world_config.get("sub_genre", "realtime")
+        
+        # Ensure LOCATION_KEY exists before populating
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY].setdefault(LOCATION_KEY, {})
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["city"] = world_config.get(LOCATION_KEY, {}).get("city", "Unknown City")
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["state"] = world_config.get(LOCATION_KEY, {}).get("state", "Unknown State")
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["country"] = world_config.get(LOCATION_KEY, {}).get("country", "Unknown Country")
+        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["coordinates"] = world_config.get(LOCATION_KEY, {}).get("coordinates", {})
+        
+        logger.info(f"Populated world_type '{loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]['world_type']}', sub_genre '{loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]['sub_genre']}', and location details from world_config into {WORLD_TEMPLATE_DETAILS_KEY}.")
+
         # --- ADDED: Explicitly copy mood from world_config if it exists ---
-        if "mood" in world_config.get(WORLD_TEMPLATE_DETAILS_KEY, {}):
-            loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["mood"] = world_config[WORLD_TEMPLATE_DETAILS_KEY]["mood"]
-            logger.info(f"Populated mood '{loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]['mood']}' from world_config.")
-        elif "mood" in world_config: # Check if mood is at the top level of world_config (legacy?)
-             loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["mood"] = world_config["mood"]
-             logger.info(f"Populated mood '{loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]['mood']}' from top-level world_config.")
-        else:
-             # If not in world_config, it will be missing, and narration_task will use its default
-             logger.info("Mood key not found in world_config, will use default in narration.")
-        # --- END ADDED ---
+        # The 'mood' might not be at the top level of world_config, but rather within a 'world_template_details' if it was saved from an old state.
+        # For new configs, we might want to define a top-level mood or a default.
+        # For now, let's assume mood is handled by ensure_state_structure or is not a top-level config item.
+        # If 'mood' is intended to be a top-level item in world_config.json, add:
+        # loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["mood"] = world_config.get("mood", "neutral")
 
-        # --- ADDED: Populate location_details from world_config if available ---
+        # Initialize other necessary top-level state structures
+        loaded_state_data.setdefault("simulacra", {})
+        loaded_state_data.setdefault("npcs", {})
+        loaded_state_data.setdefault("objects", {})
+        loaded_state_data.setdefault("narrative_log", [])
+        loaded_state_data.setdefault("world_time", 0.0)
+        loaded_state_data.setdefault(ACTIVE_SIMULACRA_IDS_KEY, [])
+        loaded_state_data.setdefault(SIMULACRA_PROFILES_KEY, {})
+        loaded_state_data.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
+
+        # --- Populate location_details from world_config if available ---
         if world_config.get(LOCATION_KEY): # Check if 'location' key exists in world_config
-             # For now, just use the primary location from world_config if it exists
-             # A more robust approach might merge multiple locations if world_config defines them
-             primary_loc_id = world_config[LOCATION_KEY].get("city", "default_start_location") # Use city name as ID or default
+             primary_loc_city = world_config[LOCATION_KEY].get("city")
+             if primary_loc_city: # Use city name as ID if available
+                 primary_loc_id = primary_loc_city 
+             else: # Fallback to a generic ID if city is not specified
+                 primary_loc_id = "default_start_location"
+                 
              primary_loc_name = world_config[LOCATION_KEY].get("city", "A Starting Point")
-             primary_loc_desc = world_config.get("description", "An initial location.") # Use world desc as fallback
+             primary_loc_desc = world_config.get("description", "An initial location.") 
 
-             # Overwrite the default 'limbo'/'default_start_location' from blank state
              loaded_state_data["location_details"] = {
                  primary_loc_id: {
                      "name": primary_loc_name,
@@ -580,14 +604,14 @@ def load_or_initialize_simulation(instance_uuid_arg: Optional[str]) -> Tuple[Opt
                      "connected_locations": []
                  }
              }
-             # Also update current_world_state to match
              loaded_state_data[WORLD_STATE_KEY][LOCATION_DETAILS_KEY] = loaded_state_data["location_details"].copy()
              logger.info(f"Populated initial location '{primary_loc_id}' from world_config.")
         # ---
 
         # Populate from life_summaries
-        default_start_loc_id = list(loaded_state_data["location_details"].keys())[0] # Get the ID of the (potentially updated) default location
-        default_start_loc_name = loaded_state_data["location_details"][default_start_loc_id]["name"]
+        default_start_loc_id = list(loaded_state_data["location_details"].keys())[0] if loaded_state_data["location_details"] else "default_start_location"
+        default_start_loc_name = loaded_state_data["location_details"].get(default_start_loc_id, {}).get("name", "A Starting Point")
+
 
         for summary in life_summaries:
             sim_id = summary.get("simulacra_id")

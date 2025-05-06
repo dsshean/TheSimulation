@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 import logging
-import os # Keep os for makedirs
+import os
 import sys
 
 from dotenv import load_dotenv
@@ -9,14 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from rich.console import Console
-console = Console()
-# Ensure src directory is in Python path or use relative import if appropriate
-try:
-    from src.simulation_async import run_simulation, APP_NAME # Import APP_NAME too
-except ImportError as e:
-    print(f"ERROR: Could not import from src.simulation_async: {e}")
-    sys.exit(1)
 
+console = Console()
+
+from src.simulation_async import (APP_NAME,  # Import APP_NAME too
+                                      run_simulation)
 # --- Logging Setup ---
 # Keep basic logging setup here at the entry point
 log_filename = "simulation_async.log"

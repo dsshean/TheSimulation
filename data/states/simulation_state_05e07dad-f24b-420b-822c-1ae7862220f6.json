@@ -25,7 +25,7 @@
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
-  "world_time": 535.6017000001265,
+  "world_time": 537.2423000001203,
   "narrative_log": [
     "[T127.1] The bedroom is quiet as I take a moment to look around. Soft morning light streams in through the window, illuminating the neatly made bed. The door is an obvious exit to the hallway. I also notice the dresser against the wall, and the small desk tucked away in the corner.",
     "[T130.2] I leave the bedroom, stepping out into the hallway.",
@@ -43,7 +43,8 @@
     "[T377.7] I reach for the kitchen cabinet, open it, and retrieve a mug. Its familiar weight feels comforting in my hand as the coffee maker sputters, signaling the end of its brewing cycle.",
     "[T387.8] I carefully pour the freshly brewed coffee into the mug, the dark liquid swirling and releasing an even more intense aroma. Steam rises, gently warming my face.",
     "[T987.9] With the mug of coffee in hand, I set off towards the park. The warmth of the mug is a welcome sensation as I step out of the kitchen and begin the walk, the anticipation of fresh air and sunshine fueling my steps.",
-    "[T1082.2] I arrive at the park."
+    "[T1082.2] I arrive at the park.",
+    "[T538.7] Eleanor pauses, the silence of the morning pressing in around her. The faint hum of the refrigerator and the quiet ticking of the kitchen clock are the only sounds that dare to break the stillness. She takes a slow, deliberate breath, the air cool against her skin, and gathers her thoughts, trying to decide where the morning will take her."
   ],
   "simulacra": {
     "sim_3e912d": {
@@ -87,23 +88,22 @@
         "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "location": "kitchen",
+      "location": "Asheville",
       "home_location": "Asheville",
       "status": "busy",
-      "current_action_end_time": 1082.1814000001332,
+      "current_action_end_time": 538.7439000001284,
       "goal": "Determine long term goals.",
-      "last_observation": "I arrive at the park.",
+      "last_observation": "Eleanor pauses, the silence of the morning pressing in around her. The faint hum of the refrigerator and the quiet ticking of the kitchen clock are the only sounds that dare to break the stillness. She takes a slow, deliberate breath, the air cool against her skin, and gathers her thoughts, trying to decide where the morning will take her.",
       "memory_log": [],
-      "pending_results": {
-        "simulacra.sim_3e912d.location": "park"
-      },
-      "last_interjection_sim_time": 482.11730000013875,
-      "current_action_description": "Action: interrupt_agent_with_observation - Details: A faint, high-pitched whine emanates from a passing electric vehicle.",
-      "inventory": "mug_with_coffee"
+      "pending_results": {},
+      "last_interjection_sim_time": 0.0,
+      "current_action_description": "Action: wait - Details: Reviewing current state to plan next action.",
+      "next_simple_timer_interjection_sim_time": 0.0
     },
     "Eleanor Hayes": {
       "location": "kitchen_table_7890",
-      "last_interjection_sim_time": 0.0
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0
     }
   },
   "npcs": {},
@@ -172,6 +172,16 @@
       "last_observation": "You find yourself in Asheville, at home in bed as you woke up in the morning.",
       "goal": "Determine long term goals.",
       "memory_log": []
+    }
+  },
+  "world_feeds": {
+    "last_update_sim_time": 536.5955000001219,
+    "weather": {
+      "condition": "Partly Cloudy",
+      "temperature_celsius": 18,
+      "forecast_short": "Morning sun, clouds increasing this afternoon.",
+      "timestamp": 536.5955000001219,
+      "source_category": "weather"
     }
   }
 }
