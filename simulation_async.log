@@ -3078,3 +3078,216 @@ Raw response:
 2025-05-06 22:29:58,125 - src.simulation_async - DEBUG - NarrationLLM Final Content: Eleanor Hayes (sim_3e912d) rinses the toothpaste from her mouth and splashes cool water onto her fac...
 2025-05-06 22:29:58,131 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.last_observation = Eleanor Hayes (sim_3e912d) rinses the toothpaste from her mouth and splashes cool water onto her face, the refreshing sensation awakening her senses and washing away the last vestiges of sleepiness.
 2025-05-06 22:29:58,131 - src.simulation_async - INFO - [NarrationTask] Appended narrative for Eleanor Hayes: Eleanor Hayes (sim_3e912d) rinses the toothpaste from her mouth and splashes coo...
+2025-05-06 22:30:56,433 - src.simulation_async - INFO - [TimeManager] Applying completed action effects for sim_3e912d at time 414.8 (due at 414.7).
+2025-05-06 22:30:56,433 - src.simulation_async - DEBUG - [TimeManager] No pending results found for completed action of sim_3e912d.
+2025-05-06 22:30:56,433 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = idle
+2025-05-06 22:30:56,433 - src.simulation_async - INFO - [TimeManager] Set sim_3e912d status to idle.
+2025-05-06 22:30:56,727 - src.simulation_async - DEBUG - [Eleanor Hayes] Status is idle. Proceeding to plan next action.
+2025-05-06 22:30:56,727 - src.simulation_async - DEBUG - [Eleanor Hayes] Sending subsequent prompt.
+2025-05-06 22:30:56,755 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:30:56,770 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:30:56,799 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A6A28DA0>
+2025-05-06 22:30:56,799 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A84B5150> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:30:56,825 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A696B3B0>
+2025-05-06 22:30:56,825 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:30:56,825 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:30:56,825 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:30:56,825 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:30:56,825 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:30:58,064 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:18 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=1226'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:30:58,064 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:30:58,064 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:30:58,064 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:30:58,065 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:30:58,065 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:30:58,082 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = thinking
+2025-05-06 22:30:58,082 - src.simulation_async - INFO - [InteractionDispatcher] Intent from sim_3e912d (move on N/A) classified as 'environment'.
+2025-05-06 22:30:58,082 - src.simulation_async - INFO - [WorldEngineLLM] Received 'environment' action request from sim_3e912d: {'action_type': 'move', 'target_id': None, 'details': 'Move back to the bedroom to get dressed.'}
+2025-05-06 22:30:58,083 - src.simulation_async - DEBUG - [WorldEngineLLM] Sending prompt to LLM for sim_3e912d's intent (move).
+2025-05-06 22:30:58,109 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:30:58,128 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:30:58,140 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A57E47D0>
+2025-05-06 22:30:58,141 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A844E1D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:30:58,157 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A6558AD0>
+2025-05-06 22:30:58,158 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:30:58,158 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:30:58,158 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:30:58,158 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:30:58,158 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:30:58,899 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:19 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=733'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:30:58,899 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:30:58,899 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:30:58,899 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:30:58,900 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:30:58,900 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:30:58,901 - src.simulation_async - DEBUG - WorldLLM Final Content: ```json
+{"valid_action": true, "duration": 10.0, "results": {}, "outcome_description": "Eleanor Haye...
+2025-05-06 22:30:58,901 - src.simulation_async - DEBUG - [WorldEngineLLM] LLM response validated successfully for sim_3e912d.
+2025-05-06 22:30:58,911 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = busy
+2025-05-06 22:30:58,911 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.pending_results = {}
+2025-05-06 22:30:58,912 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.current_action_end_time = 426.39000000001397
+2025-05-06 22:30:58,912 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.current_action_description = Action: move - Details: Move back to the bedroom to get dressed.
+2025-05-06 22:30:58,912 - src.simulation_async - INFO - [WorldEngineLLM] Action VALID for sim_3e912d. Stored results, set end time 426.4s. Outcome: Eleanor Hayes returned to the bedroom to get dressed.
+2025-05-06 22:30:58,912 - src.simulation_async - DEBUG - [NarrationTask] Using global world mood: 'The familiar, everyday real world; starting the morning routine at home.'
+2025-05-06 22:30:58,912 - src.simulation_async - INFO - [NarrationTask] Generating narrative for Eleanor Hayes's action completion. Outcome: 'Eleanor Hayes returned to the bedroom to get dressed.'
+2025-05-06 22:30:58,941 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:30:58,956 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:30:58,982 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A7F528A0>
+2025-05-06 22:30:58,982 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A6A254D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:30:59,002 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3970BF680>
+2025-05-06 22:30:59,002 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:30:59,003 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:30:59,003 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:30:59,003 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:30:59,003 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:30:59,883 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:20 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=870'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:30:59,883 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:30:59,883 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:30:59,884 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:30:59,884 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:30:59,884 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:30:59,886 - src.simulation_async - DEBUG - NarrationLLM Final Content: Eleanor Hayes (sim_3e912d) leaves the bathroom and heads back to the bedroom, the prospect of changi...
+2025-05-06 22:30:59,891 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.last_observation = Eleanor Hayes (sim_3e912d) leaves the bathroom and heads back to the bedroom, the prospect of changing out of her pajamas and into her work clothes signaling a definitive transition into the day ahead.
+2025-05-06 22:30:59,892 - src.simulation_async - INFO - [NarrationTask] Appended narrative for Eleanor Hayes: Eleanor Hayes (sim_3e912d) leaves the bathroom and heads back to the bedroom, th...
+2025-05-06 22:31:08,130 - src.simulation_async - INFO - [TimeManager] Applying completed action effects for sim_3e912d at time 426.5 (due at 426.4).
+2025-05-06 22:31:08,130 - src.simulation_async - DEBUG - [TimeManager] No pending results found for completed action of sim_3e912d.
+2025-05-06 22:31:08,130 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = idle
+2025-05-06 22:31:08,130 - src.simulation_async - INFO - [TimeManager] Set sim_3e912d status to idle.
+2025-05-06 22:31:08,239 - src.simulation_async - DEBUG - [Eleanor Hayes] Status is idle. Proceeding to plan next action.
+2025-05-06 22:31:08,239 - src.simulation_async - DEBUG - [Eleanor Hayes] Sending subsequent prompt.
+2025-05-06 22:31:08,268 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:31:08,284 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:31:08,300 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A7F04620>
+2025-05-06 22:31:08,300 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A844EF50> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:31:08,319 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A840E930>
+2025-05-06 22:31:08,319 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:08,320 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:31:08,320 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:31:08,320 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:31:08,320 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:09,334 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:29 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=1000'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:31:09,334 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:31:09,334 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:31:09,335 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:31:09,335 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:31:09,335 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:31:09,351 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = thinking
+2025-05-06 22:31:09,351 - src.simulation_async - INFO - [InteractionDispatcher] Intent from sim_3e912d (look_around on N/A) classified as 'environment'.
+2025-05-06 22:31:09,352 - src.simulation_async - INFO - [WorldEngineLLM] Received 'environment' action request from sim_3e912d: {'action_type': 'look_around', 'target_id': None, 'details': 'Look around to find the closet or dresser where I keep my clothes.'}
+2025-05-06 22:31:09,352 - src.simulation_async - DEBUG - [WorldEngineLLM] Sending prompt to LLM for sim_3e912d's intent (look_around).
+2025-05-06 22:31:09,379 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:31:09,394 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:31:09,408 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A6558AD0>
+2025-05-06 22:31:09,408 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A7F303D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:31:09,428 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A696BF80>
+2025-05-06 22:31:09,428 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:09,428 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:31:09,428 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:31:09,428 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:31:09,428 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:10,184 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:30 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=746'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:31:10,184 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:31:10,184 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:31:10,184 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:31:10,184 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:31:10,185 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:31:10,186 - src.simulation_async - DEBUG - WorldLLM Final Content: ```json
+{"valid_action": true, "duration": 5.0, "results": {}, "outcome_description": "Eleanor Hayes...
+2025-05-06 22:31:10,186 - src.simulation_async - DEBUG - [WorldEngineLLM] LLM response validated successfully for sim_3e912d.
+2025-05-06 22:31:10,197 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = busy
+2025-05-06 22:31:10,198 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.pending_results = {}
+2025-05-06 22:31:10,198 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.current_action_end_time = 432.5929999999935
+2025-05-06 22:31:10,198 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.current_action_description = Action: look_around - Details: Look around to find the closet or dresser where I keep my clothes.
+2025-05-06 22:31:10,198 - src.simulation_async - INFO - [WorldEngineLLM] Action VALID for sim_3e912d. Stored results, set end time 432.6s. Outcome: Eleanor Hayes looked around the bedroom to find the closet or dresser.
+2025-05-06 22:31:10,198 - src.simulation_async - DEBUG - [NarrationTask] Using global world mood: 'The familiar, everyday real world; starting the morning routine at home.'
+2025-05-06 22:31:10,198 - src.simulation_async - INFO - [NarrationTask] Generating narrative for Eleanor Hayes's action completion. Outcome: 'Eleanor Hayes looked around the bedroom to find the closet or dresser.'
+2025-05-06 22:31:10,226 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:31:10,242 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:31:10,257 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A83BF0B0>
+2025-05-06 22:31:10,257 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A84B77D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:31:10,274 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A7F53200>
+2025-05-06 22:31:10,274 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:10,274 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:31:10,274 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:31:10,274 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:31:10,274 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:11,068 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:31 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=784'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:31:11,068 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:31:11,068 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:31:11,069 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:31:11,069 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:31:11,069 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:31:11,070 - src.simulation_async - DEBUG - NarrationLLM Final Content: Eleanor Hayes (sim_3e912d) surveys the bedroom, her eyes seeking out the familiar forms of the close...
+2025-05-06 22:31:11,077 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.last_observation = Eleanor Hayes (sim_3e912d) surveys the bedroom, her eyes seeking out the familiar forms of the closet and the dresser, the twin repositories of her daily wardrobe, ready to equip her for the day ahead.
+2025-05-06 22:31:11,077 - src.simulation_async - INFO - [NarrationTask] Appended narrative for Eleanor Hayes: Eleanor Hayes (sim_3e912d) surveys the bedroom, her eyes seeking out the familia...
+2025-05-06 22:31:14,348 - src.simulation_async - INFO - [TimeManager] Applying completed action effects for sim_3e912d at time 432.7 (due at 432.6).
+2025-05-06 22:31:14,348 - src.simulation_async - DEBUG - [TimeManager] No pending results found for completed action of sim_3e912d.
+2025-05-06 22:31:14,348 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = idle
+2025-05-06 22:31:14,348 - src.simulation_async - INFO - [TimeManager] Set sim_3e912d status to idle.
+2025-05-06 22:31:14,349 - src.simulation_async - DEBUG - [Eleanor Hayes] Status is idle. Proceeding to plan next action.
+2025-05-06 22:31:14,349 - src.simulation_async - DEBUG - [Eleanor Hayes] Sending subsequent prompt.
+2025-05-06 22:31:14,379 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:31:14,395 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:31:14,409 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A399FFC860>
+2025-05-06 22:31:14,409 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A84745D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:31:14,426 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A66F7500>
+2025-05-06 22:31:14,426 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:14,426 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:31:14,426 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:31:14,427 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:31:14,427 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:15,474 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:35 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=1034'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:31:15,475 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:31:15,475 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:31:15,476 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:31:15,476 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:31:15,476 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:31:15,494 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = thinking
+2025-05-06 22:31:15,494 - src.simulation_async - INFO - [InteractionDispatcher] Intent from sim_3e912d (use on closet_951) classified as 'environment'.
+2025-05-06 22:31:15,494 - src.simulation_async - INFO - [WorldEngineLLM] Received 'environment' action request from sim_3e912d: {'action_type': 'use', 'target_id': 'closet_951', 'details': 'Use the closet to get dressed for work.'}
+2025-05-06 22:31:15,494 - src.simulation_async - DEBUG - [WorldEngineLLM] Sending prompt to LLM for sim_3e912d's intent (use).
+2025-05-06 22:31:15,525 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:31:15,541 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:31:15,555 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A83332C0>
+2025-05-06 22:31:15,555 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A844E8D0> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:31:15,577 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A7ED32F0>
+2025-05-06 22:31:15,577 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:15,577 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:31:15,577 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:31:15,577 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:31:15,577 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:16,312 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:36 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=724'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:31:16,312 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:31:16,312 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:31:16,312 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:31:16,312 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:31:16,312 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:31:16,313 - src.simulation_async - DEBUG - WorldLLM Final Content: ```json
+{"valid_action": true, "duration": 300.0, "results": {}, "outcome_description": "Eleanor Hay...
+2025-05-06 22:31:16,314 - src.simulation_async - DEBUG - [WorldEngineLLM] LLM response validated successfully for sim_3e912d.
+2025-05-06 22:31:16,324 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.status = busy
+2025-05-06 22:31:16,324 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.pending_results = {}
+2025-05-06 22:31:16,324 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.current_action_end_time = 733.765000000014
+2025-05-06 22:31:16,324 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.current_action_description = Action: use - Details: Use the closet to get dressed for work.
+2025-05-06 22:31:16,325 - src.simulation_async - INFO - [WorldEngineLLM] Action VALID for sim_3e912d. Stored results, set end time 733.8s. Outcome: Eleanor Hayes got dressed using the closet.
+2025-05-06 22:31:16,325 - src.simulation_async - DEBUG - [NarrationTask] Using global world mood: 'The familiar, everyday real world; starting the morning routine at home.'
+2025-05-06 22:31:16,325 - src.simulation_async - INFO - [NarrationTask] Generating narrative for Eleanor Hayes's action completion. Outcome: 'Eleanor Hayes got dressed using the closet.'
+2025-05-06 22:31:16,355 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2025-05-06 22:31:16,371 - httpcore.connection - DEBUG - connect_tcp.started host='generativelanguage.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2025-05-06 22:31:16,383 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A3A57E47D0>
+2025-05-06 22:31:16,383 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001A3A84B7650> server_hostname='generativelanguage.googleapis.com' timeout=None
+2025-05-06 22:31:16,408 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001A399FFDB80>
+2025-05-06 22:31:16,408 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:16,408 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-05-06 22:31:16,408 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-05-06 22:31:16,408 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-05-06 22:31:16,408 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-05-06 22:31:17,370 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Wed, 07 May 2025 02:31:37 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Server-Timing', b'gfet4t7; dur=951'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2025-05-06 22:31:17,371 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-06 22:31:17,371 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-05-06 22:31:17,371 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-05-06 22:31:17,371 - httpcore.http11 - DEBUG - response_closed.started
+2025-05-06 22:31:17,372 - httpcore.http11 - DEBUG - response_closed.complete
+2025-05-06 22:31:17,373 - src.simulation_async - DEBUG - NarrationLLM Final Content: Eleanor Hayes (sim_3e912d) opens the closet door and steps inside, the scent of clean laundry and fa...
+2025-05-06 22:31:17,379 - src.simulation_async - INFO - [StateUpdate] Applied: simulacra.sim_3e912d.last_observation = Eleanor Hayes (sim_3e912d) opens the closet door and steps inside, the scent of clean laundry and familiar fabrics enveloping her as she begins the process of selecting her outfit, choosing the clothes that will carry her through the day's demands.
+2025-05-06 22:31:17,379 - src.simulation_async - INFO - [NarrationTask] Appended narrative for Eleanor Hayes: Eleanor Hayes (sim_3e912d) opens the closet door and steps inside, the scent of ...
