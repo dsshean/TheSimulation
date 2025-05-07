@@ -11,26 +11,18 @@ import pytz
 from google.generativeai import types
 from rich.console import Console
 from timezonefinder import TimezoneFinder
-# from pydantic import BaseModel, ValidationError # No longer needed here
 
-# --- Constants (Moved/Duplicated from simulation_async for loading logic) ---
-# Consider a central config module in the future
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # Project Root
-STATE_DIR = os.path.join(BASE_DIR, "data", "states")
-LIFE_SUMMARY_DIR = os.path.join(BASE_DIR, "data", "life_summaries")
-WORLD_CONFIG_DIR = os.path.join(BASE_DIR, "data") # World configs are in the main data dir
-
-# State Keys (Moved/Duplicated)
-WORLD_STATE_KEY = "current_world_state"
-ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
-LOCATION_DETAILS_KEY = "location_details"
-SIMULACRA_PROFILES_KEY = "simulacra_profiles"
-CURRENT_LOCATION_KEY = "current_location"
-HOME_LOCATION_KEY = "home_location"
-WORLD_TEMPLATE_DETAILS_KEY = "world_template_details"
-LOCATION_KEY = "location" # Used in world_config
-DEFAULT_HOME_LOCATION_NAME = "At home"
-DEFAULT_HOME_DESCRIPTION = "You are at home. It's a cozy place with familiar surroundings."
+from .config import (
+    STATE_DIR,
+    LIFE_SUMMARY_DIR,
+    WORLD_CONFIG_DIR,
+    WORLD_STATE_KEY,
+    ACTIVE_SIMULACRA_IDS_KEY,
+    LOCATION_DETAILS_KEY,
+    SIMULACRA_PROFILES_KEY,
+    WORLD_TEMPLATE_DETAILS_KEY,
+    LOCATION_KEY
+)
 
 # Ensure directories exist (safe check)
 os.makedirs(STATE_DIR, exist_ok=True)
@@ -415,26 +407,6 @@ def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
     return modified
 
 def load_or_initialize_simulation(instance_uuid_arg: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """
-    Loads or initializes simulation state based on world config and life summaries.
-
-    1. Determines the target UUID (from arg, latest world config, or new).
-    2. Finds and loads the corresponding world_config JSON.
-    3. Finds corresponding life_summary JSON files.
-    4. Checks for an existing simulation_state JSON in STATE_DIR.
-    5. If state exists, loads it.
-    6. If state doesn't exist, creates a new one populated from world_config and life_summaries.
-    7. Ensures the final state structure is valid.
-    8. Saves the state if it was newly created or modified during structure check.
-
-    Args:
-        instance_uuid_arg: The specific UUID provided via command line, or None.
-
-    Returns:
-        A tuple containing:
-        - The loaded or initialized state dictionary (or None on critical failure).
-        - The path to the state file used or created (or None on critical failure).
-    """
     logger.info("Starting simulation state loading/initialization.")
     world_config_path: Optional[str] = None
     target_uuid: Optional[str] = instance_uuid_arg
@@ -442,234 +414,171 @@ def load_or_initialize_simulation(instance_uuid_arg: Optional[str]) -> Tuple[Opt
     state_file_path: Optional[str] = None
     loaded_state_data: Optional[Dict[str, Any]] = None
     created_new_state = False
-    state_modified = False
+    state_modified_during_load = False
 
-    # --- 1. Determine Target UUID ---
-    if not target_uuid: # If no specific UUID was provided via argument
+    if not target_uuid:
         logger.info("No instance UUID specified, searching for the latest world config...")
         world_config_pattern = os.path.join(WORLD_CONFIG_DIR, "world_config_*.json")
         latest_world_config_path = find_latest_file(world_config_pattern)
         if latest_world_config_path:
-            try:
-                filename = os.path.basename(latest_world_config_path)
-                # Assumes format world_config_UUID.json
-                # We will load the file first to get the definitive UUID from its content
-                world_config_path = latest_world_config_path
-                logger.info(f"Found latest world config file: {world_config_path}. Will load to determine UUID.")
-                console.print(f"Found latest world config file: [cyan]{filename}[/cyan]")
-            except IndexError: # Should not happen with find_latest_file, but safety check
-                logger.error(f"Could not process latest world config filename: {latest_world_config_path}")
-                console.print(f"[bold red]Error:[/bold red] Could not process filename {latest_world_config_path}.")
-                return None, None
+            world_config_path = latest_world_config_path
+            logger.info(f"Found latest world config file: {world_config_path}.")
+            console.print(f"Found latest world config file: [cyan]{os.path.basename(world_config_path)}[/cyan]")
         else:
-            logger.warning("No world config files found. Will create a new simulation instance.")
+            logger.warning("No world config files found. Creating new simulation instance.")
             target_uuid = str(uuid.uuid4())
             console.print(f"[yellow]Warning:[/yellow] No world config found. Creating new simulation with UUID: {target_uuid}")
-            # No world_config_path, will use defaults later
     else:
-        # UUID was provided, construct the expected world config path
         world_config_path = os.path.join(WORLD_CONFIG_DIR, f"world_config_{target_uuid}.json")
         if not os.path.exists(world_config_path):
             logger.error(f"Specified world config file not found: {world_config_path}")
-            console.print(f"[bold red]Error:[/bold red] World config for UUID {target_uuid} not found at {world_config_path}.")
+            console.print(f"[bold red]Error:[/bold red] World config for UUID {target_uuid} not found.")
             return None, None
 
-    # --- 2. Load World Config (if path exists) ---
     if world_config_path and os.path.exists(world_config_path):
         world_config = load_json_file(world_config_path)
         if world_config is None:
-            logger.error(f"Failed to load or parse world config file: {world_config_path}")
-            console.print(f"[bold red]Error:[/bold red] Failed to load world config file {world_config_path}.")
+            logger.error(f"Failed to load world config: {world_config_path}")
             return None, None
-
-        # Verify UUID match if arg was provided
         config_uuid = world_config.get("world_instance_uuid")
         if not config_uuid:
-             logger.error(f"World config file {world_config_path} is missing 'world_instance_uuid'.")
-             console.print(f"[bold red]Error:[/bold red] World config file missing 'world_instance_uuid'.")
-             # If we found the latest file but it has no UUID, we can't proceed reliably.
+             logger.error(f"World config {world_config_path} missing 'world_instance_uuid'.")
              return None, None
         if instance_uuid_arg and config_uuid != instance_uuid_arg:
-            logger.error(f"UUID mismatch: Arg specified {instance_uuid_arg}, but file {world_config_path} contains {config_uuid}")
-            console.print(f"[bold red]Error:[/bold red] UUID mismatch in world config file.")
+            logger.error(f"UUID mismatch: Arg={instance_uuid_arg}, File={config_uuid}")
             return None, None
-        target_uuid = config_uuid # Use UUID from file as definitive source
+        target_uuid = config_uuid
         logger.info(f"Successfully loaded world config for UUID: {target_uuid}")
-        if not instance_uuid_arg: # If we loaded the latest, print the UUID now
-            console.print(f"Using world config for UUID: [cyan]{target_uuid}[/cyan]")
+        if not instance_uuid_arg: console.print(f"Using world config for UUID: [cyan]{target_uuid}[/cyan]")
+    elif not world_config_path and target_uuid:
+         logger.info(f"Proceeding with new UUID {target_uuid} without a world config file (using defaults).")
+         world_config = {"world_instance_uuid": target_uuid} # Minimal default
+    else:
+        logger.error("Critical error determining world_config.")
+        return None, None
 
-    elif not world_config_path and target_uuid: # Case where no config was found and new UUID generated
-         logger.info(f"Proceeding with new simulation UUID {target_uuid} without a world config file.")
-         world_config = {} # Use empty dict as default
-    # else: world_config_path existed but file didn't - error handled above
-
-    # --- 3. Find Life Summaries ---
     life_summary_pattern = os.path.join(LIFE_SUMMARY_DIR, f"life_summary_*_{target_uuid}.json")
     life_summary_files = glob.glob(life_summary_pattern)
-    logger.info(f"Found {len(life_summary_files)} life summary file(s) for world UUID {target_uuid}.")
-    if not life_summary_files:
-        logger.warning(f"No life summary files found for world {target_uuid}. Simulation may start without agents if creating new state.")
+    logger.info(f"Found {len(life_summary_files)} life summary file(s) for UUID {target_uuid}.")
+    life_summaries = [ls_data for ls_file in life_summary_files if (ls_data := load_json_file(ls_file))]
 
-    life_summaries = []
-    for ls_file in life_summary_files:
-        summary_data = load_json_file(ls_file)
-        if summary_data:
-            life_summaries.append(summary_data)
-        else:
-            logger.error(f"Failed to load life summary file: {ls_file}")
-            console.print(f"[yellow]Warning:[/yellow] Could not load life summary {os.path.basename(ls_file)}. Skipping.")
-
-    # --- 4. Check for Existing Simulation State ---
     state_file_path = os.path.join(STATE_DIR, f"simulation_state_{target_uuid}.json")
     if os.path.exists(state_file_path):
-        # --- 5. Load Existing State ---
-        logger.info(f"Found existing simulation state file: {state_file_path}. Loading...")
+        logger.info(f"Found existing state file: {state_file_path}. Loading...")
         loaded_state_data = load_json_file(state_file_path)
         if loaded_state_data is None:
-            logger.error(f"Error loading existing simulation state file {state_file_path}. Will attempt to initialize anew.", exc_info=True)
-            console.print(f"[bold red]Error:[/bold red] Failed to load existing state file {state_file_path}. Attempting to create a new one.")
-            # Fall through to create new state
+            logger.error(f"Error loading existing state {state_file_path}. Initializing anew.")
         else:
-            # Verify UUID match within the loaded state
             state_uuid = loaded_state_data.get("world_instance_uuid")
-            if not state_uuid:
-                 logger.critical(f"State file {state_file_path} is missing 'world_instance_uuid'. Cannot proceed.")
-                 console.print(f"[bold red]Error:[/bold red] State file is missing the 'world_instance_uuid' key.")
-                 return None, None
-            if state_uuid != target_uuid:
-                 logger.critical(f"UUID mismatch! Expected '{target_uuid}', but state file contains '{state_uuid}'.")
-                 console.print(f"[bold red]Error:[/bold red] UUID mismatch between state file content ('{state_uuid}') and expected UUID ('{target_uuid}').")
-                 return None, None
-
-            logger.info(f"Successfully loaded simulation state for UUID: {target_uuid}")
-            console.print(f"Loaded existing simulation state from: [green]{state_file_path}[/green]")
-            # State is loaded, proceed to structure check
-    else:
-        # --- 6. Create New State ---
-        logger.info(f"No existing simulation state found for UUID {target_uuid}. Creating new state...")
-        console.print(f"No simulation state file found for UUID {target_uuid}. Initializing new state...")
+            if not state_uuid or state_uuid != target_uuid:
+                 logger.critical(f"UUID mismatch in state file! Expected '{target_uuid}', found '{state_uuid}'. Forcing new state.")
+                 loaded_state_data = None # Force new state
+            else:
+                logger.info(f"Successfully loaded state for UUID: {target_uuid}")
+                console.print(f"Loaded existing state from: [green]{state_file_path}[/green]")
+    
+    if loaded_state_data is None:
+        logger.info(f"No usable existing state for UUID {target_uuid}. Creating new state...")
+        console.print(f"No usable state file for UUID {target_uuid}. Initializing new state...")
         loaded_state_data = create_blank_simulation_state(target_uuid)
-        created_new_state = True # Mark that we created it
+        created_new_state = True
+        state_modified_during_load = True 
 
-        # Populate from world_config (use defaults if world_config is empty)
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["description"] = world_config.get("description", "Default World")
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["rules"] = world_config.get("rules", {})
+        # Populate simulacra for a NEW state
+        # setup_simulation.py should create the initial location_details and objects in the state file.
+        # This part only adds simulacra based on life summaries.
+        default_start_loc_id = "default_start_location" # Fallback
+        # Check if location_details exists and has keys, from create_blank_simulation_state or setup_simulation
+        loc_details_in_new_state = get_nested(loaded_state_data, WORLD_STATE_KEY, LOCATION_DETAILS_KEY)
+        if loc_details_in_new_state and isinstance(loc_details_in_new_state, dict) and loc_details_in_new_state.keys():
+            default_start_loc_id = list(loc_details_in_new_state.keys())[0]
         
-        # Explicitly copy world_type, sub_genre, and location details from the top level of world_config
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["world_type"] = world_config.get("world_type", "real")
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["sub_genre"] = world_config.get("sub_genre", "realtime")
-        
-        # Ensure LOCATION_KEY exists before populating
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY].setdefault(LOCATION_KEY, {})
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["city"] = world_config.get(LOCATION_KEY, {}).get("city", "Unknown City")
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["state"] = world_config.get(LOCATION_KEY, {}).get("state", "Unknown State")
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["country"] = world_config.get(LOCATION_KEY, {}).get("country", "Unknown Country")
-        loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]["coordinates"] = world_config.get(LOCATION_KEY, {}).get("coordinates", {})
-        
-        logger.info(f"Populated world_type '{loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]['world_type']}', sub_genre '{loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]['sub_genre']}', and location details from world_config into {WORLD_TEMPLATE_DETAILS_KEY}.")
-
-        # --- ADDED: Explicitly copy mood from world_config if it exists ---
-        # The 'mood' might not be at the top level of world_config, but rather within a 'world_template_details' if it was saved from an old state.
-        # For new configs, we might want to define a top-level mood or a default.
-        # For now, let's assume mood is handled by ensure_state_structure or is not a top-level config item.
-        # If 'mood' is intended to be a top-level item in world_config.json, add:
-        # loaded_state_data[WORLD_TEMPLATE_DETAILS_KEY]["mood"] = world_config.get("mood", "neutral")
-
-        # Initialize other necessary top-level state structures
-        loaded_state_data.setdefault("simulacra", {})
-        loaded_state_data.setdefault("npcs", {})
-        loaded_state_data.setdefault("objects", {})
-        loaded_state_data.setdefault("narrative_log", [])
-        loaded_state_data.setdefault("world_time", 0.0)
-        loaded_state_data.setdefault(ACTIVE_SIMULACRA_IDS_KEY, [])
-        loaded_state_data.setdefault(SIMULACRA_PROFILES_KEY, {})
-        loaded_state_data.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
-
-        # --- Populate location_details from world_config if available ---
-        if world_config.get(LOCATION_KEY): # Check if 'location' key exists in world_config
-             primary_loc_city = world_config[LOCATION_KEY].get("city")
-             if primary_loc_city: # Use city name as ID if available
-                 primary_loc_id = primary_loc_city 
-             else: # Fallback to a generic ID if city is not specified
-                 primary_loc_id = "default_start_location"
-                 
-             primary_loc_name = world_config[LOCATION_KEY].get("city", "A Starting Point")
-             primary_loc_desc = world_config.get("description", "An initial location.") 
-
-             loaded_state_data["location_details"] = {
-                 primary_loc_id: {
-                     "name": primary_loc_name,
-                     "description": primary_loc_desc,
-                     "objects_present": [],
-                     "connected_locations": []
-                 }
-             }
-             loaded_state_data[WORLD_STATE_KEY][LOCATION_DETAILS_KEY] = loaded_state_data["location_details"].copy()
-             logger.info(f"Populated initial location '{primary_loc_id}' from world_config.")
-        # ---
-
-        # Populate from life_summaries
-        default_start_loc_id = list(loaded_state_data["location_details"].keys())[0] if loaded_state_data["location_details"] else "default_start_location"
-        default_start_loc_name = loaded_state_data["location_details"].get(default_start_loc_id, {}).get("name", "A Starting Point")
-
-
         for summary in life_summaries:
             sim_id = summary.get("simulacra_id")
             persona = summary.get("persona_details")
-            if not sim_id or not persona:
-                logger.warning(f"Skipping life summary due to missing 'simulacra_id' or 'persona_details': {summary.get('file_origin', 'Unknown file')}")
-                continue
-
-            loaded_state_data[ACTIVE_SIMULACRA_IDS_KEY].append(sim_id)
-
-            # Populate simulacra dictionary (runtime state)
-            loaded_state_data["simulacra"][sim_id] = {
-                "id": sim_id,
-                "name": persona.get("Name", "Unnamed Simulacra"),
-                "persona": persona,
-                "location": default_start_loc_id, # Start at the default location ID
-                "home_location": default_start_loc_id, # Assume home is the start for now
-                "status": "idle", # Initial status
-                "current_action_end_time": 0.0, # Initialize action time
-                "goal": persona.get("Initial_Goal", "Determine long term goals."), # Use Initial_Goal from persona if available
-                "last_observation": f"You find yourself in {default_start_loc_name}.", # Basic observation using location name
-                "memory_log": [], # Start with empty memory log
-                "pending_results": {}
+            if not sim_id or not persona: continue
+            loaded_state_data.setdefault(ACTIVE_SIMULACRA_IDS_KEY, []).append(sim_id)
+            loaded_state_data.setdefault("simulacra", {})[sim_id] = {
+                "id": sim_id, "name": persona.get("Name", sim_id), "persona": persona,
+                "location": default_start_loc_id, "home_location": default_start_loc_id,
+                "status": "idle", "current_action_end_time": 0.0,
+                "goal": persona.get("Initial_Goal", "Determine goals."),
+                "last_observation": f"Waking up in {get_nested(loc_details_in_new_state, default_start_loc_id, 'name', default=default_start_loc_id)}.",
+                "memory_log": [], "pending_results": {}
             }
-
-            # Populate simulacra_profiles dictionary (persistent profile info)
-            loaded_state_data[SIMULACRA_PROFILES_KEY][sim_id] = {
-                "persona_details": persona,
-                "current_location": default_start_loc_id, # Use location ID
-                "home_location": default_start_loc_id, # Use location ID
-                "last_observation": loaded_state_data["simulacra"][sim_id]["last_observation"], # Use the same initial observation
-                "goal": loaded_state_data["simulacra"][sim_id]["goal"], # Store initial goal here too
-                "memory_log": [] # Store memory log here too? Decide on single source of truth.
+            loaded_state_data.setdefault(SIMULACRA_PROFILES_KEY, {})[sim_id] = {
+                "persona_details": persona, "current_location": default_start_loc_id,
+                "home_location": default_start_loc_id,
+                "last_observation": loaded_state_data["simulacra"][sim_id]["last_observation"],
+                "goal": loaded_state_data["simulacra"][sim_id]["goal"], "memory_log": []
             }
+        logger.info(f"Initialized new state for UUID {target_uuid} with {len(get_nested(loaded_state_data, ACTIVE_SIMULACRA_IDS_KEY, default=[]))} simulacra.")
 
-        logger.info(f"Initialized new simulation state for UUID {target_uuid} with {len(loaded_state_data[ACTIVE_SIMULACRA_IDS_KEY])} simulacra.")
-        console.print(f"Initialized new simulation state with [bold]{len(loaded_state_data[ACTIVE_SIMULACRA_IDS_KEY])}[/bold] simulacra.")
+    # --- Sync authoritative fields from world_config and reset objects ---
+    if loaded_state_data and world_config:
+        logger.info(f"Syncing from world_config and resetting objects for UUID: {target_uuid}")
+        wtd = loaded_state_data.setdefault(WORLD_TEMPLATE_DETAILS_KEY, {})
 
-    # --- 7. Ensure State Structure ---
+        # These fields are ALWAYS taken from world_config
+        for key, default_wc_val in [("world_type", "fictional"), ("sub_genre", "turn_based"), 
+                                    ("description", "A simulated world."), ("rules", {})]:
+            wc_val = world_config.get(key, default_wc_val)
+            if wtd.get(key) != wc_val:
+                wtd[key] = wc_val
+                state_modified_during_load = True
+        
+        loc_key_data = wtd.setdefault(LOCATION_KEY, {})
+        wc_loc = world_config.get(LOCATION_KEY, {})
+        for key, default_wc_val in [("city", "Unknown City"), ("state", "Unknown State"), 
+                                    ("country", "Unknown Country"), ("coordinates", {})]:
+            wc_val = wc_loc.get(key, default_wc_val)
+            if loc_key_data.get(key) != wc_val:
+                loc_key_data[key] = wc_val
+                state_modified_during_load = True
+        logger.info(f"Synced WORLD_TEMPLATE_DETAILS_KEY from world_config: type='{wtd.get('world_type')}', city='{loc_key_data.get('city')}'")
+
+        # ALWAYS reset objects from world_config.json
+        # This assumes world_config.json is the source of truth for initial object states.
+        # If world_config.json does NOT contain objects, this will result in an empty object dict.
+        loaded_state_data["objects"] = {} # Blank out existing objects from loaded state
+        config_objects = world_config.get("objects", {})
+        if config_objects: # Only populate if world_config has objects
+            for obj_id, obj_data_template in config_objects.items():
+                loaded_state_data["objects"][obj_id] = json.loads(json.dumps(obj_data_template)) # Deep copy
+                if "id" not in loaded_state_data["objects"][obj_id]:
+                     loaded_state_data["objects"][obj_id]["id"] = obj_id
+            logger.info(f"Reset and populated 'objects' from world_config.json ({len(loaded_state_data['objects'])} objects).")
+            state_modified_during_load = True
+        else:
+            logger.info("'objects' key not found or empty in world_config.json. State 'objects' will be empty.")
+            # If objects were blanked from a loaded state, and world_config has no objects,
+            # this is a modification.
+            if not created_new_state: # Only mark as modified if we blanked a previously non-empty dict
+                 state_modified_during_load = True
+
+        # location_details (in-game map) are NOT reset from world_config here by default,
+        # as they are managed in simulation_state.json.
+        # If world_config *were* to define the master map, you would add:
+        # if "location_details" in world_config:
+        #    loaded_state_data.setdefault(WORLD_STATE_KEY, {})
+        #    loaded_state_data[WORLD_STATE_KEY][LOCATION_DETAILS_KEY] = json.loads(json.dumps(world_config["location_details"]))
+        #    state_modified_during_load = True
+        #    logger.info(f"Reset state's '{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}' from world_config.")
+
     if loaded_state_data:
-        state_modified = ensure_state_structure(loaded_state_data)
+        structure_modified = ensure_state_structure(loaded_state_data)
+        state_modified_during_load = state_modified_during_load or structure_modified
     else:
-        logger.critical("State data is None after loading/initialization attempt. Cannot proceed.")
-        console.print("[bold red]Critical Error:[/bold red] Failed to obtain state data.")
+        logger.critical("State data is None. Cannot proceed.")
         return None, None
 
-    # --- 8. Save if New or Modified ---
-    if created_new_state or state_modified:
+    if created_new_state or state_modified_during_load:
         logger.info(f"Saving {'new' if created_new_state else 'modified'} state file: {state_file_path}")
         try:
             save_json_file(state_file_path, loaded_state_data)
         except Exception as e:
             logger.error(f"Failed to save state file {state_file_path}: {e}", exc_info=True)
-            console.print(f"[bold red]Error:[/bold red] Failed to save state file {state_file_path}.")
-            # Decide if this is critical - maybe return None if save fails?
-            # For now, we'll return the in-memory state but log the error.
-            # return None, None # Uncomment this to make saving mandatory
-
+    
     return loaded_state_data, state_file_path
 
 # --- ADDED: get_nested function ---
@@ -687,9 +596,6 @@ def get_nested(data: Dict, *keys: str, default: Any = None) -> Any:
         if current is None: # Stop early if a key is missing
             return default
     return current if current is not None else default
-# ---
-
-# --- Timestamp and Timezone Functions ---
 
 def format_iso_timestamp(iso_str: Optional[str]) -> str:
     """Formats an ISO timestamp string into 'YYYY-MM-DD h:MM AM/PM'."""

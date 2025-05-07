@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, FilePath, validator
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field, FilePath, validator, ValidationInfo
+from typing import List, Optional, Dict, Any # Removed FilePath as it's not used
 from uuid import UUID
 from datetime import datetime
 import logging
@@ -68,3 +68,32 @@ class SimulationState(BaseModel):
     simulacra: List[SimulacraState] = Field(default_factory=list)
     # Add other dynamic state elements if needed (e.g., current_time)
     current_simulation_time: Optional[datetime] = None
+
+# --- Added from simulation_async.py ---
+class WorldEngineResponse(BaseModel):
+    valid_action: bool
+    duration: float = Field(ge=0.0)
+    results: Dict[str, Any] = Field(default_factory=dict)
+    outcome_description: str
+
+    @validator('duration') # Pydantic v1 style validator
+    @classmethod
+    def duration_must_be_zero_if_invalid(cls, v: float, values: Dict[str, Any]): # Changed info to values for Pydantic v1
+        if 'valid_action' in values and not values['valid_action'] and v != 0.0:
+            # logger.warning(f"Invalid action returned non-zero duration ({v}). Forcing to 0.0.") # Logger not available here easily
+            return 0.0
+        return v
+
+    @validator('results') # Pydantic v1 style validator
+    @classmethod
+    def results_must_be_empty_if_invalid(cls, v: Dict, values: Dict[str, Any]): # Changed info to values for Pydantic v1
+        if 'valid_action' in values and not values['valid_action'] and v:
+            # logger.warning(f"Invalid action returned non-empty results ({v}). Forcing to empty dict.") # Logger not available here easily
+            return {}
+        return v
+
+class SimulacraIntentResponse(BaseModel):
+    internal_monologue: str
+    action_type: str
+    target_id: Optional[str] = None
+    details: str = ""
