@@ -18,7 +18,7 @@ from rich.text import Text # For styled text in table
 from .config import (
     MODEL_NAME, PROB_INTERJECT_AS_SELF_REFLECTION, # PROB_INTERJECT_AS_NARRATIVE removed
     WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, USER_ID,
-    # Added these constants as they are used for fetching ephemeral objects/NPCs
+    # SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"
     WORLD_STATE_KEY, LOCATION_DETAILS_KEY, SIMULACRA_KEY
 )
 from .loop_utils import get_nested # Assuming get_nested remains in loop_utils or is moved here
@@ -77,11 +77,11 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
         if i == 0: # Get location of the first active simulacra for object display
             primary_actor_location_id = get_nested(current_state, SIMULACRA_KEY, sim_id, "location")
 
-        if i >= sim_limit:
+        if i >= sim_limit and sim_limit > 0 : # Add check for sim_limit > 0
             table.add_row(f"... ({len(active_sim_ids) - sim_limit} more)", "...")
             break
-        sim_state_data = current_state.get(SIMULACRA_KEY, {}).get(sim_id, {})
-        table.add_row(f"--- Sim: {get_nested(sim_state_data, 'name', default=sim_id)} ---", "---")
+        sim_state_data = get_nested(current_state, SIMULACRA_KEY, sim_id, default={})
+        table.add_row(f"--- Sim: {get_nested(sim_state_data, 'persona_details', 'Name', default=sim_id)} ---", "---")
         table.add_row(f"  Status", get_nested(sim_state_data, 'status', default="Unknown"))
         table.add_row(f"  Location", get_nested(sim_state_data, 'location', default="Unknown"))
         sim_goal = get_nested(sim_state_data, 'goal', default="Unknown")

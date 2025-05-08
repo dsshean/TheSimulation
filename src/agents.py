@@ -69,7 +69,7 @@ def create_world_engine_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
 **Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details (unless directly caused by the action), or emotional interpretation.** This description will be used by a separate Narrator agent.
 **Input (Provided via trigger message):**
 - Actor Name & ID:{persona_name} ({sim_id})
-- Actor's Current Location ID
+- Current Location
 - Current World Time
 - World Context:
 - Actor's Current Location State (Details of the location where the actor currently is, including name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
@@ -91,14 +91,14 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
                 *   **If `Target Entity State.properties.leads_to` exists (e.g., for a door or portal):**
                     *   `valid_action: true`.
                     *   `duration`: Short (e.g., 5-15s for opening a door and stepping through).
-                    *   `results`: `{{"simulacra.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}`.
+                    *   `results`: `{{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}`.
                     *   `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to [Name of the new location if known, otherwise the ID from leads_to]."`.
                 *   Else (for other usable objects): Check other object properties (`toggleable`, `lockable`), and current state to determine outcome, duration, and results (e.g., turning a lamp on/off).
             *   `talk`:
                 *   **If target is a Simulacra:**
                     *   Check if Actor and Target Simulacra are in the same `Actor's Current Location ID`.
                     *   If not, `valid_action: false`, `duration: 0.0`, `results: {{}}`, `outcome_description: "[Actor Name] tried to talk to [Target Simulacra Name], but they are not in the same location."`
-                    *   If yes, `valid_action: true`, `duration: short (e.g., 30-120s)`, `results: {{"simulacra.[target_id].last_observation": "[Actor Name] said to you: '{{intent.details}}'"}}`, `outcome_description: "[Actor Name] spoke with [Target Simulacra Name]."`
+                    *   If yes, `valid_action: true`, `duration: short (e.g., 30-120s)`, `results: {{"simulacra_profiles.[target_id].last_observation": "[Actor Name] said to you: '{{intent.details}}'"}}`, `outcome_description: "[Actor Name] spoke with [Target Simulacra Name]."`
                 *   **If target is an ephemeral NPC (indicated by `intent.target_id` starting with 'npc_concept_' OR if `intent.details` clearly refers to an NPC described in the Actor's `last_observation` which was set by the Narrator):**
                     *   `valid_action: true`.
                     *   `duration`: Short (e.g., 15-60s).
@@ -107,7 +107,7 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
                         *   Consider `intent.details` (what the Actor said to this NPC).
                         *   Craft a plausible `npc_response_content` from the perspective of this ephemeral NPC, fitting the narrative context.
                         *   Determine a generic `npc_description_for_output` (e.g., "the shopkeeper", "your friend", "the street vendor") based on how the Narrator introduced them or how the actor referred to them in the intent.
-                    *   `results`: Format as `{{"simulacra.[actor_id].last_observation": "The [npc_description_for_output] said: '[npc_response_content]'"}}`. Replace bracketed parts with your generated content.
+                    *   `results`: Format as `{{"simulacra_profiles.[actor_id].last_observation": "The [npc_description_for_output] said: '[npc_response_content]'"}}`. Replace bracketed parts with your generated content.
                     *   `outcome_description`: Format as `"[Actor Name] spoke with the [npc_description_for_output]."` Replace bracketed parts.
         *   **World Interaction (e.g., `move`, `look_around`):** Evaluate against location state and rules.
             *   `move`:
@@ -117,15 +117,15 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
                     *   If not directly connected, consider if it's a known global location ID based on `World Context`.
                     *   If `World Rules.allow_teleportation` is true, and intent implies it, this might be valid.
                 *   **Duration Calculation (see step 3):** This is critical for `move`.
-                *   **Results:** If valid, `simulacra.[sim_id].location` should be updated to the target location ID from `intent.details`.
-            *   `look_around`: Provides a general observation. Duration is short. Results update `simulacra.[sim_id].last_observation` with a description of the current location and entities.
+                *   **Results:** If valid, `simulacra_profiles.[sim_id].location` should be updated to the target location ID from `intent.details`.
+            *   `look_around`: Provides a general observation. Duration is short. Results update `simulacra_profiles.[sim_id].last_observation` with a description of the current location and entities.
         *   **Self Interaction (e.g., `wait`, `think`):** Simple, short duration.
     *   **Handling `initiate_change` Action Type (from agent's self-reflection or idle planning):**
         *   **Goal:** The actor is signaling a need for a change. Acknowledge this and provide a new observation.
         *   **`valid_action`:** Always `true`.
         *   **`duration`:** Short (e.g., 1.0-3.0s).
         *   **`results`:**
-            *   Set actor's status to 'idle': `"simulacra.[sim_id].status": "idle"`
+            *   Set actor's status to 'idle': `"simulacra_profiles.[sim_id].status": "idle"`
             *   Set `current_action_end_time` to `current_world_time + this_action_duration`.
             *   Craft `last_observation` based on `intent.details` (e.g., if hunger: "Your stomach rumbles..."; if monotony: "A wave of restlessness washes over you...").
         *   **`outcome_description`:** Factual (e.g., "[Actor Name] realized it was lunchtime.").
@@ -134,7 +134,7 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
         *   **`valid_action`:** Always `true`.
         *   **`duration`:** Very short (e.g., 0.5-1.0s).
         *   **`results`:**
-            *   Set actor's status to 'idle': `"simulacra.[sim_id].status": "idle"`
+            *   Set actor's status to 'idle': `"simulacra_profiles.[sim_id].status": "idle"`
             *   Set `current_action_end_time` to `current_world_time + this_action_duration`.
             *   Set actor's `last_observation` to the `intent.details` provided.
         *   **`outcome_description`:** Factual (e.g., "[Actor Name]'s concentration was broken.").
@@ -150,8 +150,8 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
             *   Consider fantasy/sci-fi travel methods if appropriate for the `World Context.Sub-Genre`.
         *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 5-30 seconds).
     *   For other actions, assign plausible durations (e.g., `talk` a few minutes, `use` object varies, `wait` as specified or short).
-4.  **Determine Results:** State changes in dot notation (e.g., `objects.lamp.power: "on"`). Empty `{{}}` for invalid actions.
-    *   For a successful `move`, the key result is `{{ "simulacra.{sim_id}.location": "[target_location_id_from_intent.details]" }}`.
+4.  **Determine Results:** State changes in dot notation (e.g., `objects.lamp.power: "on"` or `simulacra_profiles.[sim_id].field: "value"`). Empty `{{}}` for invalid actions.
+    *   For a successful `move`, the key result is `{{ "simulacra_profiles.[sim_id].location": "[target_location_id_from_intent.details]" }}`.
 5.  **Generate Factual Outcome Description:** STRICTLY FACTUAL. **Crucially, if the action is performed by an actor, the `outcome_description` MUST use the `Actor Name` exactly as provided in the input.** Examples:
 6.  **Determine `valid_action`:** Final boolean.
 
@@ -198,7 +198,6 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
 5.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
     *   Write a single, engaging narrative paragraph in the **present tense**.
     *   **Style Adherence:** STRICTLY adhere to **'{world_mood}'**. Infuse with appropriate atmosphere, sensory details, and tone.
-// ...existing code...
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**
     *   **Flow:** Ensure reasonable flow.
@@ -207,6 +206,11 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
         *   You MAY also introduce 0-1 ephemeral NPCs if appropriate for the scene.
         *   For each object and NPC you describe in the narrative, you MUST also list them in the `discovered_objects` and `discovered_npcs` fields in the JSON output (see below). Assign a simple, unique `id` (e.g., `closet_bedroom_01`, `npc_cat_01`), a `name`, a brief `description`, and set `is_interactive` to `true` if it's something an agent could plausibly interact with. For objects, you can also add common-sense `properties` (e.g., `{{"is_container": true, "is_openable": true}}` for a closet).
 
+        *   **Also, if `look_around`, identify and describe potential exits or paths to other (possibly new/undiscovered) locations.** List these in `discovered_connections`.
+            *   `to_location_id_hint`: A descriptive hint or a conceptual ID for the destination (e.g., "Dark_Forest_Path_01", "the_glowing_portal_west"). This is a hint for the agent and World Engine, not necessarily a pre-defined ID.
+            *   `description`: How this connection appears (e.g., "A narrow, overgrown path leading north into the woods.").
+            *   `travel_time_estimate_seconds` (optional): A rough estimate if discernible.
+
 **Output:**
 Output ONLY a valid JSON object matching this exact structure:
 `{{
@@ -214,18 +218,24 @@ Output ONLY a valid JSON object matching this exact structure:
   "discovered_objects": [
     {{"id": "str (e.g., object_type_location_instance)", "name": "str", "description": "str", "is_interactive": bool, "properties": {{}}}}
   ],
+  "discovered_connections": [
+    {{"to_location_id_hint": "str", "description": "str", "travel_time_estimate_seconds": int (optional)}}
+  ],
   "discovered_npcs": [
     {{"id": "str (e.g., npc_concept_descriptor_instance)", "name": "str", "description": "str"}}
   ]
 }}`
 *   If no objects or NPCs are discovered/relevant (e.g., for actions other than `look_around`, or if `look_around` reveals an empty space), `discovered_objects` and `discovered_npcs` can be empty arrays `[]`.
 *   Example for `look_around` in a bedroom:
-    `{{
-      "narrative": "Eleanor glances around her sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly.",
+    `{{ // Example includes discovered_connections
+      "narrative": "Eleanor glances around her sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door (door_to_hallway_01)** is set in the east wall, likely leading to a hallway.",
       "discovered_objects": [
         {{"id": "closet_bedroom_01", "name": "Oak Closet", "description": "A large oak closet.", "is_interactive": true, "properties": {{"is_container": true, "is_openable": true, "is_open": false}}}},
         {{"id": "bed_bedroom_01", "name": "Unmade Bed", "description": "Her unmade bed.", "is_interactive": true, "properties": {{}}}},
         {{"id": "nightstand_bedroom_01", "name": "Nightstand", "description": "A small nightstand.", "is_interactive": true, "properties": {{}}}}
+      ],
+      "discovered_connections": [
+        {{"to_location_id_hint": "Hallway_01", "description": "A sturdy wooden door in the east wall, likely leading to a hallway.", "travel_time_estimate_seconds": 5}}
       ],
       "discovered_npcs": [
         {{"id": "npc_cat_01", "name": "Fluffy Cat", "description": "A fluffy cat curled up on the nightstand."}}

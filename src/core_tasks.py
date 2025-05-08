@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, List
 # Import from our new modules
 from .config import (
     MAX_SIMULATION_TIME, SIMULATION_SPEED_FACTOR, UPDATE_INTERVAL, MAX_MEMORY_LOG_ENTRIES,
-    WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS, MAX_WORLD_FEED_ITEMS, USER_ID,
+    WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS, MAX_WORLD_FEED_ITEMS, USER_ID, SIMULACRA_KEY,
     WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY
 )
 # simulation_utils will be called by tasks in simulation_async.py or here, passing state
@@ -36,28 +36,28 @@ async def time_manager_task(
             new_sim_time = current_sim_time_val + sim_delta_time
             current_state["world_time"] = new_sim_time
 
-            for agent_id, agent_state_data in list(current_state.get("simulacra", {}).items()):
+            for agent_id, agent_state_data in list(get_nested(current_state, SIMULACRA_KEY, default={}).items()):
                 if agent_state_data.get("status") == "busy":
                     action_end_time = agent_state_data.get("current_action_end_time", -1.0)
                     if action_end_time <= new_sim_time:
                         logger_instance.info(f"[TimeManager] Applying completed action effects for {agent_id} at time {new_sim_time:.1f} (due at {action_end_time:.1f}).")
                         pending_results = agent_state_data.get("pending_results", {})
                         if pending_results:
-                            memory_log_updated = False
+                            # memory_log_updated = False # Not strictly needed if we check the key directly
                             for key_path, value in list(pending_results.items()):
                                 success = _update_state_value(current_state, key_path, value, logger_instance)
-                                if success and key_path == f"simulacra.{agent_id}.memory_log":
-                                    memory_log_updated = True
-                            _update_state_value(current_state, f"simulacra.{agent_id}.pending_results", {}, logger_instance)
-                            if memory_log_updated:
-                                current_mem_log = get_nested(current_state, "simulacra", agent_id, "memory_log", default=[])
-                                if isinstance(current_mem_log, list) and len(current_mem_log) > MAX_MEMORY_LOG_ENTRIES:
-                                    _update_state_value(current_state, f"simulacra.{agent_id}.memory_log", current_mem_log[-MAX_MEMORY_LOG_ENTRIES:], logger_instance)
-                                    logger_instance.debug(f"[TimeManager] Pruned memory log for {agent_id} to {MAX_MEMORY_LOG_ENTRIES} entries.")
+                                # Check if the memory_log for this specific agent was updated
+                                if success and key_path == f"{SIMULACRA_KEY}.{agent_id}.memory_log":
+                                    # memory_log_updated = True # No longer needed
+                                    current_mem_log = get_nested(current_state, SIMULACRA_KEY, agent_id, "memory_log", default=[])
+                                    if isinstance(current_mem_log, list) and len(current_mem_log) > MAX_MEMORY_LOG_ENTRIES:
+                                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.memory_log", current_mem_log[-MAX_MEMORY_LOG_ENTRIES:], logger_instance)
+                                        logger_instance.debug(f"[TimeManager] Pruned memory log for {agent_id} to {MAX_MEMORY_LOG_ENTRIES} entries.")
+                            _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.pending_results", {}, logger_instance)
                         else:
                             logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
-                        _update_state_value(current_state, f"simulacra.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
-                        _update_state_value(current_state, f"simulacra.{agent_id}.status", "idle", logger_instance)
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance)
                         logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
             
             live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
@@ -99,7 +99,7 @@ async def interaction_dispatcher_task(
             interaction_class = "environment"
 
             if target_id:
-                if target_id in get_nested(current_state, "simulacra", default={}):
+                if target_id in get_nested(current_state, SIMULACRA_KEY, default={}):
                     interaction_class = "entity"
                 elif target_id in get_nested(current_state, "objects", default={}) and get_nested(current_state, "objects", target_id, "interactive", default=False):
                      interaction_class = "entity"

@@ -332,24 +332,15 @@
               "Continues dinner and conversation with friends.",
               "Local Restaurant, Asheville"
             ],
-            "21": [
-              "Returns home and relaxes.",
-              "Asheville, NC"
-            ],
-            "22": [
-              "Reads a local history book.",
-              "Asheville, NC"
-            ],
-            "23": [
-              "Prepares for bed.",
-              "Asheville, NC"
-            ]
+            "21": ["Returns home and relaxes.", "Asheville, NC"],
+            "22": ["Reads a local history book.", "Asheville, NC"],
+            "23": ["Prepares for bed.", "Asheville, NC"]
           },
           "news": "- Things to do in Asheville, N.C. this week - The Citizen-Times: Get in Gear Fest is noon - 5 p.m. April 26 at the Adventure Center of Asheville. This free festival ...\n- Top 2025 Spring Events in Asheville | Explore Asheville: Get in Gear Fest, April 26, 2025: Connect with some of Western North Carolina's top gear makers and ...\n- Things to Do in Asheville This Weekend -- April 25-27, 2025 | Explore ...: Saturday, April 26, 12 - 5 p.m. The Adventure Center of Asheville. Celebrate the outdoors at this fr...\n- What to do this weekend in The 828: April 25-27: How Asheville Herb Festival grew from tiny tent to weekend convention. Forty-Fourth Annual W.N.C. Pa...\n- Featured Events in Asheville in April 2025 (April Updated): Trampled By Turtles will be performing in Asheville at Asheville Yards on April 26, 2025. The event ..."
         }
       }
     }
   },
-  "simulacra_id": "sim_3e912d",
+  "sim_id": "sim_3e912d",
   "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6"
 }

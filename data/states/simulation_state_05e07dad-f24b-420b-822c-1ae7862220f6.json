@@ -1,85 +1,12 @@
 {
   "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6",
-  "location_details": {
-    "default_start_location": {
-      "name": "A Starting Point",
-      "description": "An initial location within the simulation.",
-      "objects_present": [],
-      "connected_locations": []
-    }
-  },
-  "objects": {},
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
   "world_time": 0.0,
   "narrative_log": [],
-  "simulacra": {
-    "sim_3e912d": {
-      "id": "sim_3e912d",
-      "name": "Eleanor Hayes",
-      "persona": {
-        "Name": "Eleanor Hayes",
-        "Age": 29,
-        "Occupation": "Brewery Tour Guide",
-        "Current_location": "Asheville, NC",
-        "Personality_Traits": [
-          "Enthusiastic",
-          "Outgoing",
-          "Knowledgeable",
-          "Patient",
-          "Adaptable"
-        ],
-        "Birthplace": "Charlotte, NC",
-        "Birthdate": "1995-07-15",
-        "Birthtime": "14:30",
-        "Education": "Bachelor of Arts in History",
-        "Physical_Appearance": "5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.",
-        "Hobbies": "Hiking, trying new craft beers, reading local history, volunteering at the animal shelter",
-        "Skills": "Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville",
-        "Languages": "English",
-        "Health_Status": "Generally healthy, occasional allergies",
-        "Family_Background": "Middle-class family, parents still living in Charlotte, one younger brother.",
-        "Life_Goals": "To become a local history expert and potentially open a small historical tour business.",
-        "Notable_Achievements": "Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.",
-        "Fears": "Heights, public speaking failures, not being able to achieve her goals",
-        "Strengths": "Strong communication skills, historical knowledge, adaptability",
-        "Weaknesses": "Can be overly critical of herself, sometimes struggles to say no.",
-        "Ethnicity": "Caucasian",
-        "Religion": null,
-        "Political_Views": "Liberal",
-        "Favorite_Foods": "Anything from local Asheville restaurants, especially farm-to-table cuisine.",
-        "Favorite_Music": "Indie rock, bluegrass, local Asheville bands",
-        "Favorite_Books": "Local history books, historical fiction",
-        "Favorite_Movies": "Documentaries, comedies",
-        "Pet_Peeves": "Rude tourists, littering, traffic congestion",
-        "Dreams": "To share her love of history with others and create a successful business.",
-        "Past_Traumas": null
-      },
-      "location": "default_start_location",
-      "home_location": "default_start_location",
-      "status": "idle",
-      "current_action_end_time": 0.0,
-      "goal": "Determine goals.",
-      "last_observation": "Waking up in A Starting Point.",
-      "memory_log": [],
-      "pending_results": {},
-      "last_interjection_sim_time": 0.0,
-      "next_simple_timer_interjection_sim_time": 0.0
-    }
-  },
-  "current_world_state": {
-    "location_details": {
-      "default_start_location": {
-        "name": "A Starting Point",
-        "description": "An initial location within the simulation.",
-        "objects_present": [],
-        "connected_locations": []
-      }
-    }
-  },
   "world_template_details": {
-    "description": "The real world in Asheville, NC, United States. Standard physics apply.",
+    "description": "A new world is beginning.",
     "rules": {
       "allow_teleportation": false,
       "time_progression_rate": 1.0,
@@ -97,10 +24,21 @@
         "longitude": -82.5515
       }
     },
-    "mood": "Real world"
+    "mood": "Anticipatory"
   },
   "simulacra_profiles": {
     "sim_3e912d": {
+      "current_location": "Home_01",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "Waking up in Home_01.",
+      "goal": "Determine goals.",
+      "memory_log": [],
+      "home_location": "Home_01",
+      "status": "idle",
+      "current_action_end_time": 0.0,
+      "pending_results": {},
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0,
       "persona_details": {
         "Name": "Eleanor Hayes",
         "Age": 29,
@@ -139,11 +77,8 @@
         "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "current_location": "default_start_location",
-      "home_location": "default_start_location",
-      "last_observation": "Waking up in A Starting Point.",
-      "goal": "Determine goals.",
-      "memory_log": []
+      "location": "Home_01"
     }
-  }
+  },
+  "objects": []
 }

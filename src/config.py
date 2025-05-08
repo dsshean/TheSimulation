@@ -8,8 +8,8 @@ API_KEY = os.getenv("GOOGLE_API_KEY")
 MODEL_NAME = os.getenv("MODEL_GEMINI_PRO", "gemini-2.0-flash")
 SEARCH_AGENT_MODEL_NAME = os.getenv("SEARCH_AGENT_MODEL_NAME", "gemini-2.0-flash")
 APP_NAME = "TheSimulationAsync"
-USER_ID = "player1"
-SIMULACRA_KEY = "simulacra"
+USER_ID = "player1" # Keep USER_ID
+SIMULACRA_KEY = "simulacra_profiles" # Changed from "simulacra"
 
 # --- Simulation Parameters ---
 SIMULATION_SPEED_FACTOR = float(os.getenv("SIMULATION_SPEED_FACTOR", 1))
@@ -27,7 +27,7 @@ AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS = float(os.getenv("AGENT_BUSY_POLL_INTERVA
 
 # --- Dynamic Interruption Task Parameters (for dynamic_interruption_task) ---
 DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS = float(os.getenv("DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS", 5.0)) # How often the dynamic interruption task checks, in real-world seconds
-DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS = float(os.getenv("DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS", 600.0)) # Sim duration of an action at which target probability is met
+DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS = float(os.getenv("DYNAMIC_INTERruption_TARGET_DURATION_SECONDS", 600.0)) # Sim duration of an action at which target probability is met
 DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION = float(os.getenv("DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION", 0.05)) # Target probability (e.g., 5%) per check
 DYNAMIC_INTERRUPTION_MIN_PROB = float(os.getenv("DYNAMIC_INTERRUPTION_MIN_PROB", 0.005)) # Minimum probability for eligible actions (e.g., 0.5%) per check
 DYNAMIC_INTERRUPTION_MAX_PROB_CAP = float(os.getenv("DYNAMIC_INTERRUPTION_MAX_PROB_CAP", 0.25)) # Absolute maximum probability cap per check (e.g., 15%)
@@ -56,7 +56,7 @@ IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
 WORLD_STATE_KEY = "current_world_state"
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
 LOCATION_DETAILS_KEY = "location_details"
-SIMULACRA_PROFILES_KEY = "simulacra_profiles"
+SIMULACRA_PROFILES_KEY = "simulacra_profiles" # This is the old constant, SIMULACRA_KEY now points to this value.
 CURRENT_LOCATION_KEY = "current_location"
 HOME_LOCATION_KEY = "home_location"
 WORLD_TEMPLATE_DETAILS_KEY = "world_template_details"

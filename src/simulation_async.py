@@ -48,7 +48,7 @@ from .config import (  # For run_simulation; For self-reflection; New constants 
     DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION,
     DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS,
     ENABLE_NARRATIVE_IMAGE_GENERATION, HOME_LOCATION_KEY,
-    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME,
+    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME, # SIMULACRA_KEY is now SIMULACRA_PROFILES_KEY
     IMAGE_GENERATION_OUTPUT_DIR, INTERJECTION_COOLDOWN_SIM_SECONDS,
     LIFE_SUMMARY_DIR, LOCATION_DETAILS_KEY, LOCATION_KEY,
     LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, MAX_MEMORY_LOG_ENTRIES,
@@ -56,7 +56,7 @@ from .config import (  # For run_simulation; For self-reflection; New constants 
     MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK, MODEL_NAME,
     PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, SEARCH_AGENT_MODEL_NAME,
     SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR, STATE_DIR,
-    UPDATE_INTERVAL, USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
+    UPDATE_INTERVAL, USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY, SIMULACRA_KEY) # Import SIMULACRA_KEY
 from .core_tasks import interaction_dispatcher_task  # ADK-independent tasks
 from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (get_nested, load_json_file,
@@ -121,7 +121,7 @@ async def narration_task():
                 narration_queue.task_done()
                 continue
 
-            actor_name = get_nested(state, "simulacra", actor_id, "name", default=actor_id)
+            actor_name = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
             logger.debug(f"[NarrationTask] Using global world mood: '{world_mood_global}' for actor {actor_name} at location {actor_location_at_action_time or 'Unknown'}")
 
             def clean_history_entry(entry: str) -> str:
@@ -166,10 +166,14 @@ Generate the narrative paragraph based on these details and your instructions (r
                     narrator_output_str = parse_json_output_last(narrative_text.strip())
                     if narrator_output_str is None:
                         raise json.JSONDecodeError("No JSON found by parse_json_output_last", narrative_text, 0)
-                    narrator_output = json.loads(narrator_output_str)
+                    # narrator_output_str is now guaranteed to be a dictionary
+                    # if no exception was raised by the check above.
+                    narrator_output = narrator_output_str 
+                    # logger.debug(f"[NarrationTask] Parsed narrator output: {json.dumps(narrator_output, indent=2)}")
                     
                     actual_narrative_paragraph = narrator_output.get("narrative", "An event occurred.")
                     discovered_objects = narrator_output.get("discovered_objects", [])
+                    discovered_connections = narrator_output.get("discovered_connections", []) # Phase 4
                     discovered_npcs = narrator_output.get("discovered_npcs", []) 
 
                     cleaned_narrative_text = actual_narrative_paragraph
@@ -187,8 +191,8 @@ Generate the narrative paragraph based on these details and your instructions (r
                     if len(state["narrative_log"]) > max_narrative_log:
                         state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
 
-                    if actor_id in state.get("simulacra", {}):
-                        _update_state_value(state, f"simulacra.{actor_id}.last_observation", cleaned_narrative_text, logger)
+                    if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
                     logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
 
                     if actor_location_at_action_time:
@@ -211,14 +215,19 @@ Generate the narrative paragraph based on these details and your instructions (r
                                 location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
                                 _update_state_value(state, location_path_for_ephemeral_npc, [], logger)
                                 logger.info(f"[NarrationTask] Cleared ephemeral NPCs for location {actor_location_at_action_time} as none were discovered by look_around.")
+                            
+                            # Phase 4: Store discovered connections
+                            location_path_for_connections = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.connected_locations"
+                            _update_state_value(state, location_path_for_connections, discovered_connections, logger)
+                            logger.info(f"[NarrationTask] Updated/Set {len(discovered_connections)} connected_locations for {actor_location_at_action_time} from look_around.")
 
                 except json.JSONDecodeError:
                     logger.error(f"[NarrationTask] Failed to parse JSON from Narrator: {narrative_text}. Using raw text as narrative.")
                     cleaned_narrative_text = narrative_text 
                     if cleaned_narrative_text and live_display_object:
                         live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
-                    if actor_id in state.get("simulacra", {}):
-                        _update_state_value(state, f"simulacra.{actor_id}.last_observation", cleaned_narrative_text, logger)
+                    if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
 
             narration_queue.task_done()
 
@@ -258,18 +267,19 @@ async def world_engine_task_llm():
             actor_id = get_nested(request_event, "actor_id")
             intent = get_nested(request_event, "intent")
             interaction_class = get_nested(request_event, "interaction_class", default="environment")
+            action_type = intent.get("action_type") if intent else None
             if not actor_id or not intent:
                 logger.warning(f"[WorldEngineLLM] Received invalid action request event: {request_event}")
                 event_bus.task_done()
                 continue
 
             logger.info(f"[WorldEngineLLM] Received '{interaction_class}' action request from {actor_id}: {intent}")
-            action_type = intent.get("action_type")
-            actor_state_we = get_nested(state, 'simulacra', actor_id, default={}) 
-            actor_name = actor_state_we.get('name', actor_id)
+            # action_type already defined above
+            actor_state_we = get_nested(state, SIMULACRA_KEY, actor_id, default={})
+            actor_name = get_nested(actor_state_we, "persona_details", "Name", default=actor_id)
             current_sim_time = state.get("world_time", 0.0)
-            sim_current_location_id = state.get('location_details').get('name', DEFAULT_HOME_LOCATION_NAME)
-            sim_current_location_id_desc = state.get('location_details').get('description', DEFAULT_HOME_LOCATION_NAME)
+            # sim_current_location_id = state.get('location_details').get('name', DEFAULT_HOME_LOCATION_NAME)
+            # sim_current_location_id_desc = state.get('location_details').get('description', DEFAULT_HOME_LOCATION_NAME)
             actor_location_id = get_nested(actor_state_we, "location")
             location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={})
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
@@ -278,7 +288,7 @@ async def world_engine_task_llm():
             target_id = get_nested(intent, "target_id")
             target_state_data = {}
             if target_id:
-                target_state_data = get_nested(state, 'objects', target_id, default={}) or get_nested(state, 'simulacra', target_id, default={})
+                target_state_data = get_nested(state, 'objects', target_id, default={}) or get_nested(state, SIMULACRA_KEY, target_id, default={})
 
             intent_json = json.dumps(intent, indent=2)
             target_state_json = json.dumps(target_state_data, indent=2) if target_state_data else "N/A"
@@ -286,9 +296,9 @@ async def world_engine_task_llm():
             world_rules_json = json.dumps(world_rules, indent=2)
 
             prompt = f"""
-Actor: {actor_name} ({actor_id})
-Location: {sim_current_location_id}
-Time: {current_sim_time:.1f}
+Actor Name and ID: {actor_name} ({actor_id})
+Current Location: {actor_location_id}
+Current World Time: {current_sim_time:.1f}
 Intent: {intent_json}
 Target Entity State ({target_id or 'N/A'}): {target_state_json}
 Location State: {location_state_json}
@@ -317,32 +327,18 @@ Resolve this intent based on your instructions and the provided context.
             if response_text:
                 try:
                     response_text_clean_str = parse_json_output_last(response_text.strip()) 
-                    if response_text_clean_str is None:
+                    if not isinstance(response_text_clean_str, dict): # parse_json_output_last should return a dict or None
                         raise json.JSONDecodeError("No JSON found by parse_json_output_last", response_text, 0)
-                    
-                    json_str_to_parse = response_text_clean_str
-                    correct_actor_name = actor_state_we.get('name', actor_id)
-                    agent_internal_name = f"SimulacraLLM_{actor_id}" 
-                    json_str_to_parse = json_str_to_parse.replace(agent_internal_name, correct_actor_name)
-                    json_str_to_parse = json_str_to_parse.replace("[Actor Name]", actor_name) 
-                    json_str_to_parse = json_str_to_parse.replace("[ACTOR_ID]", actor_id)
-                    if target_id:
-                        json_str_to_parse = json_str_to_parse.replace("[target_id]", target_id)
-                    if target_state_data: 
-                         obj_name = target_state_data.get("name", target_id) 
-                         json_str_to_parse = json_str_to_parse.replace("[Object Name]", obj_name)
-                         if action_type == 'talk': 
-                             target_name = target_state_data.get("name", target_id)
-                             json_str_to_parse = json_str_to_parse.replace("[Target Name]", target_name)
-                    target_object_state = get_nested(state, 'objects', target_id, default={}) if target_id else {}
-                    if target_object_state and target_object_state.get("destination"):
-                         dest_name = target_object_state.get("destination") 
-                         json_str_to_parse = json_str_to_parse.replace("[Destination Name]", dest_name)
-                         json_str_to_parse = json_str_to_parse.replace("[Destination]", dest_name)
+                                        
+                    # response_text_clean_str is now guaranteed to be a dictionary if no exception was raised.
+                    # The string replacements for placeholders like [Actor Name] are tricky if the JSON is already parsed.
+                    # For now, let's assume the LLM is not using these placeholders in its direct JSON fields for WorldEngine.
+                    # If it is, the prompt for WorldEngine needs to be adjusted to not expect placeholders in the JSON values it *generates*.
+                    # Or, the LLM needs to be instructed to return a string that *then* gets placeholders replaced before final parsing.
+                    # Given the current structure, we assume response_text_clean_str is the final dict.
+                    parsed_resolution = response_text_clean_str
 
-                    raw_data = json.loads(json_str_to_parse)
-                    parsed_resolution = raw_data
-                    validated_data = WorldEngineResponse.model_validate(raw_data)
+                    validated_data = WorldEngineResponse.model_validate(parsed_resolution)
                     logger.debug(f"[WorldEngineLLM] LLM response validated successfully for {actor_id}.")
                     outcome_description = validated_data.outcome_description
                     if live_display_object:
@@ -372,11 +368,20 @@ Resolve this intent based on your instructions and the provided context.
                     "actor_current_location_id": actor_location_id, 
                     "world_mood": world_mood_global, 
                 }
-                if actor_id in state.get("simulacra", {}):
-                    _update_state_value(state, f"simulacra.{actor_id}.status", "busy", logger)
-                    _update_state_value(state, f"simulacra.{actor_id}.pending_results", validated_data.results, logger)
-                    _update_state_value(state, f"simulacra.{actor_id}.current_action_end_time", completion_time, logger)
-                    _update_state_value(state, f"simulacra.{actor_id}.current_action_description", narration_event["current_action_description"], logger)
+                # --- Phase 3: Update location_details on successful move ---
+                if action_type == "move" and validated_data.results.get(f"{SIMULACRA_KEY}.{actor_id}.location"):
+                    new_location_id = validated_data.results[f"{SIMULACRA_KEY}.{actor_id}.location"]
+                    new_location_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
+                    new_location_details_text = f"You have arrived in {new_location_name}."
+                    # Add this to the results that TimeManager will apply
+                    validated_data.results[f"{SIMULACRA_KEY}.{actor_id}.location_details"] = new_location_details_text
+                    logger.info(f"[WorldEngineLLM] Queuing update for {actor_id}'s location_details to: '{new_location_details_text}'")
+                # --- End Phase 3 Change ---
+                if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", validated_data.results, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", narration_event["current_action_description"], logger)
                     await narration_queue.put(narration_event)
                     logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Stored results, set end time {completion_time:.1f}s. Outcome: {outcome_description}")
                 else:
@@ -384,10 +389,10 @@ Resolve this intent based on your instructions and the provided context.
             else: 
                 final_outcome_desc = validated_data.outcome_description if validated_data else outcome_description
                 logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_outcome_desc}")
-                if actor_id in state.get("simulacra", {}):
-                    _update_state_value(state, f"simulacra.{actor_id}.last_observation", final_outcome_desc, logger)
-                    _update_state_value(state, f"simulacra.{actor_id}.status", "idle", logger)
-                actor_name_for_log = get_nested(state, 'simulacra', actor_id, 'name', default=actor_id)
+                if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", final_outcome_desc, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                actor_name_for_log = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
                 resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc}
                 if live_display_object: 
                     live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
@@ -403,10 +408,10 @@ Resolve this intent based on your instructions and the provided context.
             break
         except Exception as e:
             logger.exception(f"[WorldEngineLLM] Error processing event for actor {actor_id}: {e}")
-            if actor_id and actor_id in get_nested(state, "simulacra", default={}): 
-                 _update_state_value(state, f"simulacra.{actor_id}.status", "idle", logger)
-                 _update_state_value(state, f"simulacra.{actor_id}.pending_results", {}, logger)
-                 _update_state_value(state, f"simulacra.{actor_id}.last_observation", f"Action failed unexpectedly: {e}", logger)
+            if actor_id and actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", {}, logger)
+                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", f"Action failed unexpectedly: {e}", logger)
             if request_event and event_bus._unfinished_tasks > 0: 
                 try: event_bus.task_done()
                 except ValueError: pass 
@@ -435,14 +440,14 @@ async def dynamic_interruption_task():
         active_sim_ids_dit = list(state.get(ACTIVE_SIMULACRA_IDS_KEY, []))
 
         for agent_id_to_check in active_sim_ids_dit:
-            agent_state_to_check = get_nested(state, "simulacra", agent_id_to_check, default={})
+            agent_state_to_check = get_nested(state, SIMULACRA_KEY, agent_id_to_check, default={})
             if not agent_state_to_check or agent_state_to_check.get("status") != "busy":
                 continue
             
             # If agent is busy but not eligible for other reasons, clear its stored probability
-            _update_state_value(state, f"simulacra.{agent_id_to_check}.current_interrupt_probability", None, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_interrupt_probability", None, logger)
 
-            agent_name_to_check = agent_state_to_check.get("name", agent_id_to_check)
+            agent_name_to_check = get_nested(agent_state_to_check, "persona_details", "Name", default=agent_id_to_check)
             last_interruption_time = agent_state_to_check.get("last_interjection_sim_time", 0.0) 
             cooldown_passed = (current_sim_time_dit - last_interruption_time) >= INTERJECTION_COOLDOWN_SIM_SECONDS 
             
@@ -463,7 +468,7 @@ async def dynamic_interruption_task():
                 interrupt_probability = min(DYNAMIC_INTERRUPTION_MAX_PROB_CAP, max(DYNAMIC_INTERRUPTION_MIN_PROB, scaled_prob))
             else: # Fallback if target duration is zero, use min_prob capped by max_prob
                 interrupt_probability = min(DYNAMIC_INTERRUPTION_MAX_PROB_CAP, DYNAMIC_INTERRUPTION_MIN_PROB)
-            _update_state_value(state, f"simulacra.{agent_id_to_check}.current_interrupt_probability", interrupt_probability, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_interrupt_probability", interrupt_probability, logger)
 
             if random.random() < interrupt_probability:
                 logger.info(f"[DynamicInterruptionTask] Triggering dynamic interruption for {agent_name_to_check} (Prob: {interrupt_probability:.3f}, RemDur: {remaining_duration:.1f}s).")
@@ -487,13 +492,13 @@ Output ONLY the narrative sentence(s).
                 
                 logger.info(f"[DynamicInterruptionTask] Interrupting {agent_name_to_check} with: {interruption_text}")
 
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.status", "idle", logger) 
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.last_observation", interruption_text, logger)
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.pending_results", {}, logger)
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.current_action_end_time", current_sim_time_dit, logger) 
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.current_action_description", "Interrupted by a dynamic event.", logger)
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.last_interjection_sim_time", current_sim_time_dit, logger) 
-                _update_state_value(state, f"simulacra.{agent_id_to_check}.current_interrupt_probability", None, logger) # Clear after interruption
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.status", "idle", logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.last_observation", interruption_text, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.pending_results", {}, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_action_end_time", current_sim_time_dit, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_action_description", "Interrupted by a dynamic event.", logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.last_interjection_sim_time", current_sim_time_dit, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_interrupt_probability", None, logger) # Clear after interruption
                 break 
 
         await asyncio.sleep(0.1) 
@@ -501,7 +506,7 @@ Output ONLY the narrative sentence(s).
 
 async def simulacra_agent_task_llm(agent_id: str):
     """Asynchronous task for managing a single Simulacra LLM agent."""
-    agent_name = get_nested(state, "simulacra", agent_id, "name", default=agent_id)
+    agent_name = get_nested(state, SIMULACRA_KEY, agent_id, "persona_details", "Name", default=agent_id)
     logger.info(f"[{agent_name}] LLM Agent task started.")
 
     if not adk_runner or not adk_session:
@@ -515,33 +520,40 @@ async def simulacra_agent_task_llm(agent_id: str):
         return
 
     try:
-        sim_state_init = get_nested(state, "simulacra", agent_id, default={})
+        sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
         if "last_interjection_sim_time" not in sim_state_init:
-            _update_state_value(state, f"simulacra.{agent_id}.last_interjection_sim_time", 0.0, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_interjection_sim_time", 0.0, logger)
         if "current_interrupt_probability" not in sim_state_init: # Initialize if not present
-            _update_state_value(state, f"simulacra.{agent_id}.current_interrupt_probability", None, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
         # next_simple_timer_interjection_sim_time is no longer managed by this task
 
-        if get_nested(state, "simulacra", agent_id, "status") == "idle":
-            current_sim_state_init = get_nested(state, "simulacra", agent_id, default={})
-            current_loc_id_init = current_sim_state_init.get('location_details')
-            current_loc_state_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id_init, default={}) if current_loc_id_init else {}
+        if get_nested(state, SIMULACRA_KEY, agent_id, "status") == "idle":
+            current_sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
+            # --- Phase 3: Location Awareness Enhancement ---
+            agent_current_location_id_init = current_sim_state_init.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME)
+            agent_personal_location_details_init = current_sim_state_init.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
+            world_location_data_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_init, default={})
+            world_location_description_init = world_location_data_init.get("description", "An unknown place.")
             current_world_time_init = state.get("world_time", 0.0)
 
             def get_entities_in_location_init(entity_type: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
                 entities = []
                 if not location_id: return entities
                 source_dict = state.get(entity_type, {})
-                for entity_id_init_loop, entity_data_init in source_dict.items(): 
-                    if entity_data_init.get('location') == location_id:
+                for entity_id_init_loop, entity_data_init in source_dict.items():
+                    if entity_data_init.get('location') == location_id: # For objects
                         entities.append({"id": entity_id_init_loop, "name": entity_data_init.get("name", entity_id_init_loop)})
+                    elif entity_type == SIMULACRA_KEY and get_nested(entity_data_init, "location") == location_id: # For simulacra
+                        entities.append({"id": entity_id_init_loop, "name": get_nested(entity_data_init, "persona_details", "Name", default=entity_id_init_loop)})
                 return entities
 
-            ephemeral_objects_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id_init, "ephemeral_objects", default=[])
+            ephemeral_objects_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_init, "ephemeral_objects", default=[])
             objects_in_room_for_prompt_init = []
             for obj_data in ephemeral_objects_init: 
                 objects_in_room_for_prompt_init.append({"id": obj_data.get("id"), "name": obj_data.get("name")})
-            agents_in_room_init = [a for a in get_entities_in_location_init("simulacra", current_loc_id_init) if a["id"] != agent_id]
+            # Phase 4: Get connected locations for prompt
+            connected_locations_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_init, "connected_locations", default=[])
+            agents_in_room_init = [a for a in get_entities_in_location_init(SIMULACRA_KEY, agent_current_location_id_init) if a["id"] != agent_id]
             
             raw_recent_narrative_init = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
             cleaned_recent_narrative_init = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative_init]
@@ -549,25 +561,26 @@ async def simulacra_agent_task_llm(agent_id: str):
             weather_summary = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
             latest_news_headlines = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:2]]
             news_summary = " ".join(h for h in latest_news_headlines if h) or "No major news."
-
-            sim_current_location_id = state.get('location_details').get('name', DEFAULT_HOME_LOCATION_NAME)
-            sim_current_location_id_desc = state.get('location_details').get('description', DEFAULT_HOME_LOCATION_NAME)
-
+            
             prompt_text_parts_init = [
-                 f"**Current State Info for {agent_name} ({agent_id}):**",
-                 f"- Persona Summary: {current_sim_state_init.get('persona', {}).get('summary', 'Not available.')}",
-                 f"- Location ID: {current_loc_id_init or 'Unknown'}",
-                 f"- Location Description: {current_loc_state_init.get('description', 'Not available.')}",
-                 f"- Status: {current_sim_state_init.get('status', 'idle')} (You should act now)",
-                 f"- Current Weather: {weather_summary}",
-                 f"- Recent News Snippet: {news_summary}",
-                 f"- Current Goal: {current_sim_state_init.get('goal', 'Determine goal.')}",
-                 f"- Current Time: {current_world_time_init:.1f}s",
-                 f"- Last Observation/Event: {current_sim_state_init.get('last_observation', 'None.')}",
-                 f"- Recent History:\n{history_str_init if history_str_init else 'None.'}",
-                 f"- Objects in Room: {json.dumps(objects_in_room_for_prompt_init) if objects_in_room_for_prompt_init else 'None.'}",
-                 f"- Other Agents in Room: {json.dumps(agents_in_room_init) if agents_in_room_init else 'None.'}",
+                f"**Current State Info for {agent_name} ({agent_id}):**",
+                f"- Persona: {current_sim_state_init.get('persona_details', {})}",
+                f"- Current Location ID: {agent_current_location_id_init}",
+                f"- Your understanding of this place: \"{agent_personal_location_details_init}\"",
+                f"- Official Location Description: \"{world_location_description_init}\"",
+                f"- Status: {current_sim_state_init.get('status', 'idle')} (You wake up and are ready to act.)",
+                f"- Current Weather: {weather_summary}",
+                f"- Recent News Snippet: {news_summary}",
+                f"- Current Goal: {current_sim_state_init.get('goal', 'Determine goal.')}",
+                f"- Current Time: {current_world_time_init:.1f}s",
+                f"- Last Observation/Event: {current_sim_state_init.get('last_observation', 'None.')}",
+                f"- Recent History:\n{history_str_init if history_str_init else 'None.'}",
+                f"- Objects in area: {json.dumps(objects_in_room_for_prompt_init) if objects_in_room_for_prompt_init else 'None.'}",
+                f"- Other Agents in area: {json.dumps(agents_in_room_init) if agents_in_room_init else 'None.'}",
+                f"- Exits/Connections from this location: {json.dumps(connected_locations_init) if connected_locations_init else 'None observed.'}", # Phase 4
+                f"- Current State: You wake up at home and are ready to act.",
                  "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
+            # --- End Phase 3 Change ---
             ]
             initial_trigger_text = "\n".join(prompt_text_parts_init)
             logger.debug(f"[{agent_name}] Sending initial context prompt as agent is idle.")
@@ -580,14 +593,19 @@ async def simulacra_agent_task_llm(agent_id: str):
                         response_text_clean_str = parse_json_output_last(response_text.strip())
                         if response_text_clean_str is None:
                             raise json.JSONDecodeError("No JSON found by parse_json_output_last", response_text, 0)
-                        parsed_data = json.loads(response_text_clean_str)
+                        if isinstance(response_text_clean_str, str):
+                            parsed_data = json.loads(response_text_clean_str)
+                        elif isinstance(response_text_clean_str, dict):
+                            parsed_data = response_text_clean_str # It's already a dictionary
+                        else:
+                            raise TypeError(f"Unexpected type from parse_json_output_last: {type(response_text_clean_str)}. Expected dict or None.")
                         validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
                         if live_display_object:
                             live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
                             live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
                             live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
                         await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
-                        _update_state_value(state, f"simulacra.{agent_id}.status", "thinking", logger)
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                     except (json.JSONDecodeError, ValidationError) as e_init:
                         logger.error(f"[{agent_name}] Error processing initial response: {e_init}\nResponse:\n{response_text}", exc_info=True)
                     break 
@@ -599,27 +617,34 @@ async def simulacra_agent_task_llm(agent_id: str):
         while True:
             await asyncio.sleep(AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS)
             current_sim_time_busy_loop = state.get("world_time", 0.0)
-            agent_state_busy_loop = get_nested(state, "simulacra", agent_id, default={})
+            agent_state_busy_loop = get_nested(state, SIMULACRA_KEY, agent_id, default={})
             current_status_busy_loop = agent_state_busy_loop.get("status")
 
             if current_status_busy_loop == "idle":
                 logger.debug(f"[{agent_name}] Status is idle. Proceeding to plan next action.")
-                current_loc_id = agent_state_busy_loop.get('location')
-                current_loc_state = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id, default={}) if current_loc_id else {}
+                # --- Phase 3: Location Awareness Enhancement ---
+                agent_current_location_id_loop = agent_state_busy_loop.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME)
+                agent_personal_location_details_loop = agent_state_busy_loop.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
+                world_location_data_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_loop, default={})
+                world_location_description_loop = world_location_data_loop.get("description", "An unknown place.")
                 def get_entities_in_location(entity_type: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
                     entities = []
                     if not location_id: return entities
                     source_dict = state.get(entity_type, {})
-                    for entity_id_loop, entity_data_loop in source_dict.items():
-                        if entity_data_loop.get('location') == location_id:
+                    for entity_id_loop, entity_data_loop in source_dict.items(): # Iterate over objects or simulacra_profiles
+                        if entity_type == "objects" and entity_data_loop.get('location') == location_id:
                             entities.append({"id": entity_id_loop, "name": entity_data_loop.get("name", entity_id_loop)})
+                        elif entity_type == SIMULACRA_KEY and get_nested(entity_data_loop, "location") == location_id:
+                            entities.append({"id": entity_id_loop, "name": get_nested(entity_data_loop, "persona_details", "Name", default=entity_id_loop)})
                     return entities
                 
-                ephemeral_objects_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id, "ephemeral_objects", default=[])
+                ephemeral_objects_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_loop, "ephemeral_objects", default=[])
                 objects_in_room_for_prompt_loop = []
                 for obj_data in ephemeral_objects_loop:
                     objects_in_room_for_prompt_loop.append({"id": obj_data.get("id"), "name": obj_data.get("name")})
-                agents_in_room = [a for a in get_entities_in_location("simulacra", current_loc_id) if a["id"] != agent_id]
+                # Phase 4: Get connected locations for prompt
+                connected_locations_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_loop, "connected_locations", default=[])
+                agents_in_room = [a for a in get_entities_in_location(SIMULACRA_KEY, agent_current_location_id_loop) if a["id"] != agent_id]
                 raw_recent_narrative = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
                 cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
                 history_str = "\n".join(cleaned_recent_narrative)
@@ -628,9 +653,10 @@ async def simulacra_agent_task_llm(agent_id: str):
                 news_summary_loop = " ".join(h for h in latest_news_headlines_loop if h) or "No major news."
                 prompt_text_parts = [
                      f"**Current State Info for {agent_name} ({agent_id}):**",
-                     f"- Persona Summary: {agent_state_busy_loop.get('persona', {}).get('summary', 'Not available.')}",
-                     f"- Location ID: {current_loc_id or 'Unknown'}",
-                     f"- Location Description: {current_loc_state.get('description', 'Not available.')}",
+                     f"- Persona: {agent_state_busy_loop.get('persona_details', {})}", # Use agent_state_busy_loop
+                     f"- Current Location ID: {agent_current_location_id_loop or 'Unknown'}",
+                     f"- Your understanding of this place: \"{agent_personal_location_details_loop}\"",
+                     f"- Official Location Description: \"{world_location_description_loop}\"",
                      f"- Status: {agent_state_busy_loop.get('status', 'idle')} (You should act now)",
                      f"- Current Weather: {weather_summary_loop}",
                      f"- Recent News Snippet: {news_summary_loop}",
@@ -638,9 +664,11 @@ async def simulacra_agent_task_llm(agent_id: str):
                      f"- Current Time: {current_sim_time_busy_loop:.1f}s",
                      f"- Last Observation/Event: {agent_state_busy_loop.get('last_observation', 'None.')}",
                      f"- Recent History:\n{history_str if history_str else 'None.'}",
-                     f"- Objects in Room: {json.dumps(objects_in_room_for_prompt_loop) if objects_in_room_for_prompt_loop else 'None.'}",
-                     f"- Other Agents in Room: {json.dumps(agents_in_room) if agents_in_room else 'None.'}",
+                     f"- Objects in Area: {json.dumps(objects_in_room_for_prompt_loop) if objects_in_room_for_prompt_loop else 'None.'}",
+                     f"- Other Agents in Area: {json.dumps(agents_in_room) if agents_in_room else 'None.'}",
+                     f"- Exits/Connections from this location: {json.dumps(connected_locations_loop) if connected_locations_loop else 'None observed.'}", # Phase 4
                      "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
+                # --- End Phase 3 Change ---
                 ]
                 prompt_text = "\n".join(prompt_text_parts)
                 logger.debug(f"[{agent_name}] Sending subsequent prompt.")
@@ -652,15 +680,20 @@ async def simulacra_agent_task_llm(agent_id: str):
                         try:
                             response_text_clean_str = parse_json_output_last(response_text.strip())
                             if response_text_clean_str is None:
-                                raise json.JSONDecodeError("No JSON found by parse_json_output_last", response_text, 0)
-                            parsed_data = json.loads(response_text_clean_str)
+                                raise json.JSONDecodeError("No JSON found by parse_json_output_last", response_text, 0)                                  
+                            if isinstance(response_text_clean_str, str):
+                                parsed_data = json.loads(response_text_clean_str)
+                            elif isinstance(response_text_clean_str, dict):
+                                parsed_data = response_text_clean_str # It's already a dictionary
+                            else:
+                                raise TypeError(f"Unexpected type from parse_json_output_last: {type(response_text_clean_str)}. Expected dict or None.")
                             validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
                             if live_display_object:
                                 live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
                                 live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
                                 live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
                             await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
-                            _update_state_value(state, f"simulacra.{agent_id}.status", "thinking", logger)
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                         except (json.JSONDecodeError, ValidationError) as e_idle:
                             logger.error(f"[{agent_name}] Error processing subsequent response: {e_idle}\nResponse:\n{response_text}", exc_info=True)
                         break 
@@ -678,11 +711,11 @@ async def simulacra_agent_task_llm(agent_id: str):
 
                 if remaining_duration > LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS and cooldown_passed_busy:
                     logger.info(f"[{agent_name}] Busy with long task (rem: {remaining_duration:.1f}s). Checking for self-reflection.")
-                    _update_state_value(state, f"simulacra.{agent_id}.last_interjection_sim_time", current_sim_time_busy_loop, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_interjection_sim_time", current_sim_time_busy_loop, logger)
 
                     if random.random() < PROB_INTERJECT_AS_SELF_REFLECTION: 
                         original_status_before_reflection = agent_state_busy_loop.get("status")
-                        _update_state_value(state, f"simulacra.{agent_id}.status", "reflecting", logger)
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "reflecting", logger)
                         current_action_desc_for_prompt = agent_state_busy_loop.get("current_action_description", "your current task")
                         reflection_prompt_text = f"""You are {agent_name}. You are currently busy with: "{current_action_desc_for_prompt}".
 This task is scheduled to continue for a while (until simulation time {agent_state_busy_loop.get("current_action_end_time", 0.0):.1f}).
@@ -703,31 +736,35 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                                     response_text_clean_str = parse_json_output_last(response_text.strip())
                                     if response_text_clean_str is None:
                                         raise json.JSONDecodeError("No JSON found by parse_json_output_last", response_text, 0)
-                                    parsed_data = json.loads(response_text_clean_str)
+                                    if isinstance(response_text_clean_str, str):
+                                        parsed_data = json.loads(response_text_clean_str)
+                                    elif isinstance(response_text_clean_str, dict):
+                                        parsed_data = response_text_clean_str # It's already a dictionary
+                                    else:
+                                        raise TypeError(f"Unexpected type from parse_json_output_last: {type(response_text_clean_str)}. Expected dict or None.")
                                     validated_reflection_intent = SimulacraIntentResponse.model_validate(parsed_data)
                                     if validated_reflection_intent.action_type == "continue_current_task":
                                         logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
-                                        _update_state_value(state, f"simulacra.{agent_id}.status", original_status_before_reflection, logger)
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
                                         # Probability remains as it was, task continues
                                     else:
                                         logger.info(f"[{agent_name}] Reflection: Chose to '{validated_reflection_intent.action_type}'. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
                                         await event_bus.put({ "type": "intent_declared", "actor_id": agent_id, "intent": validated_reflection_intent.model_dump(exclude={'internal_monologue'}) })
-                                        _update_state_value(state, f"simulacra.{agent_id}.current_interrupt_probability", None, logger) # Clear as action is changing
-                                        _update_state_value(state, f"simulacra.{agent_id}.status", "thinking", logger)
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger) # Clear as action is changing
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                                 except Exception as e_reflect:
                                     logger.error(f"[{agent_name}] Error processing reflection response: {e_reflect}. Staying busy. Response: {response_text}")
-                                    _update_state_value(state, f"simulacra.{agent_id}.status", original_status_before_reflection, logger)
+                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
                                 break 
 
     except asyncio.CancelledError:
         logger.info(f"[{agent_name}] Task cancelled.")
     except Exception as e:
         logger.error(f"[{agent_name}] Error in agent task: {e}", exc_info=True)
-        if agent_id in get_nested(state, "simulacra", default={}):
-            _update_state_value(state, f"simulacra.{agent_id}.status", "idle", logger)
+        if agent_id in get_nested(state, SIMULACRA_KEY, default={}):
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
     finally:
         logger.info(f"[{agent_name}] Task finished.")
-
 
 async def run_simulation(
     instance_uuid_arg: Optional[str] = None,
@@ -791,33 +828,10 @@ async def run_simulation(
         world_mood_global = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default="The familiar, everyday real world; starting the morning routine at home.")
 
 
-    active_sim_ids_from_state = list(state.get(ACTIVE_SIMULACRA_IDS_KEY, []))
-    sim_profiles_from_state = state.get(SIMULACRA_PROFILES_KEY, {})
-    
-    for sim_id_val_init in active_sim_ids_from_state:
-        if sim_id_val_init not in state.get("simulacra", {}): 
-            profile = sim_profiles_from_state.get(sim_id_val_init, {})
-            persona = profile.get("persona_details")
-            if persona:
-                default_loc = list(state.get(WORLD_STATE_KEY, {}).get(LOCATION_DETAILS_KEY, {}).keys())[0] if state.get(WORLD_STATE_KEY, {}).get(LOCATION_DETAILS_KEY) else DEFAULT_HOME_LOCATION_NAME
-                start_loc = profile.get(CURRENT_LOCATION_KEY, default_loc)
-                home_loc = profile.get(HOME_LOCATION_KEY, default_loc)
-
-                state.setdefault("simulacra", {})[sim_id_val_init] = {
-                    "id": sim_id_val_init, "name": persona.get("Name", sim_id_val_init), "persona": persona,
-                    "location": start_loc, "home_location": home_loc, "status": "idle",
-                    "current_action_end_time": state.get('world_time', 0.0),
-                    "goal": profile.get("goal", persona.get("Initial_Goal", "Determine goals.")),
-                    "last_observation": profile.get("last_observation", "Waking up."),
-                    "memory_log": profile.get("memory_log", []),
-                    "pending_results": {}, "last_interjection_sim_time": 0.0,
-                    "next_simple_timer_interjection_sim_time": 0.0,
-                    "current_action_description": "N/A",
-                    "current_interrupt_probability": None # Initialize the new field
-                }
-                logger.info(f"Ensured runtime state for simulacrum: {sim_id_val_init}")
-            else:
-                logger.warning(f"Missing persona for {sim_id_val_init} in profiles. Cannot fully populate runtime state.")
+    # The block that previously populated state["simulacra"] from state["simulacra_profiles"]
+    # has been removed. `load_or_initialize_simulation` now ensures `state[SIMULACRA_PROFILES_KEY]`
+    # (accessed via SIMULACRA_KEY from config) is correctly populated with all runtime fields.
+    # We will use SIMULACRA_KEY directly.
 
     final_active_sim_ids = state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
     if not final_active_sim_ids:
@@ -833,15 +847,25 @@ async def run_simulation(
         app_name=APP_NAME, user_id=USER_ID, session_id=adk_session_id, state=state
     )
     logger.info(f"ADK Session created: {adk_session_id}.")
+    # Create shared agents once
+    # Assuming the first simulacra's details can be used for generic agent naming/mood context if needed,
+    # or prompts are fully generic. The current prompts take actor details in the trigger.
+    first_sim_id = final_active_sim_ids[0] if final_active_sim_ids else "default_sim"
+    first_sim_profile = get_nested(state, SIMULACRA_KEY, first_sim_id, default={})
+    first_persona_name = get_nested(first_sim_profile, "persona_details", "Name", default=first_sim_id)
+
+    world_engine_agent = create_world_engine_llm_agent(first_sim_id, first_persona_name) # Generic, details come in prompt
+    narration_agent_instance = create_narration_llm_agent(first_sim_id, first_persona_name, world_mood=world_mood_global) # Generic
+    search_llm_agent_instance = create_search_llm_agent()
 
     simulacra_agents_map.clear()
     for sim_id_val in final_active_sim_ids:
-        sim_state_data = state.get("simulacra", {}).get(sim_id_val, {})
-        persona_name = sim_state_data.get("name", sim_id_val)
+        sim_profile_data = get_nested(state, SIMULACRA_KEY, sim_id_val, default={})
+        persona_name = get_nested(sim_profile_data, "persona_details", "Name", default=sim_id_val)
         sim_agent_instance = create_simulacra_llm_agent(sim_id_val, persona_name, world_mood=world_mood_global)
-        world_engine_agent = create_world_engine_llm_agent(sim_id_val, persona_name)
-        narration_agent_instance = create_narration_llm_agent(sim_id_val, persona_name,world_mood=world_mood_global)
-        search_llm_agent_instance = create_search_llm_agent()
+        # world_engine_agent = create_world_engine_llm_agent(sim_id_val, persona_name)
+        # narration_agent_instance = create_narration_llm_agent(sim_id_val, persona_name,world_mood=world_mood_global)
+        # search_llm_agent_instance = create_search_llm_agent()
         simulacra_agents_map[sim_id_val] = sim_agent_instance
     logger.info(f"Created {len(simulacra_agents_map)} simulacra agents.")
 
