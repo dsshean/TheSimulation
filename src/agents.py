@@ -23,7 +23,7 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) 
 
 CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
 FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMULACRA TO DETERMINE THE OUTCOME.
-EVERYTHING YOU DO MUST BE CONSISTENT WITH YOUR INTERNAL KNOWLEDGE OF WHERE YOU ARE AND WHO YOU ARE. 
+EVERYTHING YOU DO MUST BE CONSISTENT WITH YOUR INTERNAL KNOWLEDGE OF WHERE YOU ARE AND WHO YOU ARE.
 EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDENT OF THE AREA BASED ON YOUR LIFE SUMMARY, YOU MUST KNOW WHERE YOU ARE GOING AND HOW TO GET THERE.
 
 **Your Goal:** You determine your own goals based on your persona and the situation.
@@ -35,8 +35,9 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
     *   **Entity Interactions:** `use [object_id]`, `talk [agent_id]`.
             *   **Talking to Ephemeral NPCs (introduced by Narrator):**
             *   If the Narrator described an NPC (e.g., "a street vendor," "a mysterious figure"), you can interact by setting `action_type: "talk"`.
-            *   In `details`, specify who you are talking to based on the narrative description (e.g., `details: "to the street vendor about the strange weather"`).
-            *   If the Narrator provided a conceptual tag (e.g., "your friend Alex (npc_concept_friend_alex)"), you can use `target_id: "npc_concept_friend_alex"` and provide conversational content in `details`. This `target_id` is for contextual understanding by the World Engine, not a lookup in the game state.
+            *   Use `target_id` if the Narrator provided a conceptual tag (e.g., `(npc_concept_grumpy_shopkeeper)` becomes `target_id: "npc_concept_grumpy_shopkeeper"`). If no tag, omit `target_id` and the World Engine will infer based on your `details` and the `last_observation`.
+            *   In `details`, provide the **exact words you want to say** to the NPC. For example, if talking to a street vendor about strange weather, `details: "Excuse me, vendor, what's your take on this strange weather we're having?"`.
+            *   If you use a `target_id` like `npc_concept_friend_alex`, the `details` field should still be your direct speech, e.g., `details: "Hey Alex, fancy meeting you here!"`.
     *   **World Interactions:** `look_around`, `move` (Specify `details` like target location ID or name), `world_action` (Specify `details` for generic world interactions not covered by other types).
     *   **Passive Actions:** `wait`, `think`.
     *   **Self-Initiated Change (when 'idle' and planning your next turn):** If your current situation feels stagnant, or if an internal need arises (e.g., hunger, boredom, social need), you can use the `initiate_change` action.
@@ -104,8 +105,8 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
                     *   `duration`: Short (e.g., 15-60s).
                     *   **NPC Response Generation:**
                         *   Examine the `Actor's Last Observation` (provided implicitly via the actor's state, which you don't directly see but influences the context) and `Recent Narrative History` (if available in your input context) to understand the NPC described by the Narrator.
-                        *   Consider `intent.details` (what the Actor said to this NPC).
-                        *   Craft a plausible `npc_response_content` from the perspective of this ephemeral NPC, fitting the narrative context.
+                        *   The `intent.details` field contains the **direct speech** from the Actor to this NPC.
+                        *   Craft a plausible `npc_response_content` from the perspective of this ephemeral NPC, fitting the narrative context and the Actor's speech.
                         *   Determine a generic `npc_description_for_output` (e.g., "the shopkeeper", "your friend", "the street vendor") based on how the Narrator introduced them or how the actor referred to them in the intent.
                     *   `results`: Format as `{{"simulacra_profiles.[actor_id].last_observation": "The [npc_description_for_output] said: '[npc_response_content]'"}}`. Replace bracketed parts with your generated content.
                     *   `outcome_description`: Format as `"[Actor Name] spoke with the [npc_description_for_output]."` Replace bracketed parts.
@@ -202,8 +203,8 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
     *   **Incorporate Intent (Optional).**
     *   **Flow:** Ensure reasonable flow.
     *   **If the `Original Intent.action_type` was `look_around`:**
-        *   Your narrative MUST describe the key features and 2-4 plausible objects the actor would see in their current location (e.g., if in a bedroom: a bed, a closet, a nightstand, a window). Consider the `Original Intent.details` (e.g., "trying to identify the closet's location") to ensure relevant objects are mentioned.
-        *   You MAY also introduce 0-1 ephemeral NPCs if appropriate for the scene.
+        *   Your narrative MUST describe the key features and plausible objects the actor would see in their current location (e.g., if in a bedroom: a bed, a closet, a nightstand, a window). Consider the `Original Intent.details` (e.g., "trying to identify the closet's location") to ensure relevant objects are mentioned.
+        *   You MAY also introduce ephemeral NPCs if appropriate for the scene.
         *   For each object and NPC you describe in the narrative, you MUST also list them in the `discovered_objects` and `discovered_npcs` fields in the JSON output (see below). Assign a simple, unique `id` (e.g., `closet_bedroom_01`, `npc_cat_01`), a `name`, a brief `description`, and set `is_interactive` to `true` if it's something an agent could plausibly interact with. For objects, you can also add common-sense `properties` (e.g., `{{"is_container": true, "is_openable": true}}` for a closet).
 
         *   **Also, if `look_around`, identify and describe potential exits or paths to other (possibly new/undiscovered) locations.** List these in `discovered_connections`.
