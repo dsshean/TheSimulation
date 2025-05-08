@@ -56,6 +56,7 @@ async def time_manager_task(
                                     logger_instance.debug(f"[TimeManager] Pruned memory log for {agent_id} to {MAX_MEMORY_LOG_ENTRIES} entries.")
                         else:
                             logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
+                        _update_state_value(current_state, f"simulacra.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
                         _update_state_value(current_state, f"simulacra.{agent_id}.status", "idle", logger_instance)
                         logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
             

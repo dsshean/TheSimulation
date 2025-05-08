@@ -1,4 +1,4 @@
-# src/simulation_utils.py - Utility functions for the simulation
+# In c:\Users\dshea\Desktop\TheSimulation\src\simulation_utils.py
 
 import json
 import logging
@@ -12,11 +12,14 @@ from google.genai import types as genai_types # For type hinting
 
 from rich.table import Table # For generate_table
 from rich.panel import Panel # For generate_table
+from rich.text import Text # For styled text in table
 
 # Import constants from the config module
 from .config import (
-    MODEL_NAME, PROB_INTERJECT_AS_SELF_REFLECTION, PROB_INTERJECT_AS_NARRATIVE,
-    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, USER_ID
+    MODEL_NAME, PROB_INTERJECT_AS_SELF_REFLECTION, # PROB_INTERJECT_AS_NARRATIVE removed
+    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, USER_ID,
+    # Added these constants as they are used for fetching ephemeral objects/NPCs
+    WORLD_STATE_KEY, LOCATION_DETAILS_KEY, SIMULACRA_KEY
 )
 from .loop_utils import get_nested # Assuming get_nested remains in loop_utils or is moved here
 
@@ -68,11 +71,16 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
 
     active_sim_ids = current_state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
     sim_limit = 3
+    primary_actor_location_id: Optional[str] = None # To store the location of the first active sim
+
     for i, sim_id in enumerate(active_sim_ids):
+        if i == 0: # Get location of the first active simulacra for object display
+            primary_actor_location_id = get_nested(current_state, SIMULACRA_KEY, sim_id, "location")
+
         if i >= sim_limit:
             table.add_row(f"... ({len(active_sim_ids) - sim_limit} more)", "...")
             break
-        sim_state_data = current_state.get("simulacra", {}).get(sim_id, {})
+        sim_state_data = current_state.get(SIMULACRA_KEY, {}).get(sim_id, {})
         table.add_row(f"--- Sim: {get_nested(sim_state_data, 'name', default=sim_id)} ---", "---")
         table.add_row(f"  Status", get_nested(sim_state_data, 'status', default="Unknown"))
         table.add_row(f"  Location", get_nested(sim_state_data, 'location', default="Unknown"))
@@ -83,26 +91,70 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
         table.add_row(f"  Last Obs.", last_obs[:80] + ("..." if len(last_obs) > 80 else ""))
         action_desc = get_nested(sim_state_data, 'current_action_description', default="N/A")
         table.add_row(f"  Curr. Action", action_desc[:70] + ("..." if len(action_desc) > 70 else ""))
+        interrupt_prob = get_nested(sim_state_data, 'current_interrupt_probability')
+        if interrupt_prob is not None:
+            table.add_row(f"  Dyn.Int.Prob", f"{interrupt_prob:.2%}")
+        else:
+            # Check if busy and potentially on cooldown
+            if get_nested(sim_state_data, 'status') == 'busy':
+                last_interjection_time = get_nested(sim_state_data, "last_interjection_sim_time", 0.0)
+                current_sim_time_table = get_nested(current_state, "world_time", 0.0) # Get current time for check
+                # INTERJECTION_COOLDOWN_SIM_SECONDS would need to be imported from config
+                # For simplicity, we'll just assume if it's None and busy, it might be cooldown or too short
+                table.add_row(f"  Dyn.Int.Prob", "[dim]N/A (Cooldown/Short)[/dim]")
+            # else: if not busy, don't show the line
 
-    object_limit = 3
-    objects_dict = get_nested(current_state, 'objects', default={})
-    table.add_row("--- Objects ---", f"({len(objects_dict)} total)")
-    for i, (obj_id, obj_state_data) in enumerate(objects_dict.items()):
-         if i >= object_limit:
-             table.add_row(f"... ({len(objects_dict) - object_limit} more)", "...")
-             break
-         obj_name = get_nested(obj_state_data, 'name', default=obj_id)
-         obj_loc = get_nested(obj_state_data, 'location', default='Unknown')
-         obj_power = get_nested(obj_state_data, 'power')
-         obj_locked = get_nested(obj_state_data, 'locked')
-         obj_status = get_nested(obj_state_data, 'status')
-         obj_interactive = get_nested(obj_state_data, 'interactive')
-         details = f"Loc: {obj_loc}"
-         if obj_power is not None: details += f", Pwr: {obj_power}"
-         if obj_locked is not None: details += f", Lck: {'Y' if obj_locked else 'N'}"
-         if obj_status is not None: details += f", Sts: {obj_status}"
-         if obj_interactive is not None: details += f", Int: {'Y' if obj_interactive else 'N'}"
-         table.add_row(f"  {obj_name}", details)
+    # --- Ephemeral Objects in Primary Actor's Location ---
+    location_name_display = primary_actor_location_id if primary_actor_location_id else "Unknown Location"
+    table.add_row(Text(f"--- Objects in {location_name_display} ---", style="bold cyan"), Text("---", style="bold cyan"))
+    
+    ephemeral_objects_in_loc: List[Dict[str, Any]] = []
+    if primary_actor_location_id:
+        ephemeral_objects_in_loc = get_nested(
+            current_state,
+            WORLD_STATE_KEY,
+            LOCATION_DETAILS_KEY,
+            primary_actor_location_id,
+            "ephemeral_objects", # Key where ephemeral objects are stored
+            default=[]
+        )
+    
+    table.add_row(f"  (Ephemeral)", f"({len(ephemeral_objects_in_loc)} total)")
+    if ephemeral_objects_in_loc:
+        object_display_limit = 5 # How many ephemeral objects to show
+        for i, obj_data in enumerate(ephemeral_objects_in_loc):
+            if i >= object_display_limit:
+                table.add_row(f"    ... ({len(ephemeral_objects_in_loc) - object_display_limit} more)", "")
+                break
+            obj_name = obj_data.get("name", "N/A")
+            obj_id = obj_data.get("id", "N/A")
+            obj_desc = obj_data.get('description', '')
+            table.add_row(f"    {obj_name} ({obj_id})", obj_desc[:60] + ("..." if len(obj_desc) > 60 else ""))
+    
+    # --- Ephemeral NPCs in Primary Actor's Location ---
+    table.add_row(Text(f"--- NPCs in {location_name_display} ---", style="bold green"), Text("---", style="bold green"))
+    ephemeral_npcs_in_loc: List[Dict[str, Any]] = []
+    if primary_actor_location_id:
+        ephemeral_npcs_in_loc = get_nested(
+            current_state,
+            WORLD_STATE_KEY,
+            LOCATION_DETAILS_KEY,
+            primary_actor_location_id,
+            "ephemeral_npcs", # Key where ephemeral NPCs are stored
+            default=[]
+        )
+    table.add_row(f"  (Ephemeral)", f"({len(ephemeral_npcs_in_loc)} total)")
+    if ephemeral_npcs_in_loc:
+        npc_display_limit = 3 # How many ephemeral NPCs to show
+        for i, npc_data in enumerate(ephemeral_npcs_in_loc):
+            if i >= npc_display_limit:
+                table.add_row(f"    ... ({len(ephemeral_npcs_in_loc) - npc_display_limit} more)", "")
+                break
+            npc_name = npc_data.get("name", "N/A")
+            npc_id = npc_data.get("id", "N/A") 
+            npc_desc = npc_data.get('description', '')
+            table.add_row(f"    {npc_name} ({npc_id})", npc_desc[:60] + ("..." if len(npc_desc) > 60 else ""))
+
 
     table.add_row("--- System ---", "---")
     table.add_row("Event Bus Size", str(event_bus_qsize))
@@ -131,92 +183,6 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
     table.add_row(f"  Pop Culture", pop_culture_headline_display[:70] + "..." if len(pop_culture_headline_display) > 70 else pop_culture_headline_display)
     return table
 
-async def generate_llm_interjection_detail(
-    agent_name_for_prompt: str,
-    agent_current_action_desc: str,
-    interjection_category: str,
-    world_mood: str,
-    global_search_agent_runner: Optional[Runner],
-    search_agent_session_id: Optional[str],
-    user_id_for_search: str,
-    logger_instance: logging.Logger
-) -> str:
-    """Generates a brief interjection detail using an LLM."""
-    try:
-        if PROB_INTERJECT_AS_SELF_REFLECTION + PROB_INTERJECT_AS_NARRATIVE > 1.01: # type: ignore
-            logger_instance.warning(
-                f"Sum of PROB_INTERJECT_AS_SELF_REFLECTION ({PROB_INTERJECT_AS_SELF_REFLECTION}) and " # type: ignore
-                f"PROB_INTERJECT_AS_NARRATIVE ({PROB_INTERJECT_AS_NARRATIVE}) exceeds 1.0. " # type: ignore
-                "World events might not be chosen.")
-
-        model = genai.GenerativeModel(MODEL_NAME)
-        prompt_text = ""
-        if interjection_category == "narrative":
-            prompt_text = f"""
-Agent {agent_name_for_prompt} is currently: "{agent_current_action_desc}".
-The general world mood is: "{world_mood}".
-Invent a brief, personal, and distracting event for {agent_name_for_prompt}. This could be a sudden vivid memory, an unexpected personal thought, a brief message or call from a generic acquaintance (e.g., "a friend," "a colleague," "an old contact" - do not use specific names unless it's a generic title like "your boss"), or a minor bodily sensation.
-The event should be something that would momentarily break their concentration.
-Output ONLY the single, short, descriptive sentence of this event. Example: "A wave of nostalgia for a childhood memory washes over you." or "Your comm-link buzzes with an incoming call from an unknown number."
-Keep it concise and impactful.
-"""
-        elif interjection_category == "world_event":
-            if global_search_agent_runner and search_agent_session_id:
-                try:
-                    search_query = "latest brief world news update"
-                    # Send the query directly
-                    search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
-                    raw_search_results_text = ""
-                    search_tool_used_successfully = False
-
-                    async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content):
-                        logger_instance.debug(f"[InterjectionSearch] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
-                        if event.is_final_response() and event.content and event.content.parts:
-                            part = event.content.parts[0]
-                            if hasattr(part, 'function_response') and part.function_response and hasattr(part.function_response, 'response'):
-                                tool_response_data = dict(part.function_response.response)
-                                raw_search_results_text = json.dumps(tool_response_data.get("results", tool_response_data))
-                                search_tool_used_successfully = True
-                                logger_instance.info(f"[InterjectionSearch] Tool response received: {raw_search_results_text[:200]}...")
-                            elif part.text:
-                                raw_search_results_text = part.text
-                                # Check if it's NOT the agent just echoing tool_code
-                                if not ("tool_code" in raw_search_results_text and "google_search" in raw_search_results_text):
-                                    search_tool_used_successfully = True
-                                    logger_instance.info(f"[InterjectionSearch] Text response received: {raw_search_results_text[:200]}...")
-                                else:
-                                    logger_instance.warning(f"[InterjectionSearch] Agent returned tool_code: {raw_search_results_text[:200]}...")
-                            break # Process first final response
-
-                    if search_tool_used_successfully and raw_search_results_text:
-                        summarization_model = genai.GenerativeModel(MODEL_NAME)
-                        summarization_prompt = f"Given this raw search result: '{raw_search_results_text[:500]}...'\nCreate a very short, impactful, one-sentence news flash suitable for a brief interjection for {agent_name_for_prompt}. Example: 'A news alert flashes on a nearby screen: Major international agreement reached.'"
-                        summary_response = await summarization_model.generate_content_async(summarization_prompt)
-                        if summary_response.text:
-                            return summary_response.text.strip()
-                    else:
-                        logger_instance.warning("[InterjectionSearch] Search did not yield usable results. Falling back to LLM invention for interjection.")
-                except Exception as search_interject_e:
-                    logger_instance.error(f"Error using search for world_event interjection: {search_interject_e}", exc_info=True)
-            
-            # Fallback prompt if search fails or not used
-            prompt_text = f"""
-Agent {agent_name_for_prompt} is currently: "{agent_current_action_desc}".
-The general world mood is: "{world_mood}".
-Invent a brief, subtle, and distracting environmental event or a piece of background world news. This could be a flicker of lights, a distant sound, a change in temperature, a news snippet on a nearby screen, or a minor system alert.
-The event should be something that would momentarily break their concentration.
-Output ONLY the single, short, descriptive sentence of this event. Example: "The overhead lights flicker momentarily." or "A news bulletin flashes on a nearby screen: 'Local transport system experiencing minor delays.'"
-Keep it concise and impactful.
-"""
-        else:
-            return "A moment of quiet contemplation passes."
-
-        response = await model.generate_content_async(prompt_text)
-        return response.text.strip() if response.text else "You notice something out of the corner of your eye."
-    except Exception as e:
-        logger_instance.error(f"Error generating LLM interjection detail: {e}", exc_info=True)
-        return "A fleeting distraction crosses your mind."
-
 async def generate_simulated_world_feed_content(
     current_sim_state: Dict[str, Any],
     category: str,
@@ -240,15 +206,13 @@ async def generate_simulated_world_feed_content(
         sub_genre = get_nested(current_sim_state, WORLD_TEMPLATE_DETAILS_KEY, 'sub_genre', default="turn_based")
         use_real_feeds = world_type == "real" and sub_genre == "realtime"
 
-        search_tool_used_successfully = False # More accurately, did we get usable results
+        search_tool_used_successfully = False 
         raw_search_results_text = ""
 
         if category == "weather":
             if use_real_feeds and global_search_agent_runner and search_agent_session_id:
                 search_query = f"What is the current weather in {location_context}?"
                 logger_instance.info(f"[WorldInfoGatherer] Attempting REAL weather search for '{location_context}' with query: '{search_query}'")
-                # Send the query directly
-                # search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
                 search_trigger_content = genai_types.Content(role='user', parts=[genai_types.Part(text=search_query)])
                 async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content): # type: ignore
                     logger_instance.debug(f"[WorldInfoGatherer_SearchEvent_Weather] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
@@ -275,7 +239,7 @@ async def generate_simulated_world_feed_content(
                 else:
                     logger_instance.warning(f"[WorldInfoGatherer] REAL weather search for '{location_context}' did not yield usable results. Falling back. Raw: {raw_search_results_text[:200]}")
                     prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
-            else: # Not using real feeds or components unavailable
+            else: 
                 if use_real_feeds: logger_instance.warning(f"[WorldInfoGatherer] Intended REAL weather for '{location_context}' but search components unavailable. Falling back.")
                 prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
         
@@ -298,9 +262,7 @@ async def generate_simulated_world_feed_content(
                     search_query = f"What are the top latest {pop_culture_region} pop culture trends and entertainment news headlines (e.g., movies, music, viral trends)?"
 
                 logger_instance.info(f"[WorldInfoGatherer] Attempting REAL search for '{category}' with query: '{search_query}'")
-                # Send the query directly
                 search_trigger_content = genai_types.Content(role='user', parts=[genai_types.Part(text=search_query)])
-                # search_trigger_content = genai_types.Content(parts=[genai_types.Part(text=search_query)])
                 
                 async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content): # type: ignore
                     logger_instance.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
@@ -327,18 +289,16 @@ async def generate_simulated_world_feed_content(
                 else:
                     logger_instance.warning(f"[WorldInfoGatherer] REAL search for '{category}' did not yield usable results. Falling back. Raw: {raw_search_results_text[:200]}")
                     prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
-            else: # Not using real feeds or components unavailable
+            else: 
                 if use_real_feeds: logger_instance.warning(f"[WorldInfoGatherer] Intended REAL search for '{category}' but search components unavailable. Falling back.")
                 prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
-        else: # Unknown category
+        else: 
             return {"error": "Unknown category"}
 
-        # If search was attempted but failed to produce response_obj, or if not using real feeds
         if not (response_obj and response_obj.text):
             response_obj = await model.generate_content_async(prompt_text)
 
         response_text = response_obj.text.strip() if response_obj and response_obj.text else "{}"
-        # Clean potential markdown ```json ... ```
         response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text, flags=re.MULTILINE)
         
         try:

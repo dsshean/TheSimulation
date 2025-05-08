@@ -350,7 +350,7 @@ def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
 
     # --- ADDED: Ensure 'mood' key exists with a default ---
     if "mood" not in template_details:
-        default_mood = "neutral_descriptive" # Or choose your preferred default
+        default_mood = "Real world" # Or choose your preferred default
         template_details["mood"] = default_mood
         logger.warning(f"Added missing 'mood' key to '{WORLD_TEMPLATE_DETAILS_KEY}' with default value '{default_mood}'.")
         modified = True

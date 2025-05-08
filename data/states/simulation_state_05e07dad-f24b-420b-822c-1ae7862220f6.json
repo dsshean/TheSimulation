@@ -12,7 +12,7 @@
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
-  "world_time": 129.01599999994505,
+  "world_time": 0.0,
   "narrative_log": [],
   "simulacra": {
     "sim_3e912d": {
@@ -56,17 +56,16 @@
         "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "location": "kitchen",
+      "location": "default_start_location",
       "home_location": "default_start_location",
       "status": "idle",
-      "current_action_end_time": 127.68799999996554,
+      "current_action_end_time": 0.0,
       "goal": "Determine goals.",
-      "last_observation": "You decide to make coffee before getting ready for work.",
+      "last_observation": "Waking up in A Starting Point.",
       "memory_log": [],
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
-      "next_simple_timer_interjection_sim_time": 0.0,
-      "current_action_description": "Action: wait - Details: Waiting for the coffee to finish brewing."
+      "next_simple_timer_interjection_sim_time": 0.0
     }
   },
   "current_world_state": {
@@ -98,7 +97,7 @@
         "longitude": -82.5515
       }
     },
-    "mood": "neutral_descriptive"
+    "mood": "Real world"
   },
   "simulacra_profiles": {
     "sim_3e912d": {
@@ -146,44 +145,5 @@
       "goal": "Determine goals.",
       "memory_log": []
     }
-  },
-  "world_feeds": {
-    "last_update_sim_time": 9.905999999959022,
-    "weather": {
-      "condition": "cloudy",
-      "temperature_celsius": 16,
-      "forecast_short": "Mostly sunny this afternoon, partly cloudy tonight.",
-      "timestamp": 9.905999999959022,
-      "source_category": "weather"
-    },
-    "news_updates": [
-      {
-        "headline": "Asheville News: Tax Hike, Helene Recovery, Crime, and Airport Expansion",
-        "summary": "Asheville grapples with a potential property tax increase, ongoing Hurricane Helene recovery efforts, recent drug and gun-related arrests, and developments at the regional airport.",
-        "timestamp": 9.905999999959022,
-        "source_category": "local_news"
-      },
-      {
-        "headline": "US National News: REAL ID Deadline, Gulf Debate, and Trump's Plans",
-        "summary": "The U.S. faces REAL ID enforcement, political friction over the Gulf of America bill, and potential changes to the name of the Persian Gulf by Trump.",
-        "timestamp": 9.905999999959022,
-        "source_category": "regional_news"
-      },
-      {
-        "headline": "Global Issues Dominate World News",
-        "summary": "World news includes Romanian election, mental health crisis, climate change impact, Gaza conflict, Ukrainian drone strikes, and global carbon pricing.",
-        "timestamp": 9.905999999959022,
-        "source_category": "world_news"
-      }
-    ],
-    "pop_culture_updates": [
-      {
-        "headline": "Pop Culture Buzz: Music, TV, Movies, and Celeb News",
-        "summary": "Katy Perry's tour is 'Disneyland on wheels', 'NCIS' gets a trailer, Affleck defends filming in LA, and celeb relationships heat up.",
-        "timestamp": 9.905999999959022,
-        "source_category": "pop_culture"
-      }
-    ]
-  },
-  "current_action_end_time": 1697461450.0
+  }
 }

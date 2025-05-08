@@ -1,3 +1,4 @@
 .env
 *.log
 legacy_code/
+**/__pycache__/

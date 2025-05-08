@@ -86,7 +86,14 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
     *   **General Checks:** Plausibility, target consistency, location checks.
     *   **Action Category Reasoning:**
         *   **Entity Interaction (e.g., `use`, `talk`):** Evaluate against target state and rules.
-            *   `use`: Check `interactive` property, object properties (`toggleable`, `lockable`), and current state.
+            *   `use`:
+                *   Check `Target Entity State.is_interactive` property. If false, action is invalid.
+                *   **If `Target Entity State.properties.leads_to` exists (e.g., for a door or portal):**
+                    *   `valid_action: true`.
+                    *   `duration`: Short (e.g., 5-15s for opening a door and stepping through).
+                    *   `results`: `{{"simulacra.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}`.
+                    *   `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to [Name of the new location if known, otherwise the ID from leads_to]."`.
+                *   Else (for other usable objects): Check other object properties (`toggleable`, `lockable`), and current state to determine outcome, duration, and results (e.g., turning a lamp on/off).
             *   `talk`:
                 *   **If target is a Simulacra:**
                     *   Check if Actor and Target Simulacra are in the same `Actor's Current Location ID`.
