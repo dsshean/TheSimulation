@@ -2,3 +2,8 @@
 *.log
 legacy_code/
 **/__pycache__/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
