@@ -46,7 +46,7 @@ NEW_SIMULATION_STATE_TEMPLATE = {
       "state": "Unknown",
       "country": "Unknown"
     },
-    "mood": "Anticipatory"
+    "mood": "The real world and general slice of life."
   },
   "simulacra_profiles": {},
   "objects": [] # Will be populated from world_config's initial_objects

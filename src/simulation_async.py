@@ -1003,7 +1003,7 @@ async def narrative_image_generation_task():
             logger.debug("[NarrativeImageGenerator] Narrative log is empty. Skipping image generation.")
             continue
 
-        latest_narrative_full = narrative_log_entries[-1]
+        latest_narrative_full = narrative_log_entries[-3]
         # Strip the timestamp like "[T123.4] " from the narrative for a cleaner image prompt
         narrative_prompt_text = re.sub(r'^\[T\d+\.\d+\]\s*', '', latest_narrative_full).strip()
 
@@ -1012,7 +1012,7 @@ async def narrative_image_generation_task():
             continue
 
         current_sim_time_for_filename = state.get("world_time", 0.0)
-        prompt_for_image = f"Visually represent this scene based on the following narrative, imagine it as an instagram post in style of a cartoon: \"{narrative_prompt_text}\""
+        prompt_for_image = f"Create a charming and playful cartoon illustration based on the narrative. Emphasize expressive, stylized characters and a vibrant, appealing color palette. The scene should be brimming with personality, telling its story through whimsical details and a delightful composition that would make anyone smile and want to share: \"{narrative_prompt_text}\""
         
         logger.info(f"[NarrativeImageGenerator] Requesting image for narrative (T{current_sim_time_for_filename:.1f}): \"{narrative_prompt_text[:100]}...\"")
 

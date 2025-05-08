@@ -48,7 +48,7 @@ RANDOM_SEED: Optional[int] = int(RANDOM_SEED_VALUE) if RANDOM_SEED_VALUE and RAN
 
 # --- Narrative Image Generation Parameters ---
 ENABLE_NARRATIVE_IMAGE_GENERATION = os.getenv("ENABLE_NARRATIVE_IMAGE_GENERATION", "False").lower() == "true"
-IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 30.0)) # How often to generate an image
+IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 90.0)) # How often to generate an image
 IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "gemini-2.0-flash-preview-image-generation") # Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
 IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
 
