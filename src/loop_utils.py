@@ -80,44 +80,33 @@ def print_event_details(
          logger.debug(f"{phase_name} ({agent_id}) Final event with no standard parts. Event: {event}")
 
 def parse_json_output_last(
-    raw_text: Optional[str],
-    phase_name: str,
-    agent_name: str,
-    console: Console,
-    logger: logging.Logger
-) -> Optional[Dict[str, Any]]:
+    raw_text: Optional[str]
+) -> Optional[str]:
     """
-    Attempts to parse JSON from an agent's text output, robustly handling
-    markdown code fences and preceding/trailing text.
+    Attempts to extract a potential JSON string from an agent's text output,
+    robustly handling markdown code fences and preceding/trailing text.
     Prioritizes the LAST JSON block found.
-    Returns the parsed dictionary or None on failure.
+    Returns the potential JSON string or None if no suitable candidate is found.
     """
     if not raw_text:
-        console.print(f"[yellow]{phase_name}: {agent_name} returned empty final response.[/yellow]")
         return None
 
     text_to_parse = raw_text.strip()
-    logger.debug(f"[{phase_name}/{agent_name}] Raw output: {repr(text_to_parse)}")
-
     json_string_to_parse = None
 
-    # --- More Robust JSON Extraction - Prioritize LAST block ---
     # 1. Look for ```json ... ``` blocks
     json_matches = re.findall(r"```json\s*(\{.*?\})\s*```", text_to_parse, re.DOTALL)
     if json_matches:
         # Take the last match found
         json_string_to_parse = json_matches[-1].strip()
-        logger.debug(f"[{phase_name}/{agent_name}] Extracted LAST JSON block using ```json regex.")
     else:
         # 2. If no ```json block, look for ``` ... ``` blocks
         code_matches = re.findall(r"```\s*(\{.*?\})\s*```", text_to_parse, re.DOTALL)
         if code_matches:
             # Take the last match found
             json_string_to_parse = code_matches[-1].strip()
-            logger.debug(f"[{phase_name}/{agent_name}] Extracted LAST JSON block using ``` regex.")
         else:
-            # 3. If no markdown block, find the LAST '{' and try parsing from there
-            # This is less reliable but better than taking the first one
+            # 3. If no markdown block, find the LAST '{' and try from there
             last_brace = text_to_parse.rfind('{')
             if last_brace != -1:
                 # Attempt to find the matching closing brace (simple heuristic)
@@ -126,42 +115,14 @@ def parse_json_output_last(
                 if last_close_brace != -1:
                     potential_json = text_to_parse[last_brace : last_close_brace + 1]
                     json_string_to_parse = potential_json
-                    logger.debug(f"[{phase_name}/{agent_name}] No markdown found, trying from last '{{' to last '}}'.")
                 else:
-                    # Fallback: try parsing from last '{' to the end
+                    # Fallback: try from last '{' to the end
                     potential_json = text_to_parse[last_brace:]
                     json_string_to_parse = potential_json
-                    logger.debug(f"[{phase_name}/{agent_name}] No markdown found, trying from last '{{' to end (fallback).")
             else:
                 # 4. If no '{' found at all
-                logger.error(f"{phase_name}: Could not find JSON object start '{{' in output from {agent_name}.")
-                console.print(f"[bold red]{phase_name}: Error parsing {agent_name} JSON output (no '{{' found).[/bold red]")
-                console.print(f"[dim]Original Raw Output:[/dim]\n[grey50]{raw_text}[/grey50]")
                 return None
-    # --- End Robust Extraction ---
-
-    if json_string_to_parse is None:
-         # This case should be rare if step 3 or 4 found something, but added for safety
-         logger.error(f"{phase_name}: Could not extract any potential JSON string from {agent_name}.")
-         console.print(f"[bold red]{phase_name}: Error extracting potential JSON from {agent_name} output.[/bold red]")
-         console.print(f"[dim]Original Raw Output:[/dim]\n[grey50]{raw_text}[/grey50]")
-         return None
-
-    logger.debug(f"[{phase_name}/{agent_name}] Attempting to parse: {repr(json_string_to_parse)}")
-    try:
-        # Attempt to repair common issues like trailing commas (requires external library or more complex logic)
-        # For now, just try standard parsing
-        parsed_data = json.loads(json_string_to_parse)
-        if not isinstance(parsed_data, dict):
-            raise ValueError(f"Parsed JSON is not a dictionary (type: {type(parsed_data)}).")
-        logger.info(f"[{phase_name}/{agent_name}] Successfully parsed JSON.")
-        return parsed_data
-    except (json.JSONDecodeError, ValueError) as json_error:
-        logger.exception(f"{phase_name}: Failed to parse {agent_name} output as JSON: {json_error}")
-        console.print(f"[bold red]{phase_name}: Error parsing {agent_name} JSON output.[/bold red]")
-        console.print(f"[dim]Attempted to parse:[/dim]\n[yellow]{json_string_to_parse}[/yellow]")
-        console.print(f"[dim]Original Raw Output:[/dim]\n[grey50]{raw_text}[/grey50]")
-        return None
+    return json_string_to_parse
 
 def parse_json_output(
     raw_text: Optional[str],
@@ -249,7 +210,7 @@ def create_blank_simulation_state(new_uuid: str) -> Dict[str, Any]:
       "world_time": 0.0,
       "narrative_log": [],
       "simulacra": {},
-      "npcs": {},
+      # "npcs": {}, # NPCs are now ephemeral, removed from persistent state
       "current_world_state": {
         "location_details": {default_location_id: default_location.copy()} # Use copy
       },
@@ -328,7 +289,7 @@ def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
         "world_time": 0.0,
         "narrative_log": [],
         "simulacra": {},
-        "npcs": {},
+        # "npcs": {}, # NPCs are now ephemeral
         "current_world_state": {},
         "world_template_details": {"description": "Default", "rules": {}},
         "simulacra_profiles": {}
@@ -339,7 +300,7 @@ def ensure_state_structure(state_dict: Dict[str, Any]) -> bool:
             logger.warning(f"Added missing top-level key '{key}'.")
             modified = True
         # Ensure correct types for collections
-        elif key in ["location_details", "objects", "simulacra", "npcs", "current_world_state", "world_template_details", "simulacra_profiles"] and not isinstance(state_dict[key], dict):
+        elif key in ["location_details", "objects", "simulacra", "current_world_state", "world_template_details", "simulacra_profiles"] and not isinstance(state_dict[key], dict):
             state_dict[key] = default_value
             logger.warning(f"Corrected type for top-level key '{key}' to dict.")
             modified = True

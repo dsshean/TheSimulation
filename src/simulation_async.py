@@ -46,7 +46,7 @@ from .config import (
 )
 from .loop_utils import (get_nested, load_json_file,
                             load_or_initialize_simulation,
-                            save_json_file)
+                            save_json_file, parse_json_output_last)
 from .state_loader import parse_location_string # Used in run_simulation
 from .models import WorldEngineResponse, SimulacraIntentResponse # Pydantic models for tasks in this file
 from .agents import ( # Agent creation functions
@@ -146,6 +146,8 @@ Generate the narrative paragraph based on these details and your instructions (r
             async for event_llm in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
                 if event_llm.is_final_response() and event_llm.content:
                     narrative_text = event_llm.content.parts[0].text.strip()
+                    # The narrative_text is now expected to be a JSON string
+                    # We will parse it below.
                     logger.debug(f"NarrationLLM Final Content: {narrative_text[:100]}...")
                 elif event_llm.error_message:
                     logger.error(f"NarrationLLM Error: {event_llm.error_message}")
@@ -153,29 +155,57 @@ Generate the narrative paragraph based on these details and your instructions (r
 
             cleaned_narrative_text = narrative_text
             if narrative_text:
-                parts = narrative_text.split('\n\n', 1)
-                if len(parts) > 1 and "Actor ID:" in parts[0]:
-                    cleaned_narrative_text = parts[1].strip()
-                else:
-                    cleaned_narrative_text = re.sub(r'^Input:.*?\n\n', '', narrative_text, flags=re.DOTALL).strip()
-                internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]" # This might need to be more dynamic if agent names change
-                cleaned_narrative_text = cleaned_narrative_text.replace(internal_agent_name_placeholder, actor_name)
+                try:
+                    # Attempt to parse the entire response as JSON
+                    # narrator_output = json.loads(narrative_text)
+                    narrator_output = parse_json_output_last(narrative_text.strip()) 
+                    actual_narrative_paragraph = narrator_output.get("narrative", "An event occurred.")
+                    discovered_objects = narrator_output.get("discovered_objects", [])
+                    # discovered_npcs = narrator_output.get("discovered_npcs", []) # For future use
 
-            if cleaned_narrative_text and live_display_object:
-                live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
-            elif cleaned_narrative_text: # Fallback if live_display_object is None (e.g., during tests)
-                console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
+                    # Clean the narrative paragraph itself (if needed, though LLM should be good)
+                    cleaned_narrative_text = actual_narrative_paragraph
+                    internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
+                    cleaned_narrative_text = cleaned_narrative_text.replace(internal_agent_name_placeholder, actor_name)
 
-            final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
-            state.setdefault("narrative_log", []).append(final_narrative_entry)
-            max_narrative_log = 50 # Consider moving to config.py
-            if len(state["narrative_log"]) > max_narrative_log:
-                state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
+                    if cleaned_narrative_text and live_display_object:
+                        live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
+                    elif cleaned_narrative_text:
+                        console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
 
-            if actor_id in state.get("simulacra", {}):
-                # Use _update_state_value from simulation_utils
-                _update_state_value(state, f"simulacra.{actor_id}.last_observation", cleaned_narrative_text, logger)
-            logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
+                    final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
+                    state.setdefault("narrative_log", []).append(final_narrative_entry)
+                    max_narrative_log = 50
+                    if len(state["narrative_log"]) > max_narrative_log:
+                        state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
+
+                    if actor_id in state.get("simulacra", {}):
+                        _update_state_value(state, f"simulacra.{actor_id}.last_observation", cleaned_narrative_text, logger)
+                    logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
+
+                    # Store discovered ephemeral objects in the current location's state
+                    actor_location_id = get_nested(state, "simulacra", actor_id, "location")
+                    if actor_location_id and discovered_objects:
+                        location_path_for_ephemeral = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.ephemeral_objects"
+                        # Overwrite existing ephemeral objects for simplicity.
+                        # A more complex system might merge or update.
+                        _update_state_value(state, location_path_for_ephemeral, discovered_objects, logger)
+                        logger.info(f"[NarrationTask] Updated/Set {len(discovered_objects)} ephemeral objects for location {actor_location_id}.")
+                    elif actor_location_id and not discovered_objects:
+                        # If look_around yields no objects, clear previous ephemeral ones for this location
+                        location_path_for_ephemeral = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.ephemeral_objects"
+                        _update_state_value(state, location_path_for_ephemeral, [], logger)
+                        logger.info(f"[NarrationTask] Cleared ephemeral objects for location {actor_location_id} as none were discovered.")
+
+                except json.JSONDecodeError:
+                    logger.error(f"[NarrationTask] Failed to parse JSON from Narrator: {narrative_text}. Using raw text as narrative.")
+                    # Fallback: use the raw text as narrative, no objects discovered
+                    cleaned_narrative_text = narrative_text # Or further cleaning if needed
+                    if cleaned_narrative_text and live_display_object:
+                        live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
+                    if actor_id in state.get("simulacra", {}):
+                        _update_state_value(state, f"simulacra.{actor_id}.last_observation", cleaned_narrative_text, logger)
+
             narration_queue.task_done()
 
         except asyncio.CancelledError:
@@ -230,6 +260,14 @@ async def world_engine_task_llm():
             actor_location_id = get_nested(actor_state_we, "location")
             location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={})
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
+
+            # --- Include ephemeral objects in location_state_data for WorldEngine ---
+            # The WorldEngine prompt expects `objects_present` in its `Actor's Current Location State`
+            # We need to construct this from static (if any) and ephemeral objects.
+            # For now, assuming ephemeral_objects IS the objects_present list for the location.
+            # If you have static objects in world_config.json for locations, you'd merge them here.
+            location_state_data["objects_present"] = location_state_data.get("ephemeral_objects", [])
+            
             target_id = get_nested(intent, "target_id")
             target_state_data = {}
             if target_id:
@@ -271,7 +309,8 @@ Resolve this intent based on your instructions and the provided context.
             parsed_resolution = None
             if response_text:
                 try:
-                    response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                    # response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                    response_text_clean = parse_json_output_last(response_text.strip()) # Clean up the response text
                     # JSON string replacements (as before)
                     json_str_to_parse = response_text_clean
                     correct_actor_name = actor_state_we.get('name', actor_id)
@@ -280,7 +319,7 @@ Resolve this intent based on your instructions and the provided context.
                     json_str_to_parse = json_str_to_parse.replace("[Actor Name]", actor_name) # Generic placeholder
                     json_str_to_parse = json_str_to_parse.replace("[ACTOR_ID]", actor_id)
                     if target_id:
-                         json_str_to_parse = json_str_to_parse.replace("[target_id]", target_id)
+                        json_str_to_parse = json_str_to_parse.replace("[target_id]", target_id)
                     if target_state_data: # If there was a target
                          obj_name = target_state_data.get("name", target_id) # Use target's name
                          json_str_to_parse = json_str_to_parse.replace("[Object Name]", obj_name)
@@ -414,7 +453,12 @@ async def simulacra_agent_task_llm(agent_id: str):
                         entities.append({"id": entity_id_init_loop, "name": entity_data_init.get("name", entity_id_init_loop)})
                 return entities
 
-            objects_in_room_init = get_entities_in_location_init("objects", current_loc_id_init)
+            # --- Get objects for Simulacra prompt, including ephemeral ones ---
+            ephemeral_objects_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id_init, "ephemeral_objects", default=[])
+            objects_in_room_for_prompt_init = []
+            for obj_data in ephemeral_objects_init: # obj_data is a dict like {"id": ..., "name": ...}
+                objects_in_room_for_prompt_init.append({"id": obj_data.get("id"), "name": obj_data.get("name")})
+            # If you have static objects, merge them here too.
             agents_in_room_init = [a for a in get_entities_in_location_init("simulacra", current_loc_id_init) if a["id"] != agent_id]
             raw_recent_narrative_init = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
             cleaned_recent_narrative_init = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative_init]
@@ -435,7 +479,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                  f"- Current Time: {current_world_time_init:.1f}s",
                  f"- Last Observation/Event: {current_sim_state_init.get('last_observation', 'None.')}",
                  f"- Recent History:\n{history_str_init if history_str_init else 'None.'}",
-                 f"- Objects in Room: {json.dumps(objects_in_room_init) if objects_in_room_init else 'None.'}",
+                 f"- Objects in Room: {json.dumps(objects_in_room_for_prompt_init) if objects_in_room_for_prompt_init else 'None.'}",
                  f"- Other Agents in Room: {json.dumps(agents_in_room_init) if agents_in_room_init else 'None.'}",
                  "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
             ]
@@ -447,7 +491,8 @@ async def simulacra_agent_task_llm(agent_id: str):
                 if event.is_final_response() and event.content:
                     response_text = event.content.parts[0].text
                     try:
-                        response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                        # response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                        response_text_clean = parse_json_output_last(response_text.strip()) 
                         parsed_data = json.loads(response_text_clean)
                         validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
                         if live_display_object:
@@ -512,7 +557,13 @@ async def simulacra_agent_task_llm(agent_id: str):
                         if entity_data_loop.get('location') == location_id:
                             entities.append({"id": entity_id_loop, "name": entity_data_loop.get("name", entity_id_loop)})
                     return entities
-                objects_in_room = get_entities_in_location("objects", current_loc_id)
+                
+                # --- Get objects for Simulacra prompt (loop), including ephemeral ones ---
+                ephemeral_objects_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_loc_id, "ephemeral_objects", default=[])
+                objects_in_room_for_prompt_loop = []
+                for obj_data in ephemeral_objects_loop:
+                    objects_in_room_for_prompt_loop.append({"id": obj_data.get("id"), "name": obj_data.get("name")})
+                # If you have static objects, merge them here too.
                 agents_in_room = [a for a in get_entities_in_location("simulacra", current_loc_id) if a["id"] != agent_id]
                 raw_recent_narrative = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
                 cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
@@ -532,7 +583,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                      f"- Current Time: {current_sim_time_busy_loop:.1f}s",
                      f"- Last Observation/Event: {agent_state_busy_loop.get('last_observation', 'None.')}",
                      f"- Recent History:\n{history_str if history_str else 'None.'}",
-                     f"- Objects in Room: {json.dumps(objects_in_room) if objects_in_room else 'None.'}",
+                     f"- Objects in Room: {json.dumps(objects_in_room_for_prompt_loop) if objects_in_room_for_prompt_loop else 'None.'}",
                      f"- Other Agents in Room: {json.dumps(agents_in_room) if agents_in_room else 'None.'}",
                      "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
                 ]
@@ -545,7 +596,8 @@ async def simulacra_agent_task_llm(agent_id: str):
                     if event.is_final_response() and event.content:
                         response_text = event.content.parts[0].text
                         try:
-                            response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                            # response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                            response_text_clean = parse_json_output_last(response_text.strip()) 
                             parsed_data = json.loads(response_text_clean)
                             validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
                             if live_display_object:
@@ -603,7 +655,8 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                             if event.is_final_response() and event.content:
                                 response_text = event.content.parts[0].text
                                 try:
-                                    response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                                    # response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip(), flags=re.MULTILINE)
+                                    response_text_clean = parse_json_output_last(response_text.strip()) 
                                     parsed_data = json.loads(response_text_clean)
                                     validated_reflection_intent = SimulacraIntentResponse.model_validate(parsed_data)
                                     if validated_reflection_intent.action_type == "continue_current_task":
@@ -867,4 +920,3 @@ async def run_simulation(
         else:
             console.print("[yellow]State dictionary is empty.[/yellow]")
         console.rule("[bold green]Simulation Shutdown Complete[/]")
-
