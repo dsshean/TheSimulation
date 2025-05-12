@@ -78,7 +78,7 @@ This sequence uses LLMs (like Google's Gemini models) at each step, guided by sp
       ```
 5.  **World Setup**
     - first run setup_simulation.py
-    - python main3.py \* current working version
+    - python setup_simulation.py \* current working version
 
 ### Running
 
