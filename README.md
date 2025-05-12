@@ -4,8 +4,6 @@ Exploring Simulation Theory through Large Language Models
 
 ## Project Overview
 
-**Status:** Under Development - Core agent logic implemented.
-
 TheSimulation is an experiment exploring simulation theory utilizing Large Language Models (LLMs). This project investigates how LLMs, specifically through frameworks like the Google AI Developer Kit (ADK), can be used to create autonomous agents ("Simulacra") that perceive, reflect, and act within a simulated environment.
 
 The project aims to use LLMs to generate and analyze diverse simulated scenarios by endowing agents with personas, goals, and a structured thinking process. Potential applications include:
