@@ -105,16 +105,6 @@ Instantiate the Simulacra_V3 sequential agent.
 Run the agent through one Observe-Reflect-Decide cycle using the ADK Runner.
 Print the intermediate outputs (Observation, Reflection) and the final Intent JSON.
 
-**Key Changes Made:**
-
-1.  **Status Update:** Changed "NON FUNCTIONAL" to "Under Development - Core agent logic implemented."
-2.  **Project Overview:** Added mention of Google ADK and the Simulacra concept.
-3.  **Framework:** Added a subsection explaining the "Agent Architecture (Simulacra V3)" based on the Observe-Reflect-Decide sequence using `SequentialAgent` and `LlmAgent` from `google-adk`.
-4.  **Project Structure:** Added a basic directory structure reflecting the current code (`src/agents/simulacra_v3.py`).
-5.  **Getting Started:** Added concrete steps for setup (cloning, venv, dependencies, API key configuration via `.env`) and instructions on how to run the test function in `simulacra_v3.py`.
-6.  **Current Status and Future Directions:** Updated the current status to reflect the implemented V3 agent and outlined more specific next steps.
-7.  **Placeholders:** Kept placeholders for sections like Contributing, Ethical Considerations, etc., but noted they need content.
-
 ## Project Insights & Future Directions
 
 _(The following is a reflection on the project's status and potential based on the architecture developed in `src/simulation_async.py`)_
