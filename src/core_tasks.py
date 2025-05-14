@@ -41,9 +41,8 @@ async def time_manager_task(
                     action_end_time = agent_state_data.get("current_action_end_time", -1.0)
                     if action_end_time <= new_sim_time:
                         logger_instance.info(f"[TimeManager] Applying completed action effects for {agent_id} at time {new_sim_time:.1f} (due at {action_end_time:.1f}).")
-                        pending_results = agent_state_data.get("pending_results", {})
+                        pending_results = agent_state_data.get("pending_results", {}) # Get a copy or ensure it's mutable if needed
                         if pending_results:
-                            # memory_log_updated = False # Not strictly needed if we check the key directly
                             for key_path, value in list(pending_results.items()):
                                 success = _update_state_value(current_state, key_path, value, logger_instance)
                                 # Check if the memory_log for this specific agent was updated
@@ -99,10 +98,17 @@ async def interaction_dispatcher_task(
             interaction_class = "environment"
 
             if target_id:
-                if target_id in get_nested(current_state, SIMULACRA_KEY, default={}):
+                # Check if target is another Simulacra
+                if target_id in get_nested(current_state, SIMULACRA_KEY, default={}): # SIMULACRA_KEY points to "simulacra_profiles"
                     interaction_class = "entity"
-                elif target_id in get_nested(current_state, "objects", default={}) and get_nested(current_state, "objects", target_id, "interactive", default=False):
-                     interaction_class = "entity"
+                else:
+                    # Check if target is an interactive object
+                    # state["objects"] is a list of dicts, so we need to iterate
+                    objects_list = get_nested(current_state, "objects", default=[])
+                    for obj in objects_list:
+                        if isinstance(obj, dict) and obj.get("id") == target_id and obj.get("interactive", False):
+                            interaction_class = "entity"
+                            break
 
             logger_instance.info(f"[InteractionDispatcher] Intent from {actor_id} ({action_type} on {target_id or 'N/A'}) classified as '{interaction_class}'.")
             await event_bus_instance.put({"type": "resolve_action_request", "actor_id": actor_id, "intent": intent, "interaction_class": interaction_class})

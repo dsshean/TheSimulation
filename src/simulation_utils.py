@@ -260,7 +260,7 @@ async def generate_simulated_world_feed_content(
         if category == "weather":
             if use_real_feeds:
                 search_query = f"What is the current weather in {location_context}?"
-                summarization_template = "Based on this weather information: '{search_results}'\nExtract the current weather condition, temperature in Celsius (as an integer), and a short forecast. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\nIf temperature is in Fahrenheit, convert it to Celsius. If exact data is missing, make a plausible estimation."
+                summarization_template = "Based on this weather information: '{search_results}'\nExtract the current weather condition, temperature in Celsius (as an integer), and a short forecast. Format: {{{{ \"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\" }}}}\nIf temperature is in Fahrenheit, convert it to Celsius. If exact data is missing, make a plausible estimation."
                 response_obj = await _fetch_and_summarize_real_feed(
                     category_for_logging="WorldInfoGatherer_Weather", search_query=search_query,
                     summarization_prompt_template=summarization_template, output_format_note=output_format_note,
@@ -270,10 +270,10 @@ async def generate_simulated_world_feed_content(
                 )
                 if not response_obj: # Fallback if real search failed or components missing
                     logger_instance.warning(f"[WorldInfoGatherer] REAL weather search for '{location_context}' did not yield usable results or components missing. Falling back to simulation.")
-                    prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
+                    prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{{{ \"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\" }}}}\n{output_format_note}"
             else: 
                 # This branch is for when use_real_feeds is False
-                prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
+                prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{{{ \"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\" }}}}\n{output_format_note}"
         
         elif category in ["world_news", "regional_news", "local_news", "pop_culture"]:
             if use_real_feeds:
@@ -293,7 +293,7 @@ async def generate_simulated_world_feed_content(
                     pop_culture_region = f"{country} " if country else ""
                     search_query = f"What are the top latest {pop_culture_region} pop culture trends and entertainment news headlines (e.g., movies, music, viral trends)?"
 
-                summarization_template = f"Based on these search results for {category}: '{{search_results}}'\nProvide a single, very concise headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}"
+                summarization_template = f"Based on these search results for {category}: '{{search_results}}'\nProvide a single, very concise headline and a one-sentence summary. Format: {{{{ \"headline\": \"str\", \"summary\": \"str\" }}}}"
                 response_obj = await _fetch_and_summarize_real_feed(
                     category_for_logging=f"WorldInfoGatherer_{category}", search_query=search_query,
                     summarization_prompt_template=summarization_template, output_format_note=output_format_note,
@@ -303,10 +303,10 @@ async def generate_simulated_world_feed_content(
                 )
                 if not response_obj: # Fallback
                     logger_instance.warning(f"[WorldInfoGatherer] REAL search for '{category}' did not yield usable results or components missing. Falling back to simulation.")
-                    prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+                    prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{{{ \"headline\": \"str\", \"summary\": \"str\" }}}}\n{output_format_note}"
             else: 
                 # This branch is for when use_real_feeds is False
-                prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
+                prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{{{ \"headline\": \"str\", \"summary\": \"str\" }}}}\n{output_format_note}"
         else: 
             return {"error": "Unknown category"}
 

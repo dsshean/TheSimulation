@@ -3,7 +3,7 @@ import asyncio
 import logging
 import os
 import sys
-
+from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,12 +17,16 @@ from src.simulation_async import (APP_NAME, run_simulation)
 # Assuming logger_config.py is in the same directory or accessible via PYTHONPATH
 # and contains the setup_unique_logger function.
 try:
-    from src.logger_config import setup_unique_logger
+    from src.logger_config import setup_unique_logger, setup_event_logger # MODIFIED: Added setup_event_logger
 except ImportError:
     print("ERROR: logger_config.py not found. Please ensure it exists and is in your PYTHONPATH.")
     print("Using basic fallback logging to console only.")
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logger = logging.getLogger(APP_NAME if 'APP_NAME' in globals() else "FallbackLogger")
+    # Fallback for event logger setup
+    def setup_event_logger(instance_uuid=None, log_dir="logs/events"): # Dummy fallback
+        print(f"WARNING: setup_event_logger not found in logger_config. Event logging to JSONL will be disabled.")
+        return None, "event_log_disabled.jsonl"
     # Fallback unique_log_filename to avoid error later if setup_unique_logger failed
     unique_log_filename = "fallback_console_only.log" 
 
@@ -38,6 +42,16 @@ logger, unique_log_filename = setup_unique_logger(
 )
 logger.info(f"--- Application Start ({APP_NAME}) --- Logging to: {unique_log_filename}")
 
+# --- Event Logger Setup ---
+event_logger: Optional[logging.Logger] = None # Initialize to None, type hint for clarity
+event_log_filename: str = "event_log_not_initialized.jsonl"
+ # args will be parsed below, we'll use args.instance_uuid for the event logger
+ # The actual setup will happen after arg parsing.
+
+def initialize_event_logger(instance_uuid_for_log: Optional[str] = None):
+    global event_logger, event_log_filename
+    event_logger, event_log_filename = setup_event_logger(instance_uuid=instance_uuid_for_log, log_dir="logs/events")
+    logger.info(f"Structured event logging to: {event_log_filename if event_logger else 'DISABLED'}")
 # --- Entry Point ---
 if __name__ == "__main__":
     # Use APP_NAME imported from simulation_async
@@ -61,6 +75,9 @@ if __name__ == "__main__":
     # --- END ADDED ---
     args = parser.parse_args()
 
+    # Initialize the event logger now that we have args.instance_uuid
+    initialize_event_logger(args.instance_uuid)
+
     try:
         if sys.platform == "win32":
              # This policy might be needed on Windows for Rich Live display
@@ -69,7 +86,8 @@ if __name__ == "__main__":
         asyncio.run(run_simulation(
             instance_uuid_arg=args.instance_uuid,
             location_override_arg=args.override_location,
-            mood_override_arg=args.override_mood
+            mood_override_arg=args.override_mood,
+            event_logger_instance=event_logger # Pass the event logger
         ))
         # --- END MODIFIED ---
     except KeyboardInterrupt:

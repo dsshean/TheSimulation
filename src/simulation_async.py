@@ -32,7 +32,7 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
-
+import logging # Explicitly import logging for type hinting
 console = Console() # Keep a global console for direct prints if needed by run_simulation
 
 from .agents import create_narration_llm_agent  # Agent creation functions
@@ -62,7 +62,7 @@ from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (get_nested, load_json_file,
                          load_or_initialize_simulation, parse_json_output_last,
                          save_json_file)
-from .models import (  # Pydantic models for tasks in this file
+from .models import (NarratorOutput,  # Pydantic models for tasks in this file
     SimulacraIntentResponse, WorldEngineResponse)
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
     _update_state_value, generate_table)
@@ -75,6 +75,7 @@ logger = logging.getLogger(__name__) # Use logger from main entry point setup
 event_bus = asyncio.Queue()
 narration_queue = asyncio.Queue()
 state: Dict[str, Any] = {} # Global state dictionary
+event_logger_global: Optional[logging.Logger] = None # Global variable for the event logger
 
 adk_session_service: Optional[InMemorySessionService] = None
 adk_session_id: Optional[str] = None # Main session for World Engine, Narrator, Simulacra
@@ -92,6 +93,20 @@ search_agent_session_id_val: Optional[str] = None # Renamed
 world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home."
 live_display_object: Optional[Live] = None
 
+# --- Helper for Event Logging ---
+def _log_event(sim_time: float, agent_id: str, event_type: str, data: Dict[str, Any]):
+    """Logs a structured event to the dedicated event logger."""
+    if event_logger_global:
+        log_entry = {
+            "sim_time_s": round(sim_time, 2), # Round time for cleaner logs
+            "agent_id": agent_id,
+            "event_type": event_type,
+            "data": data
+        }
+        try:
+            event_logger_global.info(json.dumps(log_entry))
+        except Exception as e:
+            logger.error(f"Failed to log event (type: {event_type}, agent: {agent_id}) to event log: {e}", exc_info=True)
 
 # --- ADK-Dependent Tasks (Remain in this file for global context access) ---
 
@@ -163,18 +178,18 @@ Generate the narrative paragraph based on these details and your instructions (r
             cleaned_narrative_text = narrative_text
             if narrative_text:
                 try:
-                    narrator_output_str = parse_json_output_last(narrative_text.strip())
-                    if narrator_output_str is None:
+                    parsed_dict_from_llm = parse_json_output_last(narrative_text.strip())
+                    if parsed_dict_from_llm is None:
                         raise json.JSONDecodeError("No JSON found by parse_json_output_last", narrative_text, 0)
-                    # narrator_output_str is now guaranteed to be a dictionary
-                    # if no exception was raised by the check above.
-                    narrator_output = narrator_output_str 
-                    # logger.debug(f"[NarrationTask] Parsed narrator output: {json.dumps(narrator_output, indent=2)}")
                     
-                    actual_narrative_paragraph = narrator_output.get("narrative", "An event occurred.")
-                    discovered_objects = narrator_output.get("discovered_objects", [])
-                    discovered_connections = narrator_output.get("discovered_connections", []) # Phase 4
-                    discovered_npcs = narrator_output.get("discovered_npcs", []) 
+                    # Validate with Pydantic
+                    validated_narrator_output = NarratorOutput.model_validate(parsed_dict_from_llm)
+                    logger.debug(f"[NarrationTask] Narrator output validated successfully: {validated_narrator_output.model_dump_json(indent=2, exclude_none=True)}")
+
+                    actual_narrative_paragraph = validated_narrator_output.narrative
+                    discovered_objects = validated_narrator_output.discovered_objects
+                    discovered_connections = validated_narrator_output.discovered_connections
+                    discovered_npcs = validated_narrator_output.discovered_npcs
 
                     cleaned_narrative_text = actual_narrative_paragraph
                     internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
@@ -198,19 +213,19 @@ Generate the narrative paragraph based on these details and your instructions (r
                     if actor_location_at_action_time:
                         original_intent_from_event = get_nested(action_event, "action", default={})
                         if original_intent_from_event.get("action_type") == "look_around":
-                            if discovered_objects:
+                            if validated_narrator_output.discovered_objects: # Use validated data
                                 location_path_for_ephemeral_obj = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_objects"
-                                _update_state_value(state, location_path_for_ephemeral_obj, discovered_objects, logger)
-                                logger.info(f"[NarrationTask] Updated/Set {len(discovered_objects)} ephemeral objects for location {actor_location_at_action_time} from look_around.")
+                                _update_state_value(state, location_path_for_ephemeral_obj, [obj.model_dump() for obj in validated_narrator_output.discovered_objects], logger)
+                                logger.info(f"[NarrationTask] Updated/Set {len(validated_narrator_output.discovered_objects)} ephemeral objects for location {actor_location_at_action_time} from look_around.")
                             else: 
                                 location_path_for_ephemeral_obj = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_objects"
                                 _update_state_value(state, location_path_for_ephemeral_obj, [], logger)
                                 logger.info(f"[NarrationTask] Cleared ephemeral objects for location {actor_location_at_action_time} as none were discovered by look_around.")
                             
-                            if discovered_npcs:
+                            if validated_narrator_output.discovered_npcs: # Use validated data
                                 location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
-                                _update_state_value(state, location_path_for_ephemeral_npc, discovered_npcs, logger)
-                                logger.info(f"[NarrationTask] Updated/Set {len(discovered_npcs)} ephemeral NPCs for location {actor_location_at_action_time} from look_around.")
+                                _update_state_value(state, location_path_for_ephemeral_npc, [npc.model_dump() for npc in validated_narrator_output.discovered_npcs], logger)
+                                logger.info(f"[NarrationTask] Updated/Set {len(validated_narrator_output.discovered_npcs)} ephemeral NPCs for location {actor_location_at_action_time} from look_around.")
                             else: 
                                 location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
                                 _update_state_value(state, location_path_for_ephemeral_npc, [], logger)
@@ -218,11 +233,24 @@ Generate the narrative paragraph based on these details and your instructions (r
                             
                             # Phase 4: Store discovered connections
                             location_path_for_connections = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.connected_locations"
-                            _update_state_value(state, location_path_for_connections, discovered_connections, logger)
-                            logger.info(f"[NarrationTask] Updated/Set {len(discovered_connections)} connected_locations for {actor_location_at_action_time} from look_around.")
+                            _update_state_value(state, location_path_for_connections, [conn.model_dump() for conn in validated_narrator_output.discovered_connections], logger)
+                            logger.info(f"[NarrationTask] Updated/Set {len(validated_narrator_output.discovered_connections)} connected_locations for {actor_location_at_action_time} from look_around.")
 
-                except json.JSONDecodeError:
-                    logger.error(f"[NarrationTask] Failed to parse JSON from Narrator: {narrative_text}. Using raw text as narrative.")
+                    # --- Log Narration Event ---
+                    _log_event(
+                        sim_time=completion_time,
+                        agent_id="Narrator",
+                        event_type="narration",
+                        data=validated_narrator_output.model_dump() # Log the full parsed and validated output
+                    )
+
+                except json.JSONDecodeError as e_json:
+                    logger.error(f"[NarrationTask] Failed to parse JSON from Narrator: {e_json}. Raw text: {narrative_text}. Using raw text as narrative.")
+                    cleaned_narrative_text = narrative_text 
+                    if cleaned_narrative_text and live_display_object:
+                        live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator (Fallback - JSON Error) @ {completion_time:.1f}s", border_style="yellow", expand=False))
+                except ValidationError as e_val:
+                    logger.error(f"[NarrationTask] Narrator output failed Pydantic validation: {e_val}. Raw text: {narrative_text}. Using raw text as narrative.")
                     cleaned_narrative_text = narrative_text 
                     if cleaned_narrative_text and live_display_object:
                         live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
@@ -345,6 +373,14 @@ Resolve this intent based on your instructions and the provided context.
                         live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
                         try: live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
                         except TypeError: live_display_object.console.print(str(parsed_resolution)) 
+
+                    # --- Log World Engine Resolution Event ---
+                    _log_event(
+                        sim_time=current_sim_time,
+                        agent_id="WorldEngine",
+                        event_type="resolution",
+                        data=parsed_resolution # Log the full parsed resolution dict
+                    )
                 except json.JSONDecodeError as e:
                     logger.error(f"[WorldEngineLLM] Failed to decode JSON response for {actor_id}: {e}\nResponse:\n{response_text}", exc_info=True)
                     outcome_description = "Action failed due to internal error (JSON decode)."
@@ -389,6 +425,13 @@ Resolve this intent based on your instructions and the provided context.
             else: 
                 final_outcome_desc = validated_data.outcome_description if validated_data else outcome_description
                 logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_outcome_desc}")
+                # --- Log World Engine Resolution Event (Failure) ---
+                _log_event(
+                    sim_time=current_sim_time,
+                    agent_id="WorldEngine",
+                    event_type="resolution",
+                    data={"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc}
+                )
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", final_outcome_desc, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
@@ -605,6 +648,14 @@ async def simulacra_agent_task_llm(agent_id: str):
                             live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
                             live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
                         await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                        
+                        # --- Log Simulacra Intent Event ---
+                        _log_event(
+                            sim_time=current_world_time_init,
+                            agent_id=agent_id,
+                            event_type="intent",
+                            data=validated_intent.model_dump(exclude={'internal_monologue'}) # Log the intent data
+                        )
                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                     except (json.JSONDecodeError, ValidationError) as e_init:
                         logger.error(f"[{agent_name}] Error processing initial response: {e_init}\nResponse:\n{response_text}", exc_info=True)
@@ -693,6 +744,14 @@ async def simulacra_agent_task_llm(agent_id: str):
                                 live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
                                 live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
                             await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                            
+                            # --- Log Simulacra Intent Event ---
+                            _log_event(
+                                sim_time=current_sim_time_busy_loop,
+                                agent_id=agent_id,
+                                event_type="intent",
+                                data=validated_intent.model_dump(exclude={'internal_monologue'}) # Log the intent data
+                            )
                             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                         except (json.JSONDecodeError, ValidationError) as e_idle:
                             logger.error(f"[{agent_name}] Error processing subsequent response: {e_idle}\nResponse:\n{response_text}", exc_info=True)
@@ -769,13 +828,17 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
 async def run_simulation(
     instance_uuid_arg: Optional[str] = None,
     location_override_arg: Optional[str] = None,
-    mood_override_arg: Optional[str] = None
+    mood_override_arg: Optional[str] = None,
+    event_logger_instance: Optional[logging.Logger] = None # Added event_logger_instance parameter
     ):
     global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
     global world_engine_agent, simulacra_agents_map, state, live_display_object, narration_agent_instance
     global world_mood_global, search_llm_agent_instance, search_agent_runner_instance, search_agent_session_id_val
+    global event_logger_global # Ensure we can assign to the global
 
     console.rule("[bold green]Starting Async Simulation[/]")
+
+    event_logger_global = event_logger_instance # Assign the passed logger to our global variable
 
     if RANDOM_SEED is not None:
         random.seed(RANDOM_SEED)
@@ -971,6 +1034,7 @@ async def run_simulation(
 async def narrative_image_generation_task():
     """
     Periodically generates an image based on the latest narrative log entry.
+    Logs the filename to the event logger.
     """
     if not ENABLE_NARRATIVE_IMAGE_GENERATION:
         logger.info("[NarrativeImageGenerator] Task is disabled by configuration.")
@@ -1044,6 +1108,14 @@ async def narrative_image_generation_task():
                             logger.info(f"[NarrativeImageGenerator] Successfully generated and saved image: {image_path}")
                             image_generated = True
                             # image.show() # Optional: for interactive testing, but usually not for a background task
+
+                            # --- Log Image Generation Event ---
+                            _log_event(
+                                sim_time=current_sim_time_for_filename,
+                                agent_id="ImageGenerator", # Or a more specific ID if you have one
+                                event_type="image_generation",
+                                data={"image_filename": image_filename, "prompt_snippet": narrative_prompt_text[:100] + "..."}
+                            )
                             break # Assuming one image per request
                         except Exception as e_img_proc:
                             logger.error(f"[NarrativeImageGenerator] Error processing image data: {e_img_proc}")
@@ -1059,4 +1131,5 @@ async def narrative_image_generation_task():
         except Exception as e:
             logger.error(f"[NarrativeImageGenerator] Error during image generation API call: {e}")
             if hasattr(e, 'response') and e.response: # type: ignore
+                 logger.error(f"[NarrativeImageGenerator] API Response (if available): {e.response}") # type: ignore
                  logger.error(f"[NarrativeImageGenerator] API Response (if available): {e.response}") # type: ignore

@@ -3,10 +3,17 @@
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
-  "world_time": 31.68699999997625,
+  "world_time": 208.96899999998277,
   "narrative_log": [
-    "[T3.7] Eleanor's stomach rumbles, a gentle reminder that the morning has flown by. She glances at her watch; just past noon. Lunch is definitely on the agenda.",
-    "[T905.4] Eleanor sets off towards Elm Street, the familiar route unfolding before her. The midday sun warms her face as she walks, passing brownstones and small shops. After a fifteen-minute stroll, the cheerful yellow awning of the cafe comes into view."
+    "[T4.7] Eleanor's stomach gives a little rumble, a gentle reminder that it's nearly lunchtime. She idly wonders where she might want to grab a bite to eat today.",
+    "[T11.4] Eleanor takes a moment to survey her surroundings. She's currently inside the familiar bustle of the Bean Scene Coffee Shop. Several **tables and chairs (tables_bean_scene_01)** are scattered around, occupied by people chatting and working. The long **counter (counter_bean_scene_01)** dominates one side of the shop, behind which a barista (npc_barista_01) expertly steams milk. Above the counter, a **menu board (menu_board_01)** displays the various coffee drinks and pastries on offer. She can see the **street (street_exit_01)** through the large front windows, and a doorway leads into the **office lobby (lobby_exit_01)**.",
+    "[T18.3] Eleanor pushes open the glass door of the Bean Scene and steps out onto the sidewalk. The fresh air and faint city sounds wash over her as she leaves the familiar coffee shop behind, ready to explore the lunch options the street has to offer.",
+    "[T25.2] Eleanor finds herself amidst the midday hustle of a busy city street. Towering **office buildings (office_buildings_street_01)** line the block, interspersed with various **shops (shops_street_01)** and **restaurants (restaurants_street_01)**. A constant stream of **people (people_street_01)** flows in both directions, hurrying to their destinations. Across the street, she spots a promising-looking **deli (deli_street_01)**. Closer by, on the corner, a classic **hot dog stand (hot_dog_stand_street_01)** is doing a brisk business; the vendor (npc_hot_dog_vendor_01) calls out to attract customers.",
+    "[T41.8] Eleanor carefully navigates the crosswalk, waiting for the light to change before stepping onto the street. The city air is thick with the scent of exhaust and something vaguely savory. She arrives safely on the other side, standing in front of the inviting entrance to the deli.",
+    "[T48.9] The cool air of the deli is a welcome contrast to the street's humid warmth. Inside, a long **counter (deli_counter_01)** stretches across the back, showcasing an impressive array of meats, cheeses, and colorful salads. Above, a **menu board (deli_menu_board_01)** advertises the deli's offerings. A small crowd of **people (deli_customers_01)** are lined up, patiently waiting their turn to order. The hum of conversation and the clatter of utensils create a lively lunchtime atmosphere.",
+    "[T55.2] Eleanor scans the **menu board (deli_menu_board_01)**, her eyes flitting over the list of sandwiches, salads, and soups. Her gaze pauses, and a small smile touches her lips as she spots it: a vegetarian sandwich with avocado, listed as the daily special. Perfect. ",
+    "[T116.5] Eleanor joins the end of the line, shuffling forward slowly as the customers ahead of her place their orders. The air is filled with the tantalizing aromas of cured meats and freshly baked bread, making her stomach rumble in anticipation. She glances around, idly observing the other patrons while she patiently waits her turn.",
+    "[T180.5] Another minute ticks by as Eleanor inches forward in the line. The tantalizing smell of the deli, which was initially appealing, is now bordering on torture as her hunger grows. She can see the **deli worker (deli_worker_01)** efficiently assembling sandwiches behind the counter, and she mentally rehearses her order, eager to finally reach the front."
   ],
   "world_template_details": {
     "description": "A new world is beginning.",
@@ -32,17 +39,14 @@
   "simulacra_profiles": {
     "sim_3e912d": {
       "current_location": "Home_01",
-      "location_details": "Your home and bedroom.",
-      "last_observation": "Eleanor sets off towards Elm Street, the familiar route unfolding before her. The midday sun warms her face as she walks, passing brownstones and small shops. After a fifteen-minute stroll, the cheerful yellow awning of the cafe comes into view.",
+      "location_details": "You have arrived in deli_street_01.",
+      "last_observation": "```json\n{\n  \"narrative\": \"Eleanor shuffles forward again, now close enough to see the individual ingredients laid out behind the glass. The **deli worker (deli_worker_01)**, a young woman with a nametag that reads \"Sarah,\" smiles at the customer she's currently serving. Eleanor can almost taste the avocado and fresh vegetables, her stomach grumbling its approval.\",\n  \"discovered_objects\": [],\n  \"discovered_connections\": [],\n  \"discovered_npcs\": [\n    {\"id\": \"deli_worker_01\", \"name\": \"Sarah\", \"description\": \"A young woman with a nametag who works at the deli.\", \"is_interactive\": true}\n  ]\n}\n```",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "busy",
-      "current_action_end_time": 905.4220000000205,
-      "pending_results": {
-        "simulacra_profiles.sim_3e912d.location": "cafe_elm_street",
-        "simulacra_profiles.sim_3e912d.location_details": "You have arrived in cafe_elm_street."
-      },
+      "current_action_end_time": 212.28100000001723,
+      "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
       "persona_details": {
@@ -83,34 +87,225 @@
         "Dreams": "To share her love of history with others and create a successful business.",
         "Past_Traumas": null
       },
-      "location": "Home_01",
+      "location": "deli_street_01",
       "current_interrupt_probability": null,
-      "current_action_description": "Action: move - Details: Move to the cafe on Elm Street."
+      "current_action_description": "Action: wait - Details: Continue waiting in line at the deli, anticipating ordering."
     }
   },
   "objects": [],
   "world_feeds": {
-    "last_update_sim_time": 9.96899999998277,
+    "last_update_sim_time": 9.922000000020489,
     "weather": {
-      "condition": "Partly Cloudy",
-      "temperature_celsius": 22,
-      "forecast_short": "Partly cloudy with low chance of rain.",
-      "timestamp": 9.96899999998277,
+      "condition": "Partly cloudy",
+      "temperature_celsius": 19,
+      "forecast_short": "High of 74\u00b0F with partly sunny conditions and a chance of showers and thunderstorms.",
+      "timestamp": 9.922000000020489,
       "source_category": "weather"
     },
     "news_updates": [
       {
-        "headline": "Trump Arms Deal, Menendez Resentencing, and Canadian Reset Dominate National News",
-        "summary": "National headlines include Trump's arms deal and sanction plans, the Menendez brothers' resentencing hearing, and Canada's efforts to reset relations with the US amidst trade tensions.",
-        "timestamp": 9.96899999998277,
+        "headline": "Global Turmoil and US Policy Shifts Dominate Headlines",
+        "summary": "International tensions rise with Trump's Gulf trip and Gaza conflict, while US news focuses on legal issues, infrastructure concerns, and healthcare policy changes.",
+        "timestamp": 9.922000000020489,
+        "source_category": "local_news"
+      },
+      {
+        "headline": "Floods Hit Mid-Atlantic, Trump Meets Syrian Leader",
+        "summary": "Severe flooding plagues Virginia, Maryland, and Pennsylvania while Trump engages with Syria's leader, signaling potential shifts in US foreign policy.",
+        "timestamp": 9.922000000020489,
         "source_category": "regional_news"
       },
       {
-        "headline": "Global Tensions Flare: Middle East Arms Deal, Ukraine Talks, India-Pakistan Spat",
-        "summary": "Trump's Middle East visit yields a massive arms deal amidst rising tensions between India and Pakistan and uncertain Russia-Ukraine negotiations.",
-        "timestamp": 9.96899999998277,
+        "headline": "World News: Trump's Mideast Trip, Ukraine Peace Talks, and Gaza Airstrikes",
+        "summary": "Global developments include Trump's Mideast diplomacy focusing on Iran and Syria, ongoing Russia-Ukraine peace talk discussions, new EU sanctions on Russia, Macron's nuclear offer, and escalating Israeli-Palestinian conflict in Gaza.",
+        "timestamp": 9.922000000020489,
         "source_category": "world_news"
       }
+    ],
+    "pop_culture_updates": [
+      {
+        "headline": "Global Unrest and Political Maneuvering Dominate Headlines",
+        "summary": "International tensions escalate with Israeli strikes and potential Ukraine attacks, while US politics focus on Iran sanctions and immigration issues.",
+        "timestamp": 9.922000000020489,
+        "source_category": "pop_culture"
+      }
     ]
+  },
+  "current_world_state": {
+    "location_details": {
+      "Home_01": {
+        "ephemeral_objects": [
+          {
+            "id": "tables_bean_scene_01",
+            "name": "Tables and Chairs",
+            "description": "Several tables and chairs are scattered around the coffee shop.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "counter_bean_scene_01",
+            "name": "Counter",
+            "description": "The long counter where orders are placed.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "menu_board_01",
+            "name": "Menu Board",
+            "description": "A board displaying the coffee and pastry options.",
+            "is_interactive": false,
+            "properties": {}
+          }
+        ],
+        "ephemeral_npcs": [
+          {
+            "id": "npc_barista_01",
+            "name": "Barista",
+            "description": "A barista expertly steams milk behind the counter."
+          }
+        ],
+        "connected_locations": [
+          {
+            "to_location_id_hint": "Street_01",
+            "description": "Large front windows reveal the street outside.",
+            "travel_time_estimate_seconds": 5
+          },
+          {
+            "to_location_id_hint": "OfficeLobby_01",
+            "description": "A doorway leads into the office lobby.",
+            "travel_time_estimate_seconds": 5
+          }
+        ],
+        "objects_present": [
+          {
+            "id": "tables_bean_scene_01",
+            "name": "Tables and Chairs",
+            "description": "Several tables and chairs are scattered around the coffee shop.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "counter_bean_scene_01",
+            "name": "Counter",
+            "description": "The long counter where orders are placed.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "menu_board_01",
+            "name": "Menu Board",
+            "description": "A board displaying the coffee and pastry options.",
+            "is_interactive": false,
+            "properties": {}
+          }
+        ]
+      },
+      "Street_01": {
+        "ephemeral_objects": [
+          {
+            "id": "office_buildings_street_01",
+            "name": "Office Buildings",
+            "description": "Towering office buildings line the block.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "shops_street_01",
+            "name": "Shops",
+            "description": "Various shops line the street.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "restaurants_street_01",
+            "name": "Restaurants",
+            "description": "Several restaurants are visible along the street.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "deli_street_01",
+            "name": "Deli",
+            "description": "A deli is located across the street.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "hot_dog_stand_street_01",
+            "name": "Hot Dog Stand",
+            "description": "A hot dog stand is located on the corner.",
+            "is_interactive": true,
+            "properties": {}
+          }
+        ],
+        "ephemeral_npcs": [
+          {
+            "id": "npc_hot_dog_vendor_01",
+            "name": "Hot Dog Vendor",
+            "description": "The vendor at the hot dog stand."
+          }
+        ],
+        "connected_locations": [],
+        "objects_present": [
+          {
+            "id": "office_buildings_street_01",
+            "name": "Office Buildings",
+            "description": "Towering office buildings line the block.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "shops_street_01",
+            "name": "Shops",
+            "description": "Various shops line the street.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "restaurants_street_01",
+            "name": "Restaurants",
+            "description": "Several restaurants are visible along the street.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "deli_street_01",
+            "name": "Deli",
+            "description": "A deli is located across the street.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "hot_dog_stand_street_01",
+            "name": "Hot Dog Stand",
+            "description": "A hot dog stand is located on the corner.",
+            "is_interactive": true,
+            "properties": {}
+          }
+        ]
+      },
+      "deli_street_01": {
+        "ephemeral_objects": [
+          {
+            "id": "deli_menu_board_01",
+            "name": "Menu Board",
+            "description": "The menu board listing the deli's offerings.",
+            "is_interactive": false,
+            "properties": {}
+          }
+        ],
+        "ephemeral_npcs": [],
+        "connected_locations": [],
+        "objects_present": [
+          {
+            "id": "deli_menu_board_01",
+            "name": "Menu Board",
+            "description": "The menu board listing the deli's offerings.",
+            "is_interactive": false,
+            "properties": {}
+          }
+        ]
+      }
+    }
   }
 }

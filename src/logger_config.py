@@ -1,6 +1,8 @@
 import logging
-import datetime
+import datetime # This is correct for datetime.datetime.now()
 import sys
+import os # Added for os.makedirs
+import json # Added for JSON operations
  
 def setup_unique_logger(
     logger_name="TheSimulationApp",
@@ -72,3 +74,43 @@ def setup_unique_logger(
 
     # Return the specifically named logger for direct use, and the determined log_filename
     return logging.getLogger(logger_name), log_filename
+
+# --- Added for Structured Event Logging ---
+
+class JsonFormatter(logging.Formatter):
+    """
+    A custom formatter that formats the log record's message directly.
+    Assumes the message is already a JSON string.
+    """
+    def format(self, record):
+        # We expect the message to be a pre-formatted JSON string
+        return record.getMessage()
+
+def setup_event_logger(instance_uuid: str = None, log_dir: str = "logs/events"):
+    """
+    Sets up a dedicated logger for structured JSON events.
+    Events are written to a .jsonl file (one JSON object per line).
+
+    Args:
+        instance_uuid (str, optional): The UUID of the simulation instance.
+                                       If None, a timestamped log for 'latest' run is created.
+        log_dir (str): The directory to store event logs.
+
+    Returns:
+        tuple: (logging.Logger instance, str path to log file) or (None, None) if setup fails.
+    """
+    logger_name = f"EventLogger_{instance_uuid or 'latest'}"
+    event_logger = logging.getLogger(logger_name)
+    event_logger.setLevel(logging.INFO)  # Log all event messages passed to it
+    event_logger.propagate = False    # Don't send to parent (main) loggers (especially the root logger)
+
+    os.makedirs(log_dir, exist_ok=True) # Ensure the event log directory exists
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") # Consistent with setup_unique_logger
+    log_filename = f"events_{instance_uuid}_{timestamp}.jsonl" if instance_uuid else f"events_latest_{timestamp}.jsonl"
+    file_path = os.path.join(log_dir, log_filename)
+
+    fh = logging.FileHandler(file_path, mode='a', encoding='utf-8') # Append mode
+    fh.setFormatter(JsonFormatter())
+    event_logger.addHandler(fh)
+    return event_logger, file_path

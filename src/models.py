@@ -97,3 +97,28 @@ class SimulacraIntentResponse(BaseModel):
     action_type: str
     target_id: Optional[str] = None
     details: str = ""
+
+# --- Narrator Output Models (Added for Pydantic Validation) ---
+class DiscoveredObject(BaseModel):
+    id: str
+    name: str
+    description: str
+    is_interactive: bool = True
+    properties: Dict[str, Any] = Field(default_factory=dict)
+
+class DiscoveredConnection(BaseModel):
+    to_location_id_hint: str
+    description: str
+    travel_time_estimate_seconds: Optional[int] = None
+
+class DiscoveredNPC(BaseModel):
+    id: str
+    name: str
+    description: str
+    is_interactive: bool = True # Based on prompt, though example output omits it. Making it default True.
+
+class NarratorOutput(BaseModel):
+    narrative: str
+    discovered_objects: List[DiscoveredObject] = Field(default_factory=list)
+    discovered_connections: List[DiscoveredConnection] = Field(default_factory=list)
+    discovered_npcs: List[DiscoveredNPC] = Field(default_factory=list)

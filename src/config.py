@@ -14,7 +14,7 @@ SIMULACRA_KEY = "simulacra_profiles" # Changed from "simulacra"
 # --- Simulation Parameters ---
 SIMULATION_SPEED_FACTOR = float(os.getenv("SIMULATION_SPEED_FACTOR", 1))
 UPDATE_INTERVAL = float(os.getenv("UPDATE_INTERVAL", 0.1))
-MAX_SIMULATION_TIME = float(os.getenv("MAX_SIMULATION_TIME", 9600.0)) # Default to 30 minutes simulation time
+MAX_SIMULATION_TIME = float(os.getenv("MAX_SIMULATION_TIME", 96000.0)) # Default to 30 minutes simulation time
 MEMORY_LOG_CONTEXT_LENGTH = 10
 MAX_MEMORY_LOG_ENTRIES = 500
 
@@ -28,7 +28,7 @@ AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS = float(os.getenv("AGENT_BUSY_POLL_INTERVA
 # --- Dynamic Interruption Task Parameters (for dynamic_interruption_task) ---
 DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS = float(os.getenv("DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS", 5.0)) # How often the dynamic interruption task checks, in real-world seconds
 DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS = float(os.getenv("DYNAMIC_INTERruption_TARGET_DURATION_SECONDS", 600.0)) # Sim duration of an action at which target probability is met
-DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION = float(os.getenv("DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION", 0.05)) # Target probability (e.g., 5%) per check
+DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION = float(os.getenv("DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION", 0.35)) # Target probability (e.g., 5%) per check
 DYNAMIC_INTERRUPTION_MIN_PROB = float(os.getenv("DYNAMIC_INTERRUPTION_MIN_PROB", 0.005)) # Minimum probability for eligible actions (e.g., 0.5%) per check
 DYNAMIC_INTERRUPTION_MAX_PROB_CAP = float(os.getenv("DYNAMIC_INTERRUPTION_MAX_PROB_CAP", 0.25)) # Absolute maximum probability cap per check (e.g., 15%)
 MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK = float(os.getenv("MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK", 60.0)) # Actions shorter than this (sim seconds) won't be interrupted by this task
@@ -48,7 +48,7 @@ RANDOM_SEED: Optional[int] = int(RANDOM_SEED_VALUE) if RANDOM_SEED_VALUE and RAN
 
 # --- Narrative Image Generation Parameters ---
 ENABLE_NARRATIVE_IMAGE_GENERATION = os.getenv("ENABLE_NARRATIVE_IMAGE_GENERATION", "False").lower() == "true"
-IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 500.0)) # How often to generate an image
+IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 1800.0)) # How often to generate an image
 IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "gemini-2.0-flash-preview-image-generation") # Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
 IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
 
