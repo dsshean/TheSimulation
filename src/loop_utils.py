@@ -257,23 +257,20 @@ def find_latest_file(pattern: str) -> str | None:
     latest_file = max(files, key=os.path.getmtime)
     return latest_file
 
-def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict | None, str]:
-    """
-    Loads an existing simulation state or initializes a new one.
-    - If instance_uuid_arg is provided, it tries to load that specific simulation.
-    - If not, it tries to load the latest simulation.
-    - If no simulation is found, it initializes a new one (if possible).
+# --- Refactored Load/Initialize Logic ---
 
-    Returns a tuple: (loaded_state_data, state_file_path)
-    If loading/initialization fails critically, loaded_state_data might be None.
+def _determine_target_uuid_and_load_world_config(
+    instance_uuid_arg: Optional[str]
+) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[str]]:
     """
+    Determines the target UUID and loads the corresponding world_config.json.
+    Returns (target_uuid, world_config_data, world_config_path).
+    """
+    logger.debug(f"Determining target UUID. Argument: {instance_uuid_arg}")
     target_uuid = None
     world_config = None
     world_config_path = None
-    state_modified_during_load = False # Tracks if any changes made that require saving
-    created_new_state = False
 
-    # 1. Determine target_uuid and load world_config
     if instance_uuid_arg:
         logger.info(f"Attempting to load simulation for specified UUID: {instance_uuid_arg}")
         world_config_path = os.path.join(WORLD_CONFIG_DIR, f"world_config_{instance_uuid_arg}.json")
@@ -282,7 +279,7 @@ def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict |
             target_uuid = instance_uuid_arg
         else:
             logger.error(f"World config for UUID {instance_uuid_arg} not found or UUID mismatch. Cannot proceed with this instance.")
-            return None, "" # Critical failure
+            return None, None, None
     else:
         logger.info("No instance UUID provided. Attempting to load the latest simulation.")
         world_config_pattern = os.path.join(WORLD_CONFIG_DIR, "world_config_*.json")
@@ -295,101 +292,136 @@ def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict |
                 logger.info(f"Found latest world config: {os.path.basename(latest_world_config_path)} with UUID: {target_uuid}")
             else:
                 logger.warning(f"Latest world config file {latest_world_config_path} is invalid or missing UUID. Cannot load.")
+                return None, None, None # Ensure we don't proceed with invalid latest config
         else:
             logger.info("No existing world_config files found. A new simulation will need to be set up first (e.g., via setup_simulation.py).")
-            # This path implies no simulation can be started unless setup_simulation.py creates one.
-            # For now, we won't auto-create a world_config here.
-            return None, "" # Critical: No world to load or base a new state on.
+            return None, None, None
 
-    if not target_uuid or not world_config:
-        logger.error("Failed to determine a target UUID or load its world configuration. Cannot initialize simulation state.")
-        return None, ""
+    if not target_uuid or not world_config: # Double check after all paths
+        logger.error("Failed to determine a target UUID or load its world configuration.")
+        return None, None, None
+    
+    return target_uuid, world_config, world_config_path
 
-    # 2. Load Life Summaries for the target_uuid
+
+def _load_life_summaries(target_uuid: str) -> List[Dict[str, Any]]:
+    """Loads all life summary files for a given target_uuid."""
+    if not target_uuid:
+        logger.error("Cannot load life summaries: target_uuid is None.")
+        return []
+        
     life_summary_pattern = os.path.join(LIFE_SUMMARY_DIR, f"life_summary_*_{target_uuid}.json")
+    logger.debug(f"Searching for life summaries with pattern: {life_summary_pattern}")
+
     life_summary_files = glob.glob(life_summary_pattern)
-    life_summaries = [] # Initialize an empty list
+    life_summaries = []
     if life_summary_files:
         for ls_file in life_summary_files:
             ls_data = load_json_file(ls_file)
             if ls_data is None:
                 logger.warning(f"load_json_file returned None for: {os.path.basename(ls_file)}")
-                continue # Skip to next file if data couldn't be loaded
+                continue
             
-            # Strictly look for "sim_id"
             sim_id_from_file = ls_data.get("sim_id")
             logger.debug(f"Processing life summary file: {os.path.basename(ls_file)}. Found sim_id: '{sim_id_from_file}'")
 
             if sim_id_from_file: 
-                life_summaries.append(ls_data) # CORRECTED: Append valid data
+                life_summaries.append(ls_data)
                 logger.info(f"Loaded life summary: {os.path.basename(ls_file)} for sim_id: {sim_id_from_file}")
             else:
                 logger.warning(f"Could not load or validate life summary (missing 'sim_id'): {os.path.basename(ls_file)}")
     else:
         logger.warning(f"No life summary files found for UUID {target_uuid} matching pattern {life_summary_pattern}.")
-        # This might be an issue if we need to create a new state, as there would be no simulacra.
+    return life_summaries
 
-    # 3. Attempt to load existing simulation_state.json
-    state_file_path = os.path.join(STATE_DIR, f"simulation_state_{target_uuid}.json")
-    loaded_state_data = load_json_file(state_file_path)
 
-    if loaded_state_data is None and os.path.exists(state_file_path): # File exists but failed to load (e.g. corrupt)
-        logger.warning(f"Existing state file at {state_file_path} could not be loaded/parsed. Will create a new one.")
-        created_new_state = True # Treat as new state creation
-    elif not os.path.exists(state_file_path):
-        logger.info(f"No existing state file found at {state_file_path}. Will create a new one.")
-        loaded_state_data = None
+def _load_or_create_simulation_state_file(
+    state_file_path_to_check: str,
+    target_uuid: str,
+    world_config_data: Optional[Dict[str, Any]],
+    life_summaries_data: List[Dict[str, Any]]
+) -> Tuple[Optional[Dict[str, Any]], bool]:
+    """
+    Attempts to load an existing state file or creates a new one if necessary.
+    Returns (state_data, created_new_state_flag).
+    """
+    logger.debug(f"Attempting to load or create state file: {state_file_path_to_check} for UUID: {target_uuid}")
+    # state_file_path is already constructed and passed as state_file_path_to_check
+    loaded_state_data = load_json_file(state_file_path_to_check)
+    created_new_state = False
+
+    if loaded_state_data is None and os.path.exists(state_file_path_to_check):
+        logger.warning(f"Existing state file at {state_file_path_to_check} could not be loaded/parsed. Will create a new one.")
+        created_new_state = True
+    elif not os.path.exists(state_file_path_to_check):
+        logger.info(f"No existing state file found at {state_file_path_to_check}. Will create a new one.")
+        loaded_state_data = None # Ensure it's None to trigger creation
         created_new_state = True
     elif loaded_state_data.get("world_instance_uuid") != target_uuid:
         logger.warning(f"State file UUID ({loaded_state_data.get('world_instance_uuid')}) "
                        f"does not match target UUID ({target_uuid}). Creating new state.")
-        loaded_state_data = None # Discard mismatched state
+        loaded_state_data = None
         created_new_state = True
 
     if loaded_state_data is None:
-        # This is where a new state is created
-        if not world_config:
+        if not world_config_data:
             logger.error(f"Cannot create new simulation state: World config for UUID {target_uuid} not loaded/found.")
-            return None, state_file_path
-        if not life_summaries:
+            return None, True
+        if not life_summaries_data:
             logger.error(f"Cannot create new simulation state for UUID {target_uuid}: No life summaries found. At least one simulacrum is required.")
-            return None, state_file_path
+            return None, True
 
         logger.info(f"Initializing new simulation state for UUID: {target_uuid}")
-        loaded_state_data = create_blank_simulation_state(target_uuid, world_config, life_summaries)
-        state_modified_during_load = True # New state is inherently a modification
-        created_new_state = True # Explicitly set
+        loaded_state_data = create_blank_simulation_state(target_uuid, world_config_data, life_summaries_data)
+        # created_new_state is already True if we reach here
+    return loaded_state_data, created_new_state
 
-        # active_sim_ids are already populated by create_blank_simulation_state
-        # persona_details are also populated by create_blank_simulation_state
 
-    # 4. Ensure state structure and sync with world_config
-    # Get active sim_ids from summaries for ensure_state_structure, as it might be needed if state was loaded but incomplete
+def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict | None, str]:
+    """
+    Loads an existing simulation state or initializes a new one.
+    Returns a tuple: (loaded_state_data, state_file_path)
+    """
+    state_modified_during_load = False
+    state_file_path = "" # Initialize
+
+    # 1. Determine target_uuid and load world_config
+    target_uuid, world_config, _ = _determine_target_uuid_and_load_world_config(instance_uuid_arg)
+
+    if not target_uuid or not world_config:
+        logger.error("Failed to determine target UUID or load world config. Aborting simulation load.")
+        return None, ""
+    
+    state_file_path = os.path.join(STATE_DIR, f"simulation_state_{target_uuid}.json")
+
+    # 2. Load Life Summaries for the target_uuid
+    life_summaries = _load_life_summaries(target_uuid)
+
+    # 3. Attempt to load existing simulation_state.json or create a new one
+    loaded_state_data, created_new_state = _load_or_create_simulation_state_file(
+        state_file_path, target_uuid, world_config, life_summaries
+    )
+    state_modified_during_load = state_modified_during_load or created_new_state
+
+    # 4. Ensure state structure and sync with world_config if state was loaded/created
     active_sim_ids_from_summaries = [ls.get("sim_id") for ls in life_summaries if ls.get("sim_id")]
     
-    if loaded_state_data: # If state was loaded or newly created successfully
+    if loaded_state_data:
         structure_modified = ensure_state_structure(loaded_state_data, target_uuid, active_sim_ids_from_summaries)
         state_modified_during_load = state_modified_during_load or structure_modified
 
-        if world_config:
-            state_modified_by_sync = sync_world_config_to_state(loaded_state_data, world_config)
-            state_modified_during_load = state_modified_during_load or state_modified_by_sync
-        else:
-            # This case should ideally not be hit if target_uuid was derived from a loaded world_config
-            logger.warning(f"World config for UUID {target_uuid} not available for final state sync. State may be incomplete.")
-    else: # Failed to load or create state
+        # world_config is guaranteed to be non-None if target_uuid is set
+        state_modified_by_sync = sync_world_config_to_state(loaded_state_data, world_config)
+        state_modified_during_load = state_modified_during_load or state_modified_by_sync
+    else:
         logger.error(f"Failed to load or create a simulation state for UUID {target_uuid}.")
         return None, state_file_path
-
 
     # 5. Save if modified during load (e.g., new state, structure ensured, or synced)
     if state_modified_during_load and loaded_state_data:
         logger.info(f"Simulation state for {target_uuid} was modified during load/initialization. Saving changes to {state_file_path}.")
         save_json_file(state_file_path, loaded_state_data)
-    elif created_new_state and loaded_state_data: # Also save if it's a new state, even if no "modifications" per se
-        logger.info(f"Newly created simulation state for {target_uuid}. Saving to {state_file_path}.")
-        save_json_file(state_file_path, loaded_state_data)
-
+    # No need for 'elif created_new_state' because state_modified_during_load will be true if created_new_state is true.
 
     return loaded_state_data, state_file_path
 
@@ -404,9 +436,6 @@ def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
         return None
 
     # 1. Attempt to extract from markdown code fences
-    # Regex to find ```json ... ``` or ``` ... ``` and capture the content within
-    # re.DOTALL allows '.' to match newlines
-    # The main capturing group (group 1) will be the content inside the code fence
     fence_match = re.search(r"```(?:json)?\s*(.*?)\s*```", text_output, re.DOTALL | re.IGNORECASE)
     
     json_to_parse = None
@@ -421,36 +450,38 @@ def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
         if last_brace != -1:
             open_braces = 0
             candidate = ""
-            for char in text_output[last_brace:]:
+            for char_idx, char in enumerate(text_output[last_brace:]):
                 candidate += char
                 if char == '{':
                     open_braces += 1
                 elif char == '}':
                     open_braces -= 1
                     if open_braces == 0:
-                        json_to_parse = candidate # Found a balanced pair
-                        logger.debug(f"Heuristic found potential JSON object: '{json_to_parse[:200]}...'")
-                        break 
-            if open_braces != 0: # Didn't find a balanced pair
+                        # Check if this is the end of the string or followed by non-JSON characters
+                        if last_brace + char_idx + 1 == len(text_output) or not text_output[last_brace + char_idx + 1:].strip().startswith(("{", "[")):
+                            json_to_parse = candidate 
+                            logger.debug(f"Heuristic found potential JSON object: '{json_to_parse[:200]}...'")
+                            break 
+            if open_braces != 0: 
                 json_to_parse = None 
                 logger.debug(f"No balanced JSON object found after last '{{'. Candidate was: {candidate[:200]}")
         
         if not json_to_parse:
-            # Fallback: if no object found, try to find the last array '[' ... ']'
             last_bracket = text_output.rfind('[')
             if last_bracket != -1:
                 open_brackets = 0
                 candidate_arr = ""
-                for char_arr in text_output[last_bracket:]:
+                for char_idx_arr, char_arr in enumerate(text_output[last_bracket:]):
                     candidate_arr += char_arr
                     if char_arr == '[':
                         open_brackets += 1
                     elif char_arr == ']':
                         open_brackets -= 1
                         if open_brackets == 0:
-                            json_to_parse = candidate_arr
-                            logger.debug(f"Heuristic found potential JSON array: '{json_to_parse[:200]}...'")
-                            break
+                            if last_bracket + char_idx_arr + 1 == len(text_output) or not text_output[last_bracket + char_idx_arr + 1:].strip().startswith(("{", "[")):
+                                json_to_parse = candidate_arr
+                                logger.debug(f"Heuristic found potential JSON array: '{json_to_parse[:200]}...'")
+                                break
                 if open_brackets != 0:
                     json_to_parse = None
                     logger.debug(f"No balanced JSON array found after last '['. Candidate was: {candidate_arr[:200]}")
@@ -459,13 +490,10 @@ def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
         try:
             logger.debug(f"Attempting to parse: '{json_to_parse[:200]}...'")
             parsed_dict = json.loads(json_to_parse)
-            if isinstance(parsed_dict, dict):
-                logger.debug(f"Successfully parsed into dict: {str(parsed_dict)[:200]}")
-                return parsed_dict
-            else:
-                # This case is if json.loads returns a list, int, string, etc., but we expect a dict.
-                logger.warning(f"Parsed JSON is not a dictionary: Type {type(parsed_dict)}, Value: {str(parsed_dict)[:200]}")
-                return None
+            # We are now fine with it being a list or dict at this stage, as some LLM outputs might be lists of objects.
+            # The calling function will need to validate if it specifically needs a dict.
+            logger.debug(f"Successfully parsed JSON: Type {type(parsed_dict)}, Value: {str(parsed_dict)[:200]}")
+            return parsed_dict # Return whatever valid JSON was parsed
         except json.JSONDecodeError as e:
             logger.warning(f"Final JSON parsing attempt failed for: '{json_to_parse[:200]}...'. Error: {e}")
             return None
@@ -479,18 +507,18 @@ def get_nested(data: Dict, *keys: str, default: Any = None) -> Any:
     for key in keys:
         if isinstance(current, dict):
             current = current.get(key)
-        elif isinstance(current, list): # Added check for list and integer key
+        elif isinstance(current, list): 
             if isinstance(key, int):
                 try:
                     current = current[key]
                 except IndexError:
                     return default
-            else: # Key is not an int, cannot index list
+            else: 
                 return default
-        else: # Current is not a dict or list, cannot go deeper
+        else: 
             return default
         
-        if current is None: # Stop early if a key is missing or .get() returned None
+        if current is None: 
             return default
             
-    return current # Return current value, or default if any key was missing
+    return current

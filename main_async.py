@@ -12,24 +12,31 @@ from rich.console import Console
 
 console = Console()
 
-from src.simulation_async import (APP_NAME,  # Import APP_NAME too
-                                      run_simulation)
-# --- Logging Setup ---
-# Keep basic logging setup here at the entry point
-log_filename = "simulation_async.log"
-logging.basicConfig(
-    level=logging.DEBUG, # Set to DEBUG to capture all logs
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename=log_filename,
-    filemode='w' # Overwrite log file on each run
+from src.simulation_async import (APP_NAME, run_simulation)
+
+# Assuming logger_config.py is in the same directory or accessible via PYTHONPATH
+# and contains the setup_unique_logger function.
+try:
+    from src.logger_config import setup_unique_logger
+except ImportError:
+    print("ERROR: logger_config.py not found. Please ensure it exists and is in your PYTHONPATH.")
+    print("Using basic fallback logging to console only.")
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    logger = logging.getLogger(APP_NAME if 'APP_NAME' in globals() else "FallbackLogger")
+    # Fallback unique_log_filename to avoid error later if setup_unique_logger failed
+    unique_log_filename = "fallback_console_only.log" 
+
+# --- Unique Logging Setup ---
+logger, unique_log_filename = setup_unique_logger(
+    logger_name=APP_NAME,
+    file_prefix=APP_NAME, # Results in filenames like YourAppName_YYYYMMDD_HHMMSS.log
+    file_level=logging.DEBUG,    # As per original file log level
+    console_level=logging.WARNING, # As per original console log level
+    file_formatter_str='%(asctime)s - %(name)s - %(levelname)s - %(message)s', # Original file format
+    console_formatter_str='%(levelname)s: %(message)s', # Original console format
+    file_mode='w' # Original file mode (overwrite if somehow the same timestamped file existed)
 )
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.WARNING) # Show warnings and above on console
-formatter = logging.Formatter('%(levelname)s: %(message)s')
-console_handler.setFormatter(formatter)
-logging.getLogger('').addHandler(console_handler)
-logger = logging.getLogger(__name__)
-logger.info(f"--- Application Start (main_async.py) --- Logging to: {log_filename}")
+logger.info(f"--- Application Start ({APP_NAME}) --- Logging to: {unique_log_filename}")
 
 # --- Entry Point ---
 if __name__ == "__main__":
@@ -75,4 +82,3 @@ if __name__ == "__main__":
     finally:
         logging.shutdown() # Ensure logs are flushed
         console.print("Application finished.")
-

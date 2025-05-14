@@ -16,6 +16,7 @@ from rich.panel import Panel
 from rich.rule import Rule
 
 console = Console()
+from src.state_loader import parse_location_string # Import the canonical version
 
 # --- Basic Logging Setup ---
 # Configure logging to capture info from the generator
@@ -74,36 +75,6 @@ def get_user_input(prompt: str, valid_options: list = None, allow_empty: bool = 
             # No options, just return the type-converted input
             return user_input
 
-
-def parse_location_string(location_str: str) -> dict:
-    """Attempts to parse 'City, State' or 'City, Country'."""
-    parts = [p.strip() for p in location_str.split(',')]
-    location_data = {"city": None, "state": None, "country": None, "coordinates": {"latitude": None, "longitude": None}}
-    if len(parts) >= 1:
-        location_data["city"] = parts[0]
-    if len(parts) == 2:
-        # Basic check: if 2 letters, assume state (US/Canada), otherwise country
-        if len(parts[1]) == 2 and parts[1].isalpha():
-             location_data["state"] = parts[1].upper()
-             location_data["country"] = "United States" # Default assumption, could be improved
-        else:
-             location_data["country"] = parts[1]
-    elif len(parts) == 3: # Assume City, State, Country
-        location_data["state"] = parts[1].upper()
-        location_data["country"] = parts[2]
-
-    # If only city was given, try to guess country based on common knowledge or leave null
-    if location_data["city"] and not location_data["country"]:
-         # Simple examples, could be expanded or use a library
-         if location_data["city"].lower() in ["london", "paris", "tokyo"]:
-             location_data["country"] = {"london": "United Kingdom", "paris": "France", "tokyo": "Japan"}[location_data["city"].lower()]
-         # else: leave country as None
-
-    # Ensure city is set if only country was somehow derived
-    if not location_data["city"] and location_str:
-        location_data["city"] = location_str # Fallback to using the whole string as city/region name
-
-    return location_data
 
 # --- Make main async ---
 async def main():

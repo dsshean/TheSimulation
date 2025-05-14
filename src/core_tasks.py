@@ -156,21 +156,38 @@ async def world_info_gatherer_task(
             )
             _update_state_value(current_state, 'world_feeds.weather', weather_data, logger_instance)
 
+            # Parallelize fetching for different news categories
             news_categories = ["world_news", "regional_news", "local_news", "pop_culture"]
-            for news_cat in news_categories:
-                news_item = await generate_simulated_world_feed_content(
+            news_tasks = [
+                generate_simulated_world_feed_content(
                     current_sim_state=current_state, category=news_cat, simulation_time=current_sim_time_val,
                     location_context=location_context_str, world_mood=world_mood,
                     global_search_agent_runner=search_agent_runner_instance, # Passed through
                     search_agent_session_id=search_agent_session_id_for_search, # Passed through
                     user_id_for_search=USER_ID, # From config
                     logger_instance=logger_instance
-                )
+                ) for news_cat in news_categories
+            ]
+            
+            news_results = await asyncio.gather(*news_tasks, return_exceptions=True)
+
+            for i, result_item in enumerate(news_results):
+                news_cat = news_categories[i]
+                news_item: Dict[str, Any] # Ensure news_item is defined for type hinting
+
+                if isinstance(result_item, Exception):
+                    logger_instance.error(f"[WorldInfoGatherer] Error fetching {news_cat}: {result_item}")
+                    news_item = {"error": f"Failed to fetch {news_cat}", "raw_response": str(result_item), "timestamp": current_sim_time_val, "source_category": news_cat}
+                elif isinstance(result_item, dict): # Ensure it's a dict
+                    news_item = result_item
+                else: # Should not happen if generate_simulated_world_feed_content returns a dict
+                    logger_instance.error(f"[WorldInfoGatherer] Unexpected result type for {news_cat}: {type(result_item)}")
+                    news_item = {"error": f"Unexpected result type for {news_cat}", "timestamp": current_sim_time_val, "source_category": news_cat}
+
                 feed_key = "news_updates" if "news" in news_cat else "pop_culture_updates"
                 current_feed = get_nested(current_state, 'world_feeds', feed_key, default=[])
                 current_feed.insert(0, news_item)
                 _update_state_value(current_state, f'world_feeds.{feed_key}', current_feed[-MAX_WORLD_FEED_ITEMS:], logger_instance)
-
             logger_instance.info(f"[WorldInfoGatherer] World feeds updated. Next check in {WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS} sim_seconds.")
             next_run_sim_time = current_sim_time_val + WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS
             while current_state.get("world_time", 0.0) < next_run_sim_time:

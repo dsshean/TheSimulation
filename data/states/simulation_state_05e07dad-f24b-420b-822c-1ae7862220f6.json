@@ -1,0 +1,116 @@
+{
+  "world_instance_uuid": "05e07dad-f24b-420b-822c-1ae7862220f6",
+  "active_simulacra_ids": [
+    "sim_3e912d"
+  ],
+  "world_time": 31.68699999997625,
+  "narrative_log": [
+    "[T3.7] Eleanor's stomach rumbles, a gentle reminder that the morning has flown by. She glances at her watch; just past noon. Lunch is definitely on the agenda.",
+    "[T905.4] Eleanor sets off towards Elm Street, the familiar route unfolding before her. The midday sun warms her face as she walks, passing brownstones and small shops. After a fifteen-minute stroll, the cheerful yellow awning of the cafe comes into view."
+  ],
+  "world_template_details": {
+    "description": "A new world is beginning.",
+    "rules": {
+      "allow_teleportation": false,
+      "time_progression_rate": 1.0,
+      "weather_effects_travel": true,
+      "historical_date": null
+    },
+    "world_type": "real",
+    "sub_genre": "realtime",
+    "location": {
+      "city": "Asheville",
+      "state": "NC",
+      "country": "United States",
+      "coordinates": {
+        "latitude": 35.5951,
+        "longitude": -82.5515
+      }
+    },
+    "mood": "The real world and general slice of life."
+  },
+  "simulacra_profiles": {
+    "sim_3e912d": {
+      "current_location": "Home_01",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "Eleanor sets off towards Elm Street, the familiar route unfolding before her. The midday sun warms her face as she walks, passing brownstones and small shops. After a fifteen-minute stroll, the cheerful yellow awning of the cafe comes into view.",
+      "goal": "Determine goals.",
+      "memory_log": [],
+      "home_location": "Home_01",
+      "status": "busy",
+      "current_action_end_time": 905.4220000000205,
+      "pending_results": {
+        "simulacra_profiles.sim_3e912d.location": "cafe_elm_street",
+        "simulacra_profiles.sim_3e912d.location_details": "You have arrived in cafe_elm_street."
+      },
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0,
+      "persona_details": {
+        "Name": "Eleanor Hayes",
+        "Age": 29,
+        "Occupation": "Brewery Tour Guide",
+        "Current_location": "Asheville, NC",
+        "Personality_Traits": [
+          "Enthusiastic",
+          "Outgoing",
+          "Knowledgeable",
+          "Patient",
+          "Adaptable"
+        ],
+        "Birthplace": "Charlotte, NC",
+        "Birthdate": "1995-07-15",
+        "Birthtime": "14:30",
+        "Education": "Bachelor of Arts in History",
+        "Physical_Appearance": "5'6\", with wavy auburn hair and green eyes. Usually seen wearing comfortable clothing and sturdy walking shoes.",
+        "Hobbies": "Hiking, trying new craft beers, reading local history, volunteering at the animal shelter",
+        "Skills": "Public speaking, historical knowledge, beer knowledge, customer service, navigating Asheville",
+        "Languages": "English",
+        "Health_Status": "Generally healthy, occasional allergies",
+        "Family_Background": "Middle-class family, parents still living in Charlotte, one younger brother.",
+        "Life_Goals": "To become a local history expert and potentially open a small historical tour business.",
+        "Notable_Achievements": "Graduated cum laude from UNC Chapel Hill, received excellent customer service awards at previous jobs.",
+        "Fears": "Heights, public speaking failures, not being able to achieve her goals",
+        "Strengths": "Strong communication skills, historical knowledge, adaptability",
+        "Weaknesses": "Can be overly critical of herself, sometimes struggles to say no.",
+        "Ethnicity": "Caucasian",
+        "Religion": null,
+        "Political_Views": "Liberal",
+        "Favorite_Foods": "Anything from local Asheville restaurants, especially farm-to-table cuisine.",
+        "Favorite_Music": "Indie rock, bluegrass, local Asheville bands",
+        "Favorite_Books": "Local history books, historical fiction",
+        "Favorite_Movies": "Documentaries, comedies",
+        "Pet_Peeves": "Rude tourists, littering, traffic congestion",
+        "Dreams": "To share her love of history with others and create a successful business.",
+        "Past_Traumas": null
+      },
+      "location": "Home_01",
+      "current_interrupt_probability": null,
+      "current_action_description": "Action: move - Details: Move to the cafe on Elm Street."
+    }
+  },
+  "objects": [],
+  "world_feeds": {
+    "last_update_sim_time": 9.96899999998277,
+    "weather": {
+      "condition": "Partly Cloudy",
+      "temperature_celsius": 22,
+      "forecast_short": "Partly cloudy with low chance of rain.",
+      "timestamp": 9.96899999998277,
+      "source_category": "weather"
+    },
+    "news_updates": [
+      {
+        "headline": "Trump Arms Deal, Menendez Resentencing, and Canadian Reset Dominate National News",
+        "summary": "National headlines include Trump's arms deal and sanction plans, the Menendez brothers' resentencing hearing, and Canada's efforts to reset relations with the US amidst trade tensions.",
+        "timestamp": 9.96899999998277,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "Global Tensions Flare: Middle East Arms Deal, Ukraine Talks, India-Pakistan Spat",
+        "summary": "Trump's Middle East visit yields a massive arms deal amidst rising tensions between India and Pakistan and uncertain Russia-Ukraine negotiations.",
+        "timestamp": 9.96899999998277,
+        "source_category": "world_news"
+      }
+    ]
+  }
+}

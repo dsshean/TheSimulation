@@ -183,6 +183,55 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
     table.add_row(f"  Pop Culture", pop_culture_headline_display[:70] + "..." if len(pop_culture_headline_display) > 70 else pop_culture_headline_display)
     return table
 
+async def _fetch_and_summarize_real_feed(
+    category_for_logging: str,
+    search_query: str,
+    summarization_prompt_template: str, # Should contain {search_results} placeholder
+    output_format_note: str,
+    global_search_agent_runner: Optional[Runner],
+    search_agent_session_id: Optional[str],
+    user_id_for_search: str,
+    llm_for_summarization: genai.GenerativeModel,
+    logger_instance: logging.Logger
+) -> Optional[Dict[str, Any]]:
+    """Helper to perform search and then summarize the results for world feeds."""
+    raw_search_results_text = ""
+    search_tool_used_successfully = False
+
+    if not (global_search_agent_runner and search_agent_session_id):
+        logger_instance.warning(f"[{category_for_logging}] Search components unavailable. Cannot fetch real feed.")
+        return None
+
+    logger_instance.info(f"[{category_for_logging}] Attempting REAL search with query: '{search_query}'")
+    search_trigger_content = genai_types.Content(role='user', parts=[genai_types.Part(text=search_query)])
+    
+    async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content): # type: ignore
+        logger_instance.debug(f"[{category_for_logging}_SearchEvent] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
+        if event.is_final_response() and event.content and event.content.parts:
+            part = event.content.parts[0]
+            if hasattr(part, 'function_response') and part.function_response and hasattr(part.function_response, 'response'):
+                tool_response_data = dict(part.function_response.response)
+                raw_search_results_text = json.dumps(tool_response_data.get("results", tool_response_data))
+                search_tool_used_successfully = True
+                logger_instance.info(f"[{category_for_logging}_SearchEvent] Tool response: {raw_search_results_text[:200]}...")
+            elif part.text:
+                raw_search_results_text = part.text
+                if not ("tool_code" in raw_search_results_text and "google_search" in raw_search_results_text): # Avoid agent returning its own tool code
+                    search_tool_used_successfully = True
+                    logger_instance.info(f"[{category_for_logging}_SearchEvent] Text response: {raw_search_results_text[:200]}...")
+                else:
+                    logger_instance.warning(f"[{category_for_logging}_SearchEvent] Agent returned tool_code: {raw_search_results_text[:200]}...")
+            break 
+    
+    if search_tool_used_successfully and raw_search_results_text.strip():
+        logger_instance.info(f"[{category_for_logging}] REAL search returned: {raw_search_results_text.strip()[:500]}")
+        summarization_prompt = summarization_prompt_template.format(search_results=raw_search_results_text.strip()[:1000]) + f"\n{output_format_note}"
+        response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
+        return response_obj # Return the LLM response object
+    
+    logger_instance.warning(f"[{category_for_logging}] REAL search did not yield usable results. Raw: {raw_search_results_text[:200]}")
+    return None
+
 async def generate_simulated_world_feed_content(
     current_sim_state: Dict[str, Any],
     category: str,
@@ -207,44 +256,27 @@ async def generate_simulated_world_feed_content(
         use_real_feeds = world_type == "real" and sub_genre == "realtime"
 
         search_tool_used_successfully = False 
-        raw_search_results_text = ""
 
         if category == "weather":
-            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+            if use_real_feeds:
                 search_query = f"What is the current weather in {location_context}?"
-                logger_instance.info(f"[WorldInfoGatherer] Attempting REAL weather search for '{location_context}' with query: '{search_query}'")
-                search_trigger_content = genai_types.Content(role='user', parts=[genai_types.Part(text=search_query)])
-                async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content): # type: ignore
-                    logger_instance.debug(f"[WorldInfoGatherer_SearchEvent_Weather] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
-                    if event.is_final_response() and event.content and event.content.parts:
-                        part = event.content.parts[0]
-                        if hasattr(part, 'function_response') and part.function_response and hasattr(part.function_response, 'response'):
-                            tool_response_data = dict(part.function_response.response)
-                            raw_search_results_text = json.dumps(tool_response_data.get("results", tool_response_data))
-                            search_tool_used_successfully = True
-                            logger_instance.info(f"[WorldInfoGatherer_SearchEvent_Weather] Tool response: {raw_search_results_text[:200]}...")
-                        elif part.text:
-                            raw_search_results_text = part.text
-                            if not ("tool_code" in raw_search_results_text and "google_search" in raw_search_results_text):
-                                search_tool_used_successfully = True
-                                logger_instance.info(f"[WorldInfoGatherer_SearchEvent_Weather] Text response: {raw_search_results_text[:200]}...")
-                            else:
-                                logger_instance.warning(f"[WorldInfoGatherer_SearchEvent_Weather] Agent returned tool_code: {raw_search_results_text[:200]}...")
-                        break 
-                
-                if search_tool_used_successfully and raw_search_results_text.strip():
-                    logger_instance.info(f"[WorldInfoGatherer] REAL weather search returned: {raw_search_results_text.strip()[:500]}")
-                    summarization_prompt = f"Based on this weather information: '{raw_search_results_text.strip()[:1000]}...'\nExtract the current weather condition, temperature in Celsius (as an integer), and a short forecast. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\nIf temperature is in Fahrenheit, convert it to Celsius. If exact data is missing, make a plausible estimation. {output_format_note}"
-                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
-                else:
-                    logger_instance.warning(f"[WorldInfoGatherer] REAL weather search for '{location_context}' did not yield usable results. Falling back. Raw: {raw_search_results_text[:200]}")
+                summarization_template = "Based on this weather information: '{search_results}'\nExtract the current weather condition, temperature in Celsius (as an integer), and a short forecast. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\nIf temperature is in Fahrenheit, convert it to Celsius. If exact data is missing, make a plausible estimation."
+                response_obj = await _fetch_and_summarize_real_feed(
+                    category_for_logging="WorldInfoGatherer_Weather", search_query=search_query,
+                    summarization_prompt_template=summarization_template, output_format_note=output_format_note,
+                    global_search_agent_runner=global_search_agent_runner, search_agent_session_id=search_agent_session_id,
+                    user_id_for_search=user_id_for_search, llm_for_summarization=llm_for_summarization,
+                    logger_instance=logger_instance
+                )
+                if not response_obj: # Fallback if real search failed or components missing
+                    logger_instance.warning(f"[WorldInfoGatherer] REAL weather search for '{location_context}' did not yield usable results or components missing. Falling back to simulation.")
                     prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
             else: 
-                if use_real_feeds: logger_instance.warning(f"[WorldInfoGatherer] Intended REAL weather for '{location_context}' but search components unavailable. Falling back.")
+                # This branch is for when use_real_feeds is False
                 prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{\"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\"}}\n{output_format_note}"
         
         elif category in ["world_news", "regional_news", "local_news", "pop_culture"]:
-            if use_real_feeds and global_search_agent_runner and search_agent_session_id:
+            if use_real_feeds:
                 search_query = ""
                 if category == "world_news":
                     search_query = "What are the latest top world news headlines (e.g., politics, social issues, environment, major international events)?"
@@ -261,36 +293,19 @@ async def generate_simulated_world_feed_content(
                     pop_culture_region = f"{country} " if country else ""
                     search_query = f"What are the top latest {pop_culture_region} pop culture trends and entertainment news headlines (e.g., movies, music, viral trends)?"
 
-                logger_instance.info(f"[WorldInfoGatherer] Attempting REAL search for '{category}' with query: '{search_query}'")
-                search_trigger_content = genai_types.Content(role='user', parts=[genai_types.Part(text=search_query)])
-                
-                async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content): # type: ignore
-                    logger_instance.debug(f"[WorldInfoGatherer_SearchEvent_{category}] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
-                    if event.is_final_response() and event.content and event.content.parts:
-                        part = event.content.parts[0]
-                        if hasattr(part, 'function_response') and part.function_response and hasattr(part.function_response, 'response'):
-                            tool_response_data = dict(part.function_response.response)
-                            raw_search_results_text = json.dumps(tool_response_data.get("results", tool_response_data))
-                            search_tool_used_successfully = True
-                            logger_instance.info(f"[WorldInfoGatherer_SearchEvent_{category}] Tool response: {raw_search_results_text[:200]}...")
-                        elif part.text:
-                            raw_search_results_text = part.text
-                            if not ("tool_code" in raw_search_results_text and "google_search" in raw_search_results_text):
-                                search_tool_used_successfully = True
-                                logger_instance.info(f"[WorldInfoGatherer_SearchEvent_{category}] Text response: {raw_search_results_text[:200]}...")
-                            else:
-                                logger_instance.warning(f"[WorldInfoGatherer_SearchEvent_{category}] Agent returned tool_code: {raw_search_results_text[:200]}...")
-                        break
-                
-                if search_tool_used_successfully and raw_search_results_text.strip():
-                    logger_instance.info(f"[WorldInfoGatherer] Search for '{category}' returned: {raw_search_results_text.strip()[:500]}")
-                    summarization_prompt = f"Based on these search results for {category}: '{raw_search_results_text.strip()[:1000]}...'\nProvide a single, very concise headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
-                    response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
-                else:
-                    logger_instance.warning(f"[WorldInfoGatherer] REAL search for '{category}' did not yield usable results. Falling back. Raw: {raw_search_results_text[:200]}")
+                summarization_template = f"Based on these search results for {category}: '{{search_results}}'\nProvide a single, very concise headline and a one-sentence summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}"
+                response_obj = await _fetch_and_summarize_real_feed(
+                    category_for_logging=f"WorldInfoGatherer_{category}", search_query=search_query,
+                    summarization_prompt_template=summarization_template, output_format_note=output_format_note,
+                    global_search_agent_runner=global_search_agent_runner, search_agent_session_id=search_agent_session_id,
+                    user_id_for_search=user_id_for_search, llm_for_summarization=llm_for_summarization,
+                    logger_instance=logger_instance
+                )
+                if not response_obj: # Fallback
+                    logger_instance.warning(f"[WorldInfoGatherer] REAL search for '{category}' did not yield usable results or components missing. Falling back to simulation.")
                     prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
             else: 
-                if use_real_feeds: logger_instance.warning(f"[WorldInfoGatherer] Intended REAL search for '{category}' but search components unavailable. Falling back.")
+                # This branch is for when use_real_feeds is False
                 prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{\"headline\": \"str\", \"summary\": \"str\"}}\n{output_format_note}"
         else: 
             return {"error": "Unknown category"}
