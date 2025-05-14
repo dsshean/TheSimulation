@@ -1132,4 +1132,3 @@ async def narrative_image_generation_task():
             logger.error(f"[NarrativeImageGenerator] Error during image generation API call: {e}")
             if hasattr(e, 'response') and e.response: # type: ignore
                  logger.error(f"[NarrativeImageGenerator] API Response (if available): {e.response}") # type: ignore
-                 logger.error(f"[NarrativeImageGenerator] API Response (if available): {e.response}") # type: ignore
