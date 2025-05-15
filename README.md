@@ -2,6 +2,19 @@
 
 Exploring Simulation Theory through Large Language Models
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Practical Applications](#practical-applications)
+- [Conceptual Framework](#conceptual-framework)
+- [Core Architecture: A Glimpse Under the Hood](#core-architecture-a-glimpse-under-the-hood)
+- [Getting Started](#getting-started)
+- [Running the Simulation](#running-the-simulation)
+- [Configuration (`config.py` and `.env`)](#configuration-configpy-and-env)
+- Logs and Data Structure
+- Observing the Simulation
+- Future Directions
+
 ## Project Overview
 
 TheSimulation is an experiment exploring simulation theory utilizing Large Language Models (LLMs). This project investigates how LLMs, specifically through frameworks like the Google AI Developer Kit (ADK), can be used to create autonomous agents ("Simulacra") that perceive, reflect, and act within a simulated environment.
@@ -27,21 +40,77 @@ This research has potential practical applications across various fields:
 8.  **Entertainment Industry:** Developing rich fictional worlds, simulating audience reactions.
 9.  **Ethical Decision Making:** Creating complex moral dilemmas for analysis.
 
-## Framework: Language as Compressed Reality & Agent Architecture
+## Conceptual Framework
 
 ### Language as Compressed Reality
 
-The conceptual basis is that language functions as a compressed representation of reality, developed through consensus. LLMs leverage this compression to understand and generate complex information, making them suitable for simulating aspects of reality. (See original README section for more detail on "Invariant Representations" like the concept of "Dog").
+The conceptual basis is that language functions as a compressed representation of reality, developed through consensus. LLMs leverage this compression to understand and generate complex information, making them suitable for simulating aspects of reality. (The original concept discussed "Invariant Representations," like the shared understanding of "Dog," as an example of this compression).
 
-### Agent Architecture
+### Agent Design Philosophy
 
-The core simulation entities ("Simulacra") are implemented using the Google AI Developer Kit (ADK). Each Simulacrum is structured as a `SequentialAgent` that follows a specific thinking process:
+The core simulation entities ("Simulacra") are designed as autonomous agents. While the current implementation uses a specific task-based asynchronous architecture (detailed in "Core Architecture"), the underlying philosophy for agent behavior involves a perception-reflection-action cycle, primarily driven by LLMs interpreting their persona and the environment.
 
-1.  **Observe:** An `LlmAgent` perceives the current world state, its location, personal status (mood, physical condition), and social context from the simulation's shared state (`Session`).
-2.  **Reflect:** Another `LlmAgent` takes the observation and performs an internal monologue. It considers its persona (traits, aspirations), current goal, status, and the observation to evaluate its situation, potentially considering alternative actions or goal adjustments.
-3.  **Decide Intent:** A final `LlmAgent` processes the reflection and observation to determine the Simulacrum's next action. It outputs a structured JSON intent (e.g., `move`, `talk`, `use`, `wait`, `think`, `update_goal`) based on its prioritized needs and the plausibility within the simulation context.
+## Core Architecture: A Glimpse Under the Hood
 
-This sequence uses LLMs (like Google's Gemini models) at each step, guided by specific instructions and drawing data from a shared `Session` state managed by the ADK.
+TheSimulation operates through a series of interconnected asynchronous components, orchestrated using Python's `asyncio` and leveraging the Google ADK for LLM interactions.
+
+1.  **Central State (`state` dictionary):**
+
+    - A Python dictionary holds the entire simulation's current reality: world details (time, mood, global events), object states, location descriptions, and the profiles and runtime status of all active Simulacra.
+    - This state is loaded from and saved to JSON files (`data/states/`), enabling persistence and resumption of simulations.
+
+2.  **Time Manager (`time_manager_task`):**
+
+    - An asynchronous task responsible for advancing the simulation clock based on `SIMULATION_SPEED_FACTOR`.
+    - It processes events scheduled for completion (e.g., when an agent's action finishes) from the `pending_results_queue` and applies their effects to the central `state`.
+
+3.  **Event Bus System (Asynchronous Queues):**
+
+    - The simulation employs several `asyncio.Queue` instances as event buses. These facilitate decoupled, asynchronous communication between the various system components and agents.
+    - Key queues include:
+      - `intent_queue`: Simulacra agents place their chosen actions (intents) here.
+      - `world_engine_output_queue`: The World Engine places its action resolutions here.
+      - `narration_queue`: Resolved actions are sent here for the Narrator to process.
+      - `pending_results_queue`: Completed action effects are queued here before being applied by the Time Manager.
+    - _Technical Note on Event Handling:_ While the Google ADK offers Agent-to-Agent (A2A) communication, this project currently uses a custom system of `asyncio.Queue`s for broader asynchronous interaction. This was chosen for its simplicity and flexibility during initial development.
+
+4.  **Simulacra Agents (`simulacra_agent_task_llm`):**
+
+    - Each active Simulacrum is an independent asynchronous task driven by an LLM.
+    - **Persona & Goals:** Operates based on its unique "life summary" (defining its personality, background, and initial goals) loaded from `data/life_summaries/`.
+    - **Perception-Reflection-Action Cycle:**
+      1.  **Observe:** Gathers comprehensive context from the simulation `state`: its current location, nearby objects and NPCs, recent narrative events, its own status (mood, needs), the global `world_mood`, and its core persona.
+      2.  **Reflect & Decide (LLM Call):** This rich context is fed to its primary LLM (e.g., Gemini). Guided by a detailed prompt, the LLM generates an internal monologue (simulating a structured thinking process: Recall/React -> Analyze Goal -> Identify Options -> Prioritize/Choose) and decides on its next action.
+      3.  **Output Intent:** The chosen action is formatted as a structured JSON "intent" (e.g., `{"action_type": "move", "target_id": "door_main", "details": "try the handle"}`).
+      4.  **Declare Intent:** The intent is placed onto the `intent_queue` for processing.
+    - **Self-Reflection & Interruptions:** Simulacra can be interrupted during long actions for self-reflection (re-evaluating their goals or situation) or by minor dynamic events generated by the simulation, adding a layer of unpredictability.
+
+5.  **World Engine (`world_engine_task_llm`):**
+
+    - An asynchronous task that consumes intents from the `intent_queue`.
+    - **LLM-Powered Resolution:** It utilizes an LLM (the "World Engine Agent") to interpret the agent's intended action. This interpretation considers the current world `state`, including object properties, location rules, and the acting agent's capabilities.
+    - **Determines Outcomes:** The World Engine LLM decides if the action is valid, calculates its duration in simulation time, determines the direct consequences (e.g., changes to object states, agent location), and generates a factual, objective description of the outcome.
+    - The World Engine's structured output is then passed to the `narration_queue`.
+
+6.  **Narrator (`narration_task`):**
+
+    - An asynchronous task that processes the resolved action outcomes from the `narration_queue`.
+    - **LLM-Powered Storytelling:** It employs an LLM (the "Narrator Agent") to transform the factual outcome from the World Engine into a stylized narrative paragraph. This narration aims to adhere to the current `world_mood_global`, adding flavor and context.
+    - **Discovery Mechanism:** Following "look_around" actions, the Narrator also processes the World Engine's findings to identify and log new ephemeral objects, NPCs, and environmental connections, enriching the perceived world.
+    - The final narrative is appended to the simulation's main `narrative_log` (visible in the console and logs) and is also used to update the "last observation" for relevant agents.
+
+7.  **Supporting System Tasks:**
+
+    - `interaction_dispatcher_task`: A pre-processing step that classifies agent intents before they reach the World Engine.
+    - `dynamic_interruption_task`: Periodically checks for agents engaged in long actions and probabilistically introduces minor, unexpected events to interrupt them, adding dynamism.
+    - `world_info_gatherer_task`: Periodically updates global world feeds (e.g., simulated weather, news headlines) using LLMs. For "realtime" simulations, it can use a dedicated "Search Agent" (also LLM-powered) to fetch and summarize real-world information.
+    - `narrative_image_generation_task`: If enabled, this task periodically selects recent narrative segments and uses an image generation model to create visual representations, saving them to `data/images/` (or `data/narrative_images/`).
+
+8.  **Google ADK Integration:**
+    - The project primarily uses the Google Agent Development Kit (ADK) for its `LlmAgent` class, which provides a convenient abstraction for interacting with LLMs (like Gemini models).
+    - ADK's `SessionService` is used for managing the lifecycle of these LLM agent interactions.
+    - The `InMemoryMemoryService` from ADK is used for basic memory functions, such as storing the initial persona details for agents.
+    - ADK's tool-calling capabilities are leveraged, for example, by the Search Agent to use a `google_search` tool.
 
 ## Getting Started
 
@@ -54,7 +123,7 @@ This sequence uses LLMs (like Google's Gemini models) at each step, guided by sp
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your_username/TheSimulation.git
+    git clone https://github.com/your_username/TheSimulation.git # <<< TODO: Replace with your actual repository URL
     cd TheSimulation
     ```
 2.  **Set up a virtual environment (recommended):**
@@ -65,32 +134,42 @@ This sequence uses LLMs (like Google's Gemini models) at each step, guided by sp
 3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
-    # Likely dependencies include: google-adk, google-generativeai, python-dotenv
+    # Dependencies include: google-adk, google-generativeai, python-dotenv, rich, etc.
     ```
-4.  **Configure API Key:**
-    - Create a `.env` file in the project root.
-    - Add your Google API Key to the `.env` file:
+4.  **Set up Configuration (API Key & Settings):**
+
+    - Create a `.env` file in the project root directory (you can copy `.env.sample` if it exists and rename it to `.env`).
+    - Add your Google API Key to this `.env` file. This is essential for the LLMs to function.
+      ```dotenv
+      GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
       ```
-      GOOGLE_API_KEY="YOUR_API_KEY_HERE"
-      # Optional: Specify a Gemini model
-      # MODEL_GEMINI_PRO="gemini-2.0-pro"
-      ```
-5.  **World Setup**
-    - first run setup_simulation.py
-    - Run the setup script to initialize your simulation world and agent profiles:
+    - You can also override other default settings from `src/config.py` in this `.env` file. See the Configuration (`config.py` and `.env`) section for more details.
+
+5.  **World Setup (`setup_simulation.py`)**
+    - Run the `setup_simulation.py` script. This interactive script will guide you through:
+      - Defining the basic parameters of your simulation world (e.g., genre, location).
+      - Generating initial "life summaries" (personas, goals, backstories) for your Simulacra agents using an LLM.
     ```bash
     python setup_simulation.py
     ```
+    - This script will create two crucial types of files in the `data/` directory:
+      - `data/states/world_config_[uuid].json`: Contains the initial configuration and static details of your simulation world. (This file might initially be created in `data/` and then used to form part of the full simulation state).
+      - `data/life_summaries/life_summary_[AgentName]_[uuid].json`: Contains the detailed persona for each Simulacrum. These are essential for agents to operate.
 
-### Running
+## Running the Simulation
 
-The `setup_simulation.py` creates simulation setup and base life summaries needed to run the agents. Limit the Simulacra #s to 1 - multi-agent interaction is not fully test.
-
-The `main_async.py` script starts the simulation process
+Once the setup is complete and your `.env` file is configured, you can start the simulation using the `main_async.py` script:
 
 ```bash
 python main_async.py
 ```
+
+## Important Notes for Running:
+
+    - Agent Count: While the architecture is designed for multiple agents, multi-agent interactions are still under active development and refinement. For initial runs and stability, it's recommended to start with a single Simulacrum.
+    - Resuming/Resetting:
+        - The simulation saves its full state periodically to a simulation_state_[uuid].json file in data/states/. If this file exists for a given world UUID, the simulation will attempt to resume from it.
+        - To reset a world to its initial conditions (as defined by world_config_[uuid].json and the life summaries), delete the corresponding simulation_state_[uuid].json file from data/states/. The world_config_[uuid].json itself contains the initial setup and is not the running state.
 
 ### Configuration (`config.py` and `.env`)
 
@@ -141,6 +220,55 @@ GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
 # RANDOM_SEED_VALUE=42 # Integer value for reproducible randomness, or leave unset for random behavior
 ```
 
+### Key Configuration Parameters in `src/config.py`:
+
+Below is a description of the main parameters defined in src/config.py. Many can be overridden using the `.env` file as shown above.
+
+### Core API and Model Configuration:
+
+- API_KEY (Env: GOOGLE_API_KEY): Essential. Your Google API key for accessing Gemini models.
+- MODEL_NAME (Env: MODEL_GEMINI_PRO, Default: gemini-1.5-flash-latest or similar): The primary Gemini model used for complex reasoning tasks by Simulacra agents, the World Engine, and other core LLM interactions.
+- SEARCH_AGENT_MODEL_NAME (Env: SEARCH_AGENT_MODEL_NAME, Default: gemini-1.5-flash-latest or similar): The Gemini model used by the dedicated search agent.
+- IMAGE_GENERATION_MODEL_NAME (Env, Default: gemini-1.0-pro-vision-001 or similar): The model for narrative image generation. Ensure you use a model capable of image generation.
+
+### Simulation Parameters:
+
+- SIMULATION_SPEED_FACTOR (Env, Default: 1.0): Multiplier for simulation time progression relative to real time.
+- UPDATE_INTERVAL (Env, Default: 0.1): Real-world seconds between main simulation loop updates and display refreshes.
+- MAX_SIMULATION_TIME (Env, Default: 96000.0): Maximum simulation time in simulation seconds before the simulation automatically stops.
+- MEMORY_LOG_CONTEXT_LENGTH (Default: 10): Number of recent narrative entries provided to Simulacra agents as part of their immediate context.
+  Agent Self-Reflection & Dynamic Interruption Parameters: These control how agents might pause long tasks for self-reflection or be interrupted by minor dynamic events.
+
+- AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS (Env, Default: 120.0)
+- LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS (Env, Default: 300.0)
+- INTERJECTION_COOLDOWN_SIM_SECONDS (Env, Default: 450.0)
+- PROB_INTERJECT_AS_SELF_REFLECTION (Env, Default: 0.60)
+- DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS (Env, Default: 5.0)
+- DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS (Env, Default: 600.0)
+- DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION (Env, Default: 0.35)
+- MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK (Env, Default: 60.0)
+
+### World Information Gatherer:
+
+- WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS (Env, Default: 3600.0): How often (in simulation seconds) world feeds (e.g., weather, news) are updated.
+- MAX_WORLD_FEED_ITEMS (Env, Default: 5): Maximum number of items to retain for each feed category.
+
+### Narrative Image Generation:
+
+- ENABLE_NARRATIVE_IMAGE_GENERATION (Env, Default: False): Set to "true" to enable image generation.
+- IMAGE_GENERATION_INTERVAL_REAL_SECONDS (Env, Default: 1800.0): Frequency (in real-world seconds) of image generation attempts.
+
+### Random Seed:
+
+- RANDOM_SEED (Env: RANDOM_SEED_VALUE, Default: None): If set to an integer, this seed is used for random number generation, allowing for reproducible runs (for aspects dependent on random). If None, randomness will vary.
+
+### Paths & Keys:
+
+- BASE_DIR, STATE_DIR, LIFE_SUMMARY_DIR, IMAGE_GENERATION_OUTPUT_DIR (or NARRATIVE_IMAGE_OUTPUT_DIR): These define the directory structure for storing data, state files, agent profiles, and generated images. They are typically derived from the project's root.
+- Various \_KEY constants (e.g., SIMULACRA_KEY, WORLD_STATE_KEY): Internal string constants used to consistently access parts of the main simulation state dictionary. They are generally not meant for direct user configuration via .env but are central to the codebase's state management.
+
+Refer to src/config.py for the full list of parameters, their default values, and more specific comments.
+
 ### Logs and Data
 
 The `data/` directory is the primary location for all persistent files related to your simulations. It typically contains the following subdirectories:
@@ -167,67 +295,44 @@ life_summary_name_uuid.json
 
 to reset the world to starting conditions, remove the world_config_uuid.json from data\states\ directory
 
-## Project Insights & Future Directions
+### Observing the Simulation
 
-_(The following is a reflection on the project's status and potential based on the architecture developed in `src/simulation_async.py`)_
+The simulation provides rich output to the console (using the rich library for a live, updating table display) and detailed logs in data/logs/. Here’s what you can typically observe:
 
-### Simulating Reality with LLMs in "TheSimulation"
+- Simulacra Monologues: Rich text showing the agent's internal reasoning – reacting to observations ("The door is locked, drat!"), considering its persona ("As Eleanor Vance, a brewery guide, maybe I should look for local history books?"), weighing options, and finally stating its chosen action.
+- Simulacra Intents: Clean JSON objects like {"action_type": "use", "target_id": "door_main", "details": "try the handle"} or {"action_type": "look_around", "target_id": null, "details": ""}.
+- World Engine Resolutions: JSON outputs from the World Engine detailing the action's validity, duration, any state changes (results), and the crucial factual outcome description.
+- Narrative Log: A growing list showing the chronological story unfolding, crafted by the Narrator based on the World Engine's outcomes: [T10.5] Eleanor Vance looks around., [T13.5] The room is dusty, containing only a table and a locked chest., [T15.0] Eleanor Vance tries the handle of the chest, but it's firmly locked.
+- Narrative Tone & LLM Quirks: Pay attention to the Narrator agent's tone. While guided by world_mood, LLMs can sometimes produce unexpected stylistic interpretations (e.g., describing a "cozy home" with surprisingly bleak or dramatic flair). This is an inherent aspect of working with creative LLMs and an ongoing area for prompt refinement and experimentation.
 
-### Current Architecture: A Glimpse Under the Hood
-
-Based on the code structure (primarily in `src/simulation_async.py`), TheSimulation currently operates with a few key components orchestrated using Python's `asyncio` and the Google ADK:
-
-1.  **The State:** A central Python dictionary holds the entire simulation state – world details, object states, location descriptions, and the current status of all active Simulacra. This state is loaded from and saved to JSON files, allowing simulations to be paused and resumed.
-2.  **The Time Manager:** An asynchronous task advances simulation time, processes scheduled events (like action completions), and updates the simulation state accordingly.
-3.  **The Event Bus:** A simple `asyncio.Queue` acts as a communication channel, primarily for agents to declare their intended actions.
-4.  **The World Engine (LLM Agent):** This ADK `LlmAgent` listens for intents on the event bus. It uses an LLM (like Gemini) to interpret the agent's intended action within the context of the current world state (location, object properties, rules). It determines if the action is valid, calculates its duration, figures out the consequences (state changes), and generates a descriptive narrative of the outcome. We've worked on refining its prompt to ensure it focuses on results and uses sensory details.
-5.  **The Simulacra/Boltzmann Brain (LLM Agents):** Each active agent is also an ADK `LlmAgent`. When idle, it:
-    - **Observes:** Gathers context from the simulation state (location, recent events, nearby objects/agents, its own status, and persona).
-    - **Reflects & Decides:** Feeds this context into its LLM, guided by a detailed prompt. The LLM generates an internal monologue (following a structured thinking process: Recall/React -> Analyze Goal -> Identify Options -> Prioritize/Choose) and decides on the next action (like `move`, `use`, `look_around`, `talk`, `wait`). This decision is formatted as a JSON "intent".
-    - **Declares Intent:** Puts the generated intent onto the event bus for the World Engine to process.
-6.  **ADK Integration:** The `Runner`, `SessionService`, and the `MemoryService` from the ADK are used to manage the interaction flow with the LLM agents and handle features like tool calling.
-
-### Observing the Simulation: What the Logs Might Tell Us
-
-Examine the output both from console and the log file, which you will find some interesting and weird interactions which points to the need for further refinement. For whatever reason the world_engine seems to always narrate extremely horror movie esque settings regardless of the initial conditions...
-"You wake up at home, a friend and cozy place"
-
-To the narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
-
-![Alt text](output2.png)
-
-- **Simulacra Monologues:** Rich text showing the agent's internal reasoning – reacting to observations ("The door is locked, drat!"), considering its persona ("As Eleanor Vance, a brewery guide, maybe I should look for local history books?"), weighing options, and finally stating its chosen action.
-- **Simulacra Intents:** Clean JSON objects like `{"action_type": "use", "target_id": "door_main", "details": "try the handle"}` or `{"action_type": "look_around", "target_id": null, "details": ""}`.
-- **World Engine Resolutions:** JSON outputs from the World Engine detailing the action's validity, duration, any state changes (`results`), and the crucial narrative (e.g., `"narrative": "Eleanor Vance tries the handle of the main door, but it's firmly locked."`).
-- **Narrative Log:** A growing list showing the chronological story unfolding based on the World Engine's narratives: `[T10.5] Eleanor Vance looks around.`, `[T13.5] The room is dusty, containing only a table and a locked chest.`, `[T15.0] Eleanor Vance tries the handle of the chest, but it's firmly locked.`
-
-### Future Work
+### Future Directions
 
 While the core loop is functional, several exciting areas need development:
 
-1.  **Longer-Term Memory:**
+- Longer-Term Memory:
 
-    - **Current State:** We've just integrated ADK's `InMemoryMemoryService` to store the initial persona. Agents can use the `load_memory` tool to recall this static background. The main `memory_log` is still just a list in the state file, prone to growing large and lacking efficient search.
-    - **Next Steps:** Persistent, searchable memory. Replacing `InMemoryMemoryService` with `VertexAiRagMemoryService` (leveraging Vertex AI Vector Search). This would allow agents to semantically search _all_ their past observations, actions, and reflections ("What did I learn about locked doors yesterday?", "Who did I talk to in the library?").
+  - Current State: The project uses ADK's InMemoryMemoryService to store the initial persona, accessible via a load_memory tool. The main narrative_log serves as a short-term contextual memory but can grow large and lacks efficient semantic search.
+  - Next Steps: Implementing persistent, searchable long-term memory. This could involve replacing or augmenting InMemoryMemoryService with solutions like VertexAiRagMemoryService (leveraging Vertex AI Vector Search). This would allow agents to semantically search their entire history of observations, actions, and reflections (e.g., "What did I learn about locked doors yesterday?", "Who did I talk to in the library?").
 
-2.  **Multi-Agent Interaction:**
+- Multi-Agent Interaction:
 
-    - **Current State:** The basic `talk` action exists which interacts with NPCs. Overall interaction is implemented and designed to be open-ended not to restrict it from emergent behavior.
+  - Current State: The basic talk action exists, primarily for interacting with pre-defined or ephemeral NPCs. Direct, dynamic Simulacrum-to-Simulacrum interaction is rudimentary.
+  - Next Steps: Developing more sophisticated protocols for multi-agent communication and collaboration/conflict. This includes refining how agents perceive and react to each other's actions, manage shared resources, and form social relationships.
 
-3.  **Real-World Sync:**
+- Real-World Sync & Dynamic Environments:
 
-    - **Current State:** The simulation runs on its own accelerated or decelerated clock (`SIMULATION_SPEED_FACTOR`).
-      - For certain applications (e.g., simulating contemporary events), linking the simulation clock to real-world external real-time events to influence the simulation. The hierachy is World, Regional, and Local Weather/News context. Again this will use the memory service and a timed sync mechanism.
-      - For non-real (ie Sci-Fi/Fantazy) worlds - split on world history generation is needed and many of the tasks will be offloaded either through on demand generation or based on similar structure life summaries are generated for the simulacras.
-      - Real time interaction with simulacra - Mechanism to talk to the simulated individual - Either via Text/IM/Chat (in real word) to crystal ball / telepathy / disembodied voice... to interact with individual. GM or GOD mode is functional but need better UI to actually input/inject things.
-      - Ability to inject events - ie "You suddently meet your long lost high school best friend in the street" , "All of a sudden you are teleported to the moon." Or more practical - "You are shopping at a supermarket, you are faced with two different toothbrushes... which one do you choose and why?"
-      - Detailed locality - either through maps services.
+  - Current State: The simulation runs on its own accelerated or decelerated clock (SIMULATION_SPEED_FACTOR). The world_info_gatherer_task provides periodic updates for simulated news/weather, with an option for real-time search.
+  - Next Steps & Considerations:
+    - Enhanced Real-time Data Feeds: For contemporary simulations, deepening the integration of real-world data (weather, news, social trends) via APIs to dynamically influence the world_mood, available information, and potential events.
+    - Fictional World History & Lore Evolution: For non-contemporary settings, developing mechanisms for generating and evolving rich world history and lore. This could involve on-demand LLM generation or structured knowledge bases that agents can query and contribute to.
+    - Direct User Interaction / "Game Master" Mode: Improving mechanisms for an observer or "Game Master" to interact directly with Simulacra (e.g., ask questions, give commands) or inject specific events and narrative elements into the simulation.
+    - Enhanced Spatial Reasoning & Detailed Locality: Integrating more detailed environmental information, potentially using map services for real-world locations or procedurally generated layouts for fictional ones, to allow for more complex spatial behaviors and exploration.
 
-4.  **External Tool Integration:**
-    - **Current State:** Limited memory through json files. No RAG implementation.
-    - **Next Steps:**
-      _ **Search the Web:** Give them a tool to query Google Search for real-time information relevant to their goals. *Implemented*
-      _ **Generate Images:** Allow an agent to "visualize" something by calling an image generation API (like Imagen). _Implemented_
-      _ **Interact with Social Media:** Create a tool for an agent to post updates or read feeds on platforms like Bluesky (using its API). *TBD*
-      _ **Send/Receive Email:** Simulate communication with the "outside world." \* **Access Other APIs:** Connect to weather services, stock market data, translation tools, etc._TBD_
-      \_ Probably through MCP or A2A these integrations will take place - to run this 24/7 for a long term experiment.
+- External Tool Integration & Agent Capabilities:
+
+  - Current State: Agents can use tools for web search (google_search) and image generation.
+  - Next Steps:
+    - Interact with Social Media (Simulated/Real): Develop tools for agents to post updates or read feeds on simulated social media platforms within the simulation, or potentially interact with real platforms like Bluesky via its API. (To Be Determined)
+    - Simulated Communication Systems: Implement tools for agents to send/receive emails or messages, enabling more complex inter-agent or agent-to-outside-world communication. (To Be Determined)
+    - Broader API Access: Connect to a wider range of external APIs (e.g., more detailed weather services, stock market data, translation tools, scientific knowledge bases) to enrich the simulation's data sources and agent capabilities. (To Be Determined)
+    - These integrations will likely leverage robust communication patterns (A2A and MCP).
