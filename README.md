@@ -297,6 +297,13 @@ to reset the world to starting conditions, remove the world_config_uuid.json fro
 
 ### Observing the Simulation
 
+Examine the output both from console and the log file, which you will find some interesting and weird interactions which points to the need for further refinement. For whatever reason the world_engine seems to always narrate extremely horror movie esque settings regardless of the initial conditions...
+"You wake up at home, a friend and cozy place"
+
+To the narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
+
+![Alt text](output2.png)
+
 The simulation provides rich output to the console (using the rich library for a live, updating table display) and detailed logs in data/logs/. Here’s what you can typically observe:
 
 - Simulacra Monologues: Rich text showing the agent's internal reasoning – reacting to observations ("The door is locked, drat!"), considering its persona ("As Eleanor Vance, a brewery guide, maybe I should look for local history books?"), weighing options, and finally stating its chosen action.
