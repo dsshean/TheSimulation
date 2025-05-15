@@ -40,7 +40,7 @@ This research has potential practical applications across various fields:
 8.  **Entertainment Industry:** Developing rich fictional worlds, simulating audience reactions.
 9.  **Ethical Decision Making:** Creating complex moral dilemmas for analysis.
 
-## Conceptual Framework
+## Framework
 
 ### Language as Compressed Reality
 
@@ -50,7 +50,7 @@ The conceptual basis is that language functions as a compressed representation o
 
 The core simulation entities ("Simulacra") are designed as autonomous agents. While the current implementation uses a specific task-based asynchronous architecture (detailed in "Core Architecture"), the underlying philosophy for agent behavior involves a perception-reflection-action cycle, primarily driven by LLMs interpreting their persona and the environment.
 
-## Core Architecture: A Glimpse Under the Hood
+## Architecture
 
 TheSimulation operates through a series of interconnected asynchronous components, orchestrated using Python's `asyncio` and leveraging the Google ADK for LLM interactions.
 
