@@ -1,3 +1,5 @@
 google-adk
+google-generativeai
 python-dotenv
-# Add litellm if using non-Google models via LiteLlm
+rich
+pillow

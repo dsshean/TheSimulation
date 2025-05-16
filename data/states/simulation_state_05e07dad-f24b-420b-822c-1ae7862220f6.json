@@ -3,7 +3,7 @@
   "active_simulacra_ids": [
     "sim_3e912d"
   ],
-  "world_time": 208.96899999998277,
+  "world_time": 212.90700000006473,
   "narrative_log": [
     "[T4.7] Eleanor's stomach gives a little rumble, a gentle reminder that it's nearly lunchtime. She idly wonders where she might want to grab a bite to eat today.",
     "[T11.4] Eleanor takes a moment to survey her surroundings. She's currently inside the familiar bustle of the Bean Scene Coffee Shop. Several **tables and chairs (tables_bean_scene_01)** are scattered around, occupied by people chatting and working. The long **counter (counter_bean_scene_01)** dominates one side of the shop, behind which a barista (npc_barista_01) expertly steams milk. Above the counter, a **menu board (menu_board_01)** displays the various coffee drinks and pastries on offer. She can see the **street (street_exit_01)** through the large front windows, and a doorway leads into the **office lobby (lobby_exit_01)**.",
@@ -44,7 +44,7 @@
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
-      "status": "busy",
+      "status": "idle",
       "current_action_end_time": 212.28100000001723,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
