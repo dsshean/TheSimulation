@@ -118,7 +118,7 @@ TheSimulation operates through a series of interconnected asynchronous component
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your_username/TheSimulation.git
+    git clone https://github.com/dsshean/TheSimulation.git
     cd TheSimulation
     ```
 2.  **Set up a virtual environment (recommended):**
