@@ -1,6 +1,8 @@
 # TheSimulation
 
-Exploring Simulation Theory through Large Language Models
+Exploring Simulation Theory through Large Language Models 
+
+Contributions welcomed
 
 ## Table of Contents
 
