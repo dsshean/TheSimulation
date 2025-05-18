@@ -41,7 +41,7 @@ This research has potential practical applications across various fields:
 
 The conceptual basis is that language functions as a compressed representation of reality, developed through consensus. LLMs leverage this compression to understand and generate complex information, making them suitable for simulating aspects of reality. (The original concept discussed "Invariant Representations," like the shared understanding of "Dog," as an example of this compression).
 
-### Agent Design Philosophy
+### Design
 
 The core simulation entities ("Simulacra") are designed as autonomous agents. While the current implementation uses a specific task-based asynchronous architecture (detailed in "Core Architecture"), the underlying philosophy for agent behavior involves a perception-reflection-action cycle, primarily driven by LLMs interpreting their persona and the environment.
 
