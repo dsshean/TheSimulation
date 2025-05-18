@@ -147,6 +147,10 @@ async def narration_task():
             cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)]
             history_str = "\n".join(cleaned_recent_narrative)
 
+            # Fetch world feeds for the Narrator
+            weather_summary_narrator = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+            latest_news_headlines_narrator = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:1]] # Just one for brevity
+            news_summary_narrator = latest_news_headlines_narrator[0] if latest_news_headlines_narrator else "No major news."
             logger.info(f"[NarrationTask] Generating narrative for {actor_name}'s action completion. Outcome: '{outcome_desc}'")
             intent_json = json.dumps(intent, indent=2)
             results_json = json.dumps(results, indent=2)
@@ -158,6 +162,8 @@ Original Intent: {intent_json}
 Factual Outcome Description: {outcome_desc}
 State Changes (Results): {results_json}
 Current World Time: {completion_time:.1f}
+Current Weather: {weather_summary_narrator}
+Latest News Headline: {news_summary_narrator}
 Recent Narrative History (Cleaned):
 {history_str}
 
@@ -317,6 +323,11 @@ async def world_engine_task_llm():
             target_state_data = {}
             if target_id:
                 target_state_data = get_nested(state, 'objects', target_id, default={}) or get_nested(state, SIMULACRA_KEY, target_id, default={})
+            
+            # Fetch world feeds for the World Engine
+            weather_summary_we = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+            latest_news_headlines_we = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:1]] # Just one for context
+            news_summary_we = latest_news_headlines_we[0] if latest_news_headlines_we else "No major news."
 
             intent_json = json.dumps(intent, indent=2)
             target_state_json = json.dumps(target_state_data, indent=2) if target_state_data else "N/A"
@@ -328,6 +339,8 @@ Actor Name and ID: {actor_name} ({actor_id})
 Current Location: {actor_location_id}
 Current World Time: {current_sim_time:.1f}
 Intent: {intent_json}
+Current Weather: {weather_summary_we}
+Latest News Headline: {news_summary_we}
 Target Entity State ({target_id or 'N/A'}): {target_state_json}
 Location State: {location_state_json}
 World Rules: {world_rules_json}
@@ -916,9 +929,20 @@ async def run_simulation(
     first_sim_id = final_active_sim_ids[0] if final_active_sim_ids else "default_sim"
     first_sim_profile = get_nested(state, SIMULACRA_KEY, first_sim_id, default={})
     first_persona_name = get_nested(first_sim_profile, "persona_details", "Name", default=first_sim_id)
+    
+    # Get world_type and sub_genre for agent creation
+    world_template_details_for_agents = state.get(WORLD_TEMPLATE_DETAILS_KEY, {})
+    current_world_type = world_template_details_for_agents.get("world_type", "unknown")
+    current_sub_genre = world_template_details_for_agents.get("sub_genre", "unknown")
 
-    world_engine_agent = create_world_engine_llm_agent(first_sim_id, first_persona_name) # Generic, details come in prompt
-    narration_agent_instance = create_narration_llm_agent(first_sim_id, first_persona_name, world_mood=world_mood_global) # Generic
+    world_engine_agent = create_world_engine_llm_agent(
+        sim_id=first_sim_id, persona_name=first_persona_name, # Generic actor context for agent creation
+        world_type=current_world_type, sub_genre=current_sub_genre
+    )
+    narration_agent_instance = create_narration_llm_agent(
+        sim_id=first_sim_id, persona_name=first_persona_name, # Generic actor context
+        world_mood=world_mood_global, world_type=current_world_type, sub_genre=current_sub_genre
+    )
     search_llm_agent_instance = create_search_llm_agent()
 
     simulacra_agents_map.clear()
@@ -926,9 +950,6 @@ async def run_simulation(
         sim_profile_data = get_nested(state, SIMULACRA_KEY, sim_id_val, default={})
         persona_name = get_nested(sim_profile_data, "persona_details", "Name", default=sim_id_val)
         sim_agent_instance = create_simulacra_llm_agent(sim_id_val, persona_name, world_mood=world_mood_global)
-        # world_engine_agent = create_world_engine_llm_agent(sim_id_val, persona_name)
-        # narration_agent_instance = create_narration_llm_agent(sim_id_val, persona_name,world_mood=world_mood_global)
-        # search_llm_agent_instance = create_search_llm_agent()
         simulacra_agents_map[sim_id_val] = sim_agent_instance
     logger.info(f"Created {len(simulacra_agents_map)} simulacra agents.")
 
@@ -1067,7 +1088,7 @@ async def narrative_image_generation_task():
             logger.debug("[NarrativeImageGenerator] Narrative log is empty. Skipping image generation.")
             continue
 
-        latest_narrative_full = narrative_log_entries[-3]
+        latest_narrative_full = narrative_log_entries[-1] # Get the actual latest narrative entry
         # Strip the timestamp like "[T123.4] " from the narrative for a cleaner image prompt
         narrative_prompt_text = re.sub(r'^\[T\d+\.\d+\]\s*', '', latest_narrative_full).strip()
 
@@ -1076,8 +1097,34 @@ async def narrative_image_generation_task():
             continue
 
         current_sim_time_for_filename = state.get("world_time", 0.0)
-        prompt_for_image = f"Create a charming and playful cartoon illustration based on the narrative. Emphasize expressive, stylized characters and a vibrant, appealing color palette. The scene should be brimming with personality, telling its story through whimsical details and a delightful composition that would make anyone smile and want to share: \"{narrative_prompt_text}\""
-        
+
+        # Attempt to extract an actor name from the narrative for a more personal prompt.
+        # This is a heuristic and assumes the narrative often features the actor's name.
+        actor_name_in_narrative = "the character involved" # Default
+        match = re.match(r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)", narrative_prompt_text)
+        if match:
+            # Avoid common sentence-starting words that aren't names
+            common_words_to_avoid = ["As", "The", "A", "An", "It", "He", "She", "They", "Then", "Suddenly", "During", "While"]
+            if match.group(1) not in common_words_to_avoid:
+                actor_name_in_narrative = match.group(1)
+
+        # Access the world mood from the global state, falling back to the global variable if not found in state
+        current_world_mood_ig = state.get(WORLD_TEMPLATE_DETAILS_KEY, {}).get('mood', world_mood_global)
+
+        prompt_for_image = f"""
+Subject: A social media photo (like Instagram) taken by {actor_name_in_narrative}.
+
+Narrative Context: "{narrative_prompt_text}"
+World Mood: "{current_world_mood_ig}"
+
+Instructions for the Image:
+1.  **Perspective:** The image should be from {actor_name_in_narrative}'s point of view. This could be a first-person shot of what they are seeing, a selfie {actor_name_in_narrative} would take (showing their reaction to the narrative context), or a photo of an object, person, or scene {actor_name_in_narrative} finds interesting enough to post.
+2.  **Style & Realism:** The image must look like a photograph a person would realistically take with a phone or camera for social media. Consider common Instagram aesthetics (e.g., well-composed, interesting lighting, perhaps a subtle filter effect if appropriate for the mood). Avoid overly cartoonish styles unless the world mood itself is highly stylized that way. The image should feel authentic.
+3.  **Content & Focus:** The main subject of the photo should be clear and directly relevant to the narrative context. Incorporate details that {actor_name_in_narrative} would notice or want to share. If it's a selfie, {actor_name_in_narrative}'s expression and pose should match the narrative and their implied personality.
+4.  **Overall Feel:** The image should evoke the feeling of an authentic social media post made by an individual experiencing the described event.
+
+Generate this image.
+"""
         logger.info(f"[NarrativeImageGenerator] Requesting image for narrative (T{current_sim_time_for_filename:.1f}): \"{narrative_prompt_text[:100]}...\"")
 
         try:

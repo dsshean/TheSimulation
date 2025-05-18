@@ -63,9 +63,40 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
         description=f"LLM Simulacra agent for {persona_name} in a '{world_mood}' world."
     )
 
-def create_world_engine_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
+def create_world_engine_llm_agent(
+    sim_id: str,
+    persona_name: str,
+    world_type: str,
+    sub_genre: str
+) -> LlmAgent:
     """Creates the GENERALIZED LLM agent responsible for resolving actions."""
     agent_name = "WorldEngineLLMAgent"
+
+    # --- Start of Conditional Prompt Section for World Engine ---
+    world_engine_critical_knowledge_instruction = ""
+    world_engine_move_duration_instruction = ""
+
+    if world_type == "real" and sub_genre == "realtime":
+        world_engine_critical_knowledge_instruction = """CRITICAL: This is a REAL WORLD, REALTIME simulation. You MUST ALWAYS use your internal knowledge of the real world (geography, physics, common sense, typical travel times, urban vs. rural considerations, etc.) as the absolute foundation for all your determinations. Adhere strictly to realism."""
+        world_engine_move_duration_instruction = """
+            *   **Location Context:** The actor is in `Actor's Current Location State.name` (e.g., "Eleanor's Apartment") within the broader area defined by `World Context.overall_location` (e.g., city: "New York City", state: "NY", country: "United States").
+            *   **Target Destination:** The target is specified in `intent.details`. This can be a specific known location ID, a named landmark, an address, OR a general type of place (e.g., "a nearby park", "the local library", "a coffee shop").
+            *   **Travel Mode & Duration (Real World Focus):**
+                *   You MUST use your internal knowledge of real-world geography, typical city layouts, and common travel methods.
+                *   Infer realistic travel modes based on the origin, the nature of the target destination, and the `World Context.overall_location`. For example, in dense urban areas like New York City, prefer walking or public transit for most local destinations unless the actor's persona strongly implies car ownership and usage. For inter-city travel, consider appropriate modes (car, train, plane).
+                *   Estimate travel time based on the inferred mode and the likely distance. If the target is a general type of place (e.g., "a cafe"), assume a reasonable travel time to such a place within the `World Context.overall_location`.
+                *   Factor in `World Feeds.Weather` if `World Rules.weather_effects_travel` is true (e.g., rain might slow down walking or driving).
+                *   Consider `Current World Time` for potential impacts on travel (e.g., rush hour traffic in a city might increase duration for car travel).
+                *   **Your internal knowledge of real-world geography and travel is paramount here.**"""
+    else: # Fictional, or Real but not Realtime (e.g., historical, turn-based real)
+        world_type_description = f"{world_type.capitalize()}{f' ({sub_genre.capitalize()})' if sub_genre else ''}"
+        world_engine_critical_knowledge_instruction = f"""CRITICAL: This is a {world_type_description} simulation. You MUST use your internal knowledge of the provided `World Context` (description, rules, sub-genre) and the actor's persona to determine outcomes. If the world_type is 'real' but not 'realtime', apply real-world logic adapted to the specific sub_genre or historical context if provided."""
+        world_engine_move_duration_instruction = """
+            *   Estimate based on implied distances from `World Context.World Description`, `Actor's Current Location State`, and the nature of the target location.
+            *   Consider fantasy/sci-fi travel methods if appropriate for the `World Context.Sub-Genre`.
+            *   Factor in `World Feeds.Weather` if `World Rules.weather_effects_travel` is true."""
+    # --- End of Conditional Prompt Section for World Engine ---
+
     instruction = f"""You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
 **Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details (unless directly caused by the action), or emotional interpretation.** This description will be used by a separate Narrator agent.
 **Input (Provided via trigger message):**
@@ -73,14 +104,15 @@ def create_world_engine_llm_agent(sim_id: str, persona_name: str) -> LlmAgent:
 - Current Location
 - Current World Time
 - World Context:
-- Actor's Current Location State (Details of the location where the actor currently is, including name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
+- Actor's Current Location State (Details of the specific location where the actor currently is, including its name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
+- World Context (Overall world settings: world_type, sub_genre, description, overall_location (city/state/country))
 - Intent: {{"action_type": "...", "target_id": "...", "details": "..."}}
 - Target Entity State (if applicable)
 - World Feeds (Weather, recent major news - for environmental context)
+World Rules (e.g., allow_teleportation)
 
 **Your Task:**
-CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
-FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMULACRA TO DETERMINE THE OUTCOME.
+{world_engine_critical_knowledge_instruction}
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
     *   For `move` actions, `intent.details` specifies the target location's ID or a well-known name.
 2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Entity State, Location State, and World Rules.
@@ -143,12 +175,7 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
 3.  **Calculate Duration:** Realistic duration for valid actions. 0.0 for invalid.
     *   For `move` actions:
         *   If moving to a location listed in `Actor's Current Location State.connected_locations` which has explicit travel time, use that.
-        *   If `World Context.World Type` is "real":
-            *   Estimate travel time based on the distance between `Actor's Current Location State.name` and the target location (from `intent.details`, potentially referencing `World Context.Overall World Location`).
-            *   Use common sense for travel modes (walking for short distances within a city, car/transit for longer). Factor in `World Feeds.Weather` if `World Rules.weather_effects_travel` is true.
-        *   If `World Context.World Type` is "fictional":
-            *   Estimate based on implied distances from `World Context.World Description`, `Actor's Current Location State`, and the nature of the target location.
-            *   Consider fantasy/sci-fi travel methods if appropriate for the `World Context.Sub-Genre`.
+        {world_engine_move_duration_instruction}
         *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 5-30 seconds).
     *   For other actions, assign plausible durations (e.g., `talk` a few minutes, `use` object varies, `wait` as specified or short).
 4.  **Determine Results:** State changes in dot notation (e.g., `objects.lamp.power: "on"` or `simulacra_profiles.[sim_id].field: "value"`). Empty `{{}}` for invalid actions.
@@ -169,14 +196,34 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
         description="LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome description."
     )
 
-def create_narration_llm_agent(sim_id: str, persona_name: str,world_mood: str) -> LlmAgent:
+def create_narration_llm_agent(
+    sim_id: str,
+    persona_name: str,
+    world_mood: str,
+    world_type: str,
+    sub_genre: str
+) -> LlmAgent:
     """Creates the LLM agent responsible for generating stylized narrative."""
     agent_name = "NarrationLLMAgent"
-    instruction = f"""
-You are the Narrator for **TheSimulation**, currently focusing on events related to {persona_name} ({sim_id}). The established **World Style/Mood** for this simulation is **'{world_mood}'**. Your role is to weave the factual outcomes of actions into an engaging and atmospheric narrative, STRICTLY matching this '{world_mood}' style.
-CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
-FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMULACRA TO DETERMINE THE OUTCOME.
 
+    # --- Start of Conditional Prompt Section for Narrator ---
+    narrator_intro_instruction = ""
+    narrator_style_adherence_instruction = ""
+    narrator_infuse_time_env_instruction = ""
+
+    if world_type == "real" and sub_genre == "realtime":
+        narrator_intro_instruction = f"You are the Narrator for **TheSimulation**, currently focusing on events related to {persona_name} ({sim_id}). The established **World Style/Mood** for this simulation is **'{world_mood}'**. This is a **REAL WORLD, REALTIME** simulation. Your narrative MUST be grounded and realistic."
+        narrator_style_adherence_instruction = f"**Style Adherence:** STRICTLY adhere to **'{world_mood}'** and **REAL WORLD REALISM**. Infuse with appropriate atmosphere, plausible sensory details, and tone."
+        narrator_infuse_time_env_instruction = f"**Infuse with Time and Environment (Realistically):** Use the `Current World Time` (e.g., to describe realistic lighting, typical activity levels for that time of day) and `Current World Feeds` (weather, news) to add subtle, atmospheric details that are authentic to a real-world setting and align with the **'{world_mood}'**. Avoid fantastical elements unless explicitly part of a news feed or a very unusual weather event."
+    else:
+        world_type_description = f"{world_type.capitalize()}{f' ({sub_genre.capitalize()})' if sub_genre else ''}"
+        narrator_intro_instruction = f"You are the Narrator for **TheSimulation**, currently focusing on events related to {persona_name} ({sim_id}). The established **World Style/Mood** for this simulation is **'{world_mood}'**. This is a **{world_type_description}** simulation (e.g., Fictional, Fantasy, Sci-Fi, or Real World but not Realtime). Your narrative should align with this context and the specified mood."
+        narrator_style_adherence_instruction = f"**Style Adherence:** STRICTLY adhere to **'{world_mood}'** and the **{world_type_description}**. Infuse with appropriate atmosphere, sensory details, and tone."
+        narrator_infuse_time_env_instruction = f"**Infuse with Time and Environment (Stylistically):** Use the `Current World Time` and `Current World Feeds` to add atmospheric details that fit the **'{world_mood}'** and the **{world_type_description}** (e.g., magical effects for fantasy, futuristic tech for sci-fi)."
+    # --- End of Conditional Prompt Section for Narrator ---
+
+    instruction = f"""
+{narrator_intro_instruction}
 **Input (Provided via trigger message):**
 - Actor Name & ID
 - Original Intent
@@ -191,14 +238,15 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
 1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description.
 2.  **Recall the Mood:** Remember the required narrative style is **'{world_mood}'**.
 3.  **Consider the Context:** Note Recent Narrative History. **IGNORE any `World Style/Mood` in `Recent Narrative History`. Prioritize the established '{world_mood}' style.**
-4.  **Introduce Ephemeral NPCs (Optional but Encouraged):** If appropriate for the scene, the actor's location, and the narrative flow, you can describe an NPC appearing, speaking, or performing an action.
+{narrator_infuse_time_env_instruction}
+5.  **Introduce Ephemeral NPCs (Optional but Encouraged):** If appropriate for the scene, the actor's location, and the narrative flow, you can describe an NPC appearing, speaking, or performing an action.
     *   These NPCs are ephemeral and exist only in the narrative.
     *   If an NPC might be conceptually recurring (e.g., "the usual shopkeeper", "your friend Alex"), you can give them a descriptive tag in parentheses for context, like `(npc_concept_grumpy_shopkeeper)` or `(npc_concept_friend_alex)`. This tag is for LLM understanding, not a system ID.
     *   Example: "As [Actor Name] entered the tavern, a grizzled man with an eye patch (npc_concept_old_pirate_01) at a corner table grunted a greeting."
     *   Example: "A street vendor (npc_concept_flower_seller_01) called out, '[Actor Name], lovely flowers for a lovely day?'"
-5.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
+6.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
     *   Write a single, engaging narrative paragraph in the **present tense**.
-    *   **Style Adherence:** STRICTLY adhere to **'{world_mood}'**. Infuse with appropriate atmosphere, sensory details, and tone.
+    {narrator_style_adherence_instruction}
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**
     *   **Flow:** Ensure reasonable flow.

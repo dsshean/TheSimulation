@@ -6,6 +6,7 @@ import uuid
 import glob
 import copy
 from typing import Any, Dict, Optional, List, Tuple # Added Tuple
+from datetime import datetime, timezone # Added for real_world_start_utc
 from .file_utils import ensure_dir_exists, get_data_dir, get_states_dir, get_world_config_dir, get_life_summary_dir
 from .state_loader import parse_location_string # Assuming this is correctly placed or imported
 import re
@@ -130,6 +131,21 @@ def create_blank_simulation_state(
 
     # Populate objects from world_config_data
     state["objects"] = world_config_data.get("initial_objects", [])
+
+    # For "real" and "realtime" simulations, anchor the narrative start time to the real world
+    # using the timestamp from when the world_config was created.
+    if state["world_template_details"].get("world_type") == "real" and \
+       state["world_template_details"].get("sub_genre") == "realtime":
+        # world_config_data is the raw dict from the world_config_*.json file
+        setup_time = world_config_data.get("setup_timestamp_utc")
+        if setup_time:
+            state["world_template_details"]["real_world_start_utc"] = setup_time
+            logger.info(f"Set real_world_start_utc from world_config setup_timestamp_utc: {setup_time}")
+        else:
+            # Fallback if setup_timestamp_utc is somehow missing from world_config_data
+            current_time_iso = datetime.now(timezone.utc).isoformat()
+            state["world_template_details"]["real_world_start_utc"] = current_time_iso
+            logger.warning(f"world_config_data missing 'setup_timestamp_utc'. Using current time as real_world_start_utc: {current_time_iso}")
 
     # Populate simulacra_profiles from life_summaries_data
     for summary_data in all_life_summaries_data:
