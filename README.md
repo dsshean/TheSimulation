@@ -2,7 +2,7 @@
 
 Exploring Simulation Theory through Large Language Models 
 
-Contributions welcomed
+Current state - Fully functional - Needs enhancements and contributions welcomed.
 
 ## Table of Contents
 
