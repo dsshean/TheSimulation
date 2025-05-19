@@ -52,6 +52,25 @@ IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTER
 IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "gemini-2.0-flash-preview-image-generation") # Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
 IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
 
+# --- Social Media Posting Configuration ---
+ENABLE_TWITTER_POSTING = os.getenv("ENABLE_TWITTER_POSTING", "False").lower() == "true"
+TWITTER_CONSUMER_KEY = os.getenv("TWITTER_CONSUMER_KEY")
+TWITTER_CONSUMER_SECRET = os.getenv("TWITTER_CONSUMER_SECRET")
+TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
+TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
+TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN") # Needed for v2 client actions
+
+ENABLE_BLUESKY_POSTING = os.getenv("ENABLE_BLUESKY_POSTING", "False").lower() == "true"
+BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE") # Your Bluesky handle (e.g., yourname.bsky.social)
+BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD") # An app-specific password
+
+# --- Hashtags for Social Posts ---
+SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#TheSimulation #AI #DigitalTwin #ProceduralStorytelling")
+
+# --- Character Limit for Social Posts (excluding image/hashtags) ---
+SOCIAL_POST_TEXT_LIMIT = int(os.getenv("SOCIAL_POST_TEXT_LIMIT", "200"))
+
+
 # --- State Keys ---
 WORLD_STATE_KEY = "current_world_state"
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"

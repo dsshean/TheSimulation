@@ -3,3 +3,4 @@ google-generativeai
 python-dotenv
 rich
 pillow
+duckduckgo_search
