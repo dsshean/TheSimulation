@@ -7,10 +7,10 @@ Latest Update as of 5/19/2025
 * World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
 * Image generation moved to Imagen 3 - Bluesky integration live
 * To DO:
-*     Rework of life_generation.py using ADK - migrataion in progress and option to post entire life generation sequence to Bluesky
-*     Posting of interactions to Bluesky - possibly to keep up with realtime updates.  Exploring feasibility or practicality
-*     Life graph - all interactions mapping for Data Analysis in graph format.  TBD
-*     Further tools use by simulacra ie. Email access / X(Twitter) / Blueksy etc... web browsing.
+* Rework of life_generation.py using ADK - migrataion in progress and option to post entire life generation sequence to Bluesky
+* Posting of interactions to Bluesky - possibly to keep up with realtime updates.  Exploring feasibility or practicality
+* Life graph - all interactions mapping for Data Analysis in graph format.  TBD
+* Further tools use by simulacra ie. Email access / X(Twitter) / Blueksy etc... web browsing.
 
 ## Table of Contents
 
