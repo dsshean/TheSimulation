@@ -1,6 +1,8 @@
 # TheSimulation
 
-Exploring Simulation Theory through Large Language Models
+Exploring Simulation Theory through Large Language Models 
+
+Current state - Fully functional - Needs enhancements and contributions welcomed.
 
 ## Table of Contents
 
@@ -41,7 +43,7 @@ This research has potential practical applications across various fields:
 
 The conceptual basis is that language functions as a compressed representation of reality, developed through consensus. LLMs leverage this compression to understand and generate complex information, making them suitable for simulating aspects of reality. (The original concept discussed "Invariant Representations," like the shared understanding of "Dog," as an example of this compression).
 
-### Agent Design Philosophy
+### Design
 
 The core simulation entities ("Simulacra") are designed as autonomous agents. While the current implementation uses a specific task-based asynchronous architecture (detailed in "Core Architecture"), the underlying philosophy for agent behavior involves a perception-reflection-action cycle, primarily driven by LLMs interpreting their persona and the environment.
 
@@ -309,21 +311,21 @@ The simulation provides rich output to the console (using the rich library for a
 
 ### Future Directions
 
-While the core loop is functional, several exciting areas need development:
+While the core loop is functional, several areas need development:
 
 - Longer-Term Memory:
 
   - Current State: The project uses ADK's InMemoryMemoryService to store the initial persona, accessible via a load_memory tool. The main narrative_log serves as a short-term contextual memory but can grow large and lacks efficient semantic search.
-  - Next Steps: Implementing persistent, searchable long-term memory. This could involve replacing or augmenting InMemoryMemoryService with solutions like VertexAiRagMemoryService (leveraging Vertex AI Vector Search). This would allow agents to semantically search their entire history of observations, actions, and reflections (e.g., "What did I learn about locked doors yesterday?", "Who did I talk to in the library?").
+  - Next Steps: Implementing persistent, searchable long-term memory. This could involve replacing or augmenting InMemoryMemoryService with VertexAiRagMemoryService (leveraging Vertex AI Vector Search). This would allow agents to semantically search their entire history of observations, actions, and reflections (e.g., "What did I learn about locked doors yesterday?", "Who did I talk to in the library?").
 
 - Multi-Agent Interaction:
 
-  - Current State: The basic talk action exists, primarily for interacting with pre-defined or ephemeral NPCs. Direct, dynamic Simulacrum-to-Simulacrum interaction is rudimentary.
-  - Next Steps: Developing more sophisticated protocols for multi-agent communication and collaboration/conflict. This includes refining how agents perceive and react to each other's actions, manage shared resources, and form social relationships.
+  - Current State: All interactions with NPCS exists and works - NPCs are defined as non world objects, it can be people or say a computer.  A mountain wouldnt be considered an NPC.
+  - Next Steps: Test multi-agent communication and collaboration/conflict. This includes refining how agents perceive and react to each other's actions, manage shared resources, and form social relationships.
 
 - Real-World Sync & Dynamic Environments:
 
-  - Current State: The simulation runs on its own accelerated or decelerated clock (SIMULATION_SPEED_FACTOR). The world_info_gatherer_task provides periodic updates for simulated news/weather, with an option for real-time search.
+  - Current State: The simulation runs on its own accelerated or decelerated clock (SIMULATION_SPEED_FACTOR), also supports real world time sync so the world run in parallel to ours. The world_info_gatherer_task provides periodic updates for simulated news/weather, with an option for real-time search.
   - Next Steps & Considerations:
     - Enhanced Real-time Data Feeds: For contemporary simulations, deepening the integration of real-world data (weather, news, social trends) via APIs to dynamically influence the world_mood, available information, and potential events.
     - Fictional World History & Lore Evolution: For non-contemporary settings, developing mechanisms for generating and evolving rich world history and lore. This could involve on-demand LLM generation or structured knowledge bases that agents can query and contribute to.
