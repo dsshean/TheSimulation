@@ -1069,7 +1069,7 @@ async def generate_new_simulacra_background(
         return None # Return None if the core generation fails
 
     # --- Add Metadata and Save Results ---
-    life_data["simulacra_id"] = sim_id
+    life_data["sim_id"] = sim_id
     life_data["world_instance_uuid"] = world_instance_uuid
     # Ensure generation_info exists and update generated_at (it's set inside sequential now)
     if "generation_info" in life_data:

@@ -295,26 +295,11 @@
               "Sleeping soundly, occasionally shifting position.",
               "Brooklyn Apartment"
             ],
-            "2": [
-              "Deep sleep, no discernible activity.",
-              "Brooklyn Apartment"
-            ],
-            "3": [
-              "Restful sleep, possibly dreaming.",
-              "Brooklyn Apartment"
-            ],
-            "4": [
-              "Still asleep, breathing steadily.",
-              "Brooklyn Apartment"
-            ],
-            "5": [
-              "Beginning to stir, light sleep.",
-              "Brooklyn Apartment"
-            ],
-            "6": [
-              "Waking up slowly, stretching in bed.",
-              "Brooklyn Apartment"
-            ],
+            "2": ["Deep sleep, no discernible activity.", "Brooklyn Apartment"],
+            "3": ["Restful sleep, possibly dreaming.", "Brooklyn Apartment"],
+            "4": ["Still asleep, breathing steadily.", "Brooklyn Apartment"],
+            "5": ["Beginning to stir, light sleep.", "Brooklyn Apartment"],
+            "6": ["Waking up slowly, stretching in bed.", "Brooklyn Apartment"],
             "7": [
               "Getting out of bed, starting her morning routine.",
               "Brooklyn Apartment"
@@ -396,26 +381,14 @@
               "Asleep in bed, tossing and turning slightly.",
               "Brooklyn Apartment"
             ],
-            "2": [
-              "Deep sleep, completely still.",
-              "Brooklyn Apartment"
-            ],
-            "3": [
-              "Restless sleep, adjusts her pillow.",
-              "Brooklyn Apartment"
-            ],
-            "4": [
-              "Light sleep, almost awake.",
-              "Brooklyn Apartment"
-            ],
+            "2": ["Deep sleep, completely still.", "Brooklyn Apartment"],
+            "3": ["Restless sleep, adjusts her pillow.", "Brooklyn Apartment"],
+            "4": ["Light sleep, almost awake.", "Brooklyn Apartment"],
             "5": [
               "Wakes up briefly due to a distant siren, then falls back asleep.",
               "Brooklyn Apartment"
             ],
-            "6": [
-              "Slowly waking up, stretches in bed.",
-              "Brooklyn Apartment"
-            ],
+            "6": ["Slowly waking up, stretches in bed.", "Brooklyn Apartment"],
             "7": [
               "Gets out of bed, makes coffee, and starts her yoga routine.",
               "Brooklyn Apartment"
@@ -490,6 +463,6 @@
       }
     }
   },
-  "simulacra_id": "sim_xxt27r",
+  "sim_id": "sim_xxt27r",
   "world_instance_uuid": "c05be4fd-91ef-4445-9787-28ed0a2fd321"
 }

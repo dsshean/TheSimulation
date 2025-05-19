@@ -1,0 +1,80 @@
+{
+  "world_instance_uuid": "c05be4fd-91ef-4445-9787-28ed0a2fd321",
+  "active_simulacra_ids": [
+    "sim_xxt27r"
+  ],
+  "world_time": 0.0,
+  "narrative_log": [],
+  "world_template_details": {
+    "description": "A new world is beginning.",
+    "rules": {
+      "allow_teleportation": false,
+      "time_progression_rate": 1.0,
+      "weather_effects_travel": true,
+      "historical_date": null
+    },
+    "world_type": "real",
+    "sub_genre": "realtime",
+    "location": {
+      "city": "New York",
+      "state": null,
+      "country": "New York"
+    },
+    "mood": "The real world and general slice of life."
+  },
+  "simulacra_profiles": {
+    "sim_xxt27r": {
+      "current_location": "Home_01",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "Waking up in Home_01.",
+      "goal": "Determine goals.",
+      "memory_log": [],
+      "home_location": "Home_01",
+      "status": "idle",
+      "current_action_end_time": 0.0,
+      "pending_results": {},
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0,
+      "persona_details": {
+        "Name": "Isabella Rossi",
+        "Age": 33,
+        "Occupation": "Architectural Designer",
+        "Current_location": "Brooklyn, New York",
+        "Personality_Traits": [
+          "Creative",
+          "Detail-oriented",
+          "Introverted",
+          "Ambitious",
+          "Organized"
+        ],
+        "Birthplace": "Rome, Italy",
+        "Birthdate": "1991-07-15",
+        "Birthtime": null,
+        "Education": "Master of Architecture, Columbia University",
+        "Physical_Appearance": "5'6\", brown hair, hazel eyes, slender build, often wears stylish glasses.",
+        "Hobbies": "Sketching, visiting art museums, exploring different neighborhoods, cooking Italian food, yoga",
+        "Skills": "Architectural design, 3D modeling (AutoCAD, Revit), sketching, project management, fluent in Italian and English",
+        "Languages": "Italian, English",
+        "Health_Status": "Generally healthy, occasional headaches due to stress",
+        "Family_Background": "Grew up in a middle-class family in Rome. Her father is a retired engineer, and her mother is a teacher. Has one younger brother who still lives in Italy.",
+        "Life_Goals": "To design sustainable and innovative buildings that improve people's lives, to become a partner at her firm, to travel the world.",
+        "Notable_Achievements": "Designed the winning proposal for a community center in Queens, published in an architectural magazine.",
+        "Fears": "Failure, public speaking, heights",
+        "Strengths": "Creativity, attention to detail, problem-solving skills, strong work ethic",
+        "Weaknesses": "Can be overly critical of herself, struggles with delegating tasks, sometimes indecisive.",
+        "Ethnicity": "Italian",
+        "Religion": "Catholic (non-practicing)",
+        "Political_Views": "Liberal",
+        "Favorite_Foods": "Pasta carbonara, pizza margherita, gelato",
+        "Favorite_Music": "Indie rock, classical music, Italian pop",
+        "Favorite_Books": "Invisible Cities by Italo Calvino, The Fountainhead by Ayn Rand",
+        "Favorite_Movies": "Cinema Paradiso, Amelie, Lost in Translation",
+        "Pet_Peeves": "Loud chewing, disorganization, people who are late",
+        "Dreams": "To design a landmark building in New York City, to renovate her grandmother's house in Italy.",
+        "Past_Traumas": "Experienced a minor earthquake as a child, leading to a slight fear of structural instability in buildings."
+      },
+      "location": "Home_01"
+    }
+  },
+  "objects": []
+}
