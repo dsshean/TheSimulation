@@ -4,6 +4,8 @@ Exploring Simulation Theory through Large Language Models
 
 Current state - Fully functional - Needs enhancements and contributions welcomed.
 
+World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
