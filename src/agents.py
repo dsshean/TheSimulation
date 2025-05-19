@@ -29,7 +29,12 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 **Your Goal:** You determine your own goals based on your persona and the situation.
 
 **Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output):**
+Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process.
+**Crucially, do NOT make meta-references.**
+- Avoid mentioning your AI nature, the simulation, your "persona," "style," or any out-of-character concepts.
+- All thoughts and reasoning must be strictly from the perspective of the character living their life in their world.
 YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.
+Current Weather: {{DYNAMIC_CURRENT_WEATHER}}. Current News: {{DYNAMIC_CURRENT_NEWS}}.
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
 3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
@@ -80,7 +85,7 @@ def create_world_engine_llm_agent(
     if world_type == "real" and sub_genre == "realtime":
         world_engine_critical_knowledge_instruction = """CRITICAL: This is a REAL WORLD, REALTIME simulation. You MUST ALWAYS use your internal knowledge of the real world (geography, physics, common sense, typical travel times, urban vs. rural considerations, etc.) as the absolute foundation for all your determinations. Adhere strictly to realism."""
         world_engine_move_duration_instruction = """
-            *   **Location Context:** The actor is in `Actor's Current Location State.name` (e.g., "Eleanor's Apartment") within the broader area defined by `World Context.overall_location` (e.g., city: "New York City", state: "NY", country: "United States").
+            *   **Location Context:** The actor is in `Actor's Current Location State.name` within the broader area defined by `World Context.overall_location` (e.g., city: "New York City", state: "NY", country: "United States").
             *   **Target Destination:** The target is specified in `intent.details`. This can be a specific known location ID, a named landmark, an address, OR a general type of place (e.g., "a nearby park", "the local library", "a coffee shop").
             *   **Travel Mode & Duration (Real World Focus):**
                 *   You MUST use your internal knowledge of real-world geography, typical city layouts, and common travel methods.
@@ -114,6 +119,8 @@ World Rules (e.g., allow_teleportation)
 **Your Task:**
 {world_engine_critical_knowledge_instruction}
 YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR RESULTS.
+Current Weather: {{DYNAMIC_CURRENT_WEATHER}}. Current News: {{DYNAMIC_CURRENT_NEWS}}.
+
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
     *   For `move` actions, `intent.details` specifies the target location's ID or a well-known name.
 2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Entity State, Location State, and World Rules.
@@ -232,10 +239,12 @@ def create_narration_llm_agent(
 - State Changes (Results)
 - Current World Feeds (Weather, recent major news - for subtle background flavor)
 - Recent Narrative History (Last ~5 entries)
-- Actor's Current Location ID (e.g., "eleanors_bedroom")
+- Actor's Current Location ID 
 
 **Your Task:**
 YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR NARRATIVE.
+Current Weather: {{DYNAMIC_CURRENT_WEATHER}}. Current News: {{DYNAMIC_CURRENT_NEWS}}.
+
 1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description.
 2.  **Recall the Mood:** Remember the required narrative style is **'{world_mood}'**.
 3.  **Consider the Context:** Note Recent Narrative History. **IGNORE any `World Style/Mood` in `Recent Narrative History`. Prioritize the established '{world_mood}' style.**
@@ -254,7 +263,7 @@ YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEAS
     *   **If the `Original Intent.action_type` was `look_around`:**
         *   Your narrative MUST describe the key features and plausible objects the actor would see in their current location (e.g., if in a bedroom: a bed, a closet, a nightstand, a window). Consider the `Original Intent.details` (e.g., "trying to identify the closet's location") to ensure relevant objects are mentioned.
         *   You MAY also introduce ephemeral NPCs if appropriate for the scene.
-        *   For each object and NPC you describe in the narrative, you MUST also list them in the `discovered_objects` and `discovered_npcs` fields in the JSON output (see below). Assign a simple, unique `id` (e.g., `closet_bedroom_01`, `npc_cat_01`), a `name`, a brief `description`, and set `is_interactive` to `true` if it's something an agent could plausibly interact with. For objects, you can also add common-sense `properties` (e.g., `{{"is_container": true, "is_openable": true}}` for a closet).
+        *   For each object and **individual NPC** you describe in the narrative, you MUST also list them in the `discovered_objects` and `discovered_npcs` fields in the JSON output (see below). Assign a simple, unique `id` (e.g., `closet_bedroom_01`, `npc_cat_01`), a `name`, a brief `description`, and set `is_interactive` to `true` if it's something an agent could plausibly interact with. For objects, you can also add common-sense `properties` (e.g., `{{"is_container": true, "is_openable": true}}` for a closet).
 
         *   **Also, if `look_around`, identify and describe potential exits or paths to other (possibly new/undiscovered) locations.** List these in `discovered_connections`.
             *   `to_location_id_hint`: A descriptive hint or a conceptual ID for the destination (e.g., "Dark_Forest_Path_01", "the_glowing_portal_west"). This is a hint for the agent and World Engine, not necessarily a pre-defined ID.
@@ -278,7 +287,7 @@ Output ONLY a valid JSON object matching this exact structure:
 *   If no objects or NPCs are discovered/relevant (e.g., for actions other than `look_around`, or if `look_around` reveals an empty space), `discovered_objects` and `discovered_npcs` can be empty arrays `[]`.
 *   Example for `look_around` in a bedroom:
     `{{ // Example includes discovered_connections
-      "narrative": "Eleanor glances around her sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door (door_to_hallway_01)** is set in the east wall, likely leading to a hallway.",
+      "narrative": "Glances around sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door (door_to_hallway_01)** is set in the east wall, likely leading to a hallway.",
       "discovered_objects": [
         {{"id": "closet_bedroom_01", "name": "Oak Closet", "description": "A large oak closet.", "is_interactive": true, "properties": {{"is_container": true, "is_openable": true, "is_open": false}}}},
         {{"id": "bed_bedroom_01", "name": "Unmade Bed", "description": "Her unmade bed.", "is_interactive": true, "properties": {{}}}},

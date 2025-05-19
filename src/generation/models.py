@@ -49,6 +49,7 @@ class PersonaDetailsResponse(BaseModel):
     """Defines the structure for a generated persona's basic details."""
     Name: str = Field(..., description="A plausible full name.")
     Age: conint(ge=1, le=120) = Field(..., description="A plausible current age between 1 and 120.")  # Min age 1
+    Gender: Optional[str] = Field(None, description="The persona's gender (e.g., Male, Female, Non-binary, Other).")
     Occupation: str = Field(..., description="A plausible occupation (consistent with age).")
     Current_location: str = Field(..., description="A plausible current location (City, State/Country).")
     Personality_Traits: List[str] = Field(..., min_length=3, max_length=6, description="A list of 3-6 descriptive personality traits.")

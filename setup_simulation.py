@@ -27,24 +27,23 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 
-def get_user_input(prompt: str, valid_options: list = None, allow_empty: bool = False, input_type: type = str) -> any:
-    """Gets validated user input with type checking."""
+def get_user_input(prompt: str, valid_options: list = None, allow_empty: bool = False, input_type: type = str, default_value: any = None) -> any:
+    """
+    Gets validated user input with type checking and optional default on empty.
+    """
     while True:
         user_input_str = input(f"{prompt} ").strip()
+
         if not user_input_str and not allow_empty:
             print("Input cannot be empty.")
             continue
+        elif not user_input_str and allow_empty: # If input is empty and allowed
+            return default_value # Return the default value
 
         # Handle type conversion
         try:
-            if input_type == int:
-                if not user_input_str and allow_empty:
-                    return None # Or a default int if appropriate
-                user_input = int(user_input_str)
-            elif input_type == float:
-                 if not user_input_str and allow_empty:
-                    return None # Or a default float
-                 user_input = float(user_input_str)
+            if input_type == int: user_input = int(user_input_str)
+            elif input_type == float: user_input = float(user_input_str)
             else: # Default to string
                 user_input = user_input_str
         except ValueError:
@@ -60,8 +59,6 @@ def get_user_input(prompt: str, valid_options: list = None, allow_empty: bool = 
                     for opt in valid_options:
                         if user_input.lower() == str(opt).lower():
                             return opt
-                elif allow_empty and not user_input:
-                     return "" # Return empty string if allowed
                 else:
                     print(f"Invalid option. Please choose from: {', '.join(map(str, valid_options))}")
                     continue # Re-prompt if invalid option
@@ -111,8 +108,10 @@ async def main():
     # --- World Config Input ---
     console.print(Rule("World Configuration", style="yellow"))
     sim_type_input = get_user_input(
-        "Select World Type (RealWorld, SciFi, Fantasy, Custom):",
-        ["RealWorld", "SciFi", "Fantasy", "Custom"]
+        "Select World Type (RealWorld, SciFi, Fantasy, Custom) [Default: RealWorld]:",
+        ["RealWorld", "SciFi", "Fantasy", "Custom"],
+        allow_empty=True,
+        default_value="RealWorld"
     )
 
     type_mapping = {"realworld": "real", "scifi": "scifi", "fantasy": "fantasy", "custom": "custom"}
@@ -120,14 +119,19 @@ async def main():
 
     if config_data["world_type"] == "real":
         realworld_type = get_user_input(
-            "Select Real World Sub-Genre (RealTime, Historical):",
-            ["RealTime", "Historical"]
+            "Select Real World Sub-Genre (RealTime, Historical) [Default: RealTime]:",
+            ["RealTime", "Historical"],
+            allow_empty=True,
+            default_value="RealTime"
         )
         config_data["sub_genre"] = realworld_type.lower()
 
         if config_data["sub_genre"] == "realtime":
-            location_str = get_user_input("Enter Primary Location (e.g., 'Asheville, NC', 'Tokyo, Japan'):")
-            config_data["location"] = parse_location_string(location_str)
+            location_str = get_user_input(
+                "Enter Primary Location (e.g., 'Asheville, NC', 'Tokyo, Japan') [Default: New York, New York]:",
+                allow_empty=True,
+                default_value="New York, New York")
+            config_data["location"] = parse_location_string(location_str) # parse_location_string handles empty input
             config_data["description"] = f"A simulation mirroring the current real world in {location_str}. Standard physics apply."
             config_data["rules"]["time_progression_rate"] = 1.0
         else: # Historical
@@ -197,7 +201,11 @@ async def main():
              console.print("Aborting simulacra generation.")
              return
 
-    num_simulacra = get_user_input("How many simulacra to generate for this world?", input_type=int)
+    num_simulacra = get_user_input(
+        "How many simulacra to generate for this world? [Default: 1]:",
+        input_type=int,
+        allow_empty=True,
+        default_value=1)
 
     if num_simulacra <= 0:
         console.print("Number of simulacra must be positive. Skipping generation.")

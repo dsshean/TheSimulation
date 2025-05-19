@@ -23,7 +23,7 @@ World Generation Fixed - missing models.py - temporary, full world creation will
 
 TheSimulation is an experiment exploring simulation theory utilizing Large Language Models (LLMs). This project investigates how LLMs, specifically through frameworks like the Google AI Developer Kit (ADK), can be used to create autonomous agents ("Simulacra") that perceive, reflect, and act within a simulated environment.
 
-The project aims to use LLMs to generate and analyze diverse simulated scenarios by endowing agents with personas, goals, and a structured thinking process.
+The project aims to use LLMs to generate and analyze diverse simulated scenarios by giving agents with personas, goals, and a structured thinking process.
 
 ## Practical Applications
 
@@ -57,11 +57,11 @@ Currently it gives interesting results with all the mundane activities we conduc
 
 ### Design
 
-The core simulation entities ("Simulacra") are designed as autonomous agents. While the current implementation uses a specific task-based asynchronous architecture (detailed in "Core Architecture"), the underlying philosophy for agent behavior involves a perception-reflection-action cycle, primarily driven by LLMs interpreting their persona and the environment.
+The simulation entities ("Simulacra") are designed as autonomous agents. While the current implementation uses a specific task-based asynchronous architecture (detailed in "Core Architecture"), the underlying agent behavior involves a perception-reflection-action cycle, primarily driven by LLMs interpreting their persona and the environment.
 
 ## Architecture
 
-TheSimulation operates through a series of interconnected asynchronous components, orchestrated using Python's `asyncio` and leveraging the Google ADK for LLM interactions.
+TheSimulation operates through a series of asynchronous components, orchestrated using Python's `asyncio` and leveraging the Google ADK for LLM interactions.
 
 1.  **Central State (`state` dictionary):**
 

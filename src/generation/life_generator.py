@@ -104,10 +104,17 @@ async def _call_llm_and_get_validated_data(
 async def generate_random_persona(
     llm_service: LLMService,
     world_type: str,
-    world_description: str
+    world_description: str,
+    gender_preference: Optional[str] = None # New parameter
 ) -> Optional[Dict[str, Any]]:
     """Generates a random plausible persona including age using the LLM, considering the world context."""
     logger.info(f"Generating random persona for world type '{world_type}'...")
+    if gender_preference:
+        logger.info(f"Gender preference specified: {gender_preference}")
+
+    gender_instruction = ""
+    if gender_preference:
+        gender_instruction = f"- The persona's gender MUST be '{gender_preference}'. Ensure the name chosen is appropriate for this gender."
 
     prompt = f"""
 Create a detailed and plausible random fictional persona profile suitable for the following world:
@@ -119,8 +126,9 @@ World Description: {world_description}
 - Ensure the persona's details (occupation, background, location, etc.) are consistent with the provided world description.
 - Age should be an integer between 18 and 45.
 - Generate a plausible birthdate (YYYY-MM-DD) consistent with the generated age and the world type (e.g., future year for SciFi, past year for Fantasy/Historical).
+{gender_instruction}
 
-**Required Fields:** Name, Age (integer), Occupation, Current_location (City, State/Country appropriate for the world), Personality_Traits (list, 3-6 adjectives), Birthplace (City, State/Country appropriate for the world), Birthdate (YYYY-MM-DD), Education, Physical_Appearance (brief description), Hobbies, Skills, Languages, Health_Status, Family_Background, Life_Goals, Notable_Achievements, Fears, Strengths, Weaknesses, Ethnicity, Religion (optional), Political_Views (optional), Favorite_Foods, Favorite_Music, Favorite_Books, Favorite_Movies, Pet_Peeves, Dreams, Past_Traumas (optional).
+**Required Fields:** Name, Age (integer), Gender, Occupation, Current_location (City, State/Country appropriate for the world), Personality_Traits (list, 3-6 adjectives), Birthplace (City, State/Country appropriate for the world), Birthdate (YYYY-MM-DD), Education, Physical_Appearance (brief description), Hobbies, Skills, Languages, Health_Status, Family_Background, Life_Goals, Notable_Achievements, Fears, Strengths, Weaknesses, Ethnicity, Religion (optional), Political_Views (optional), Favorite_Foods, Favorite_Music, Favorite_Books, Favorite_Movies, Pet_Peeves, Dreams, Past_Traumas (optional).
 
 Respond ONLY with valid JSON matching the required fields.
 """
@@ -972,7 +980,8 @@ async def generate_new_simulacra_background(
     generated_persona = await generate_random_persona(
         llm_service=llm_service,
         world_type=world_type,
-        world_description=world_description
+        world_description=world_description,
+        gender_preference="male" # <--- New parameter
     )
 
     # --- Fallback and Birthdate Handling ---

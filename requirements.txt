@@ -6,3 +6,4 @@ pillow
 duckduckgo_search
 geopy
 timezonefinder
+atproto

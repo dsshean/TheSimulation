@@ -1,0 +1,496 @@
+{
+  "persona_details": {
+    "Name": "Daniel Rodriguez",
+    "Age": 33,
+    "Gender": "male",
+    "Occupation": "Software Engineer",
+    "Current_location": "Brooklyn, New York",
+    "Personality_Traits": [
+      "Analytical",
+      "Reserved",
+      "Creative",
+      "Diligent",
+      "Loyal"
+    ],
+    "Birthplace": "Miami, Florida",
+    "Birthdate": "1991-07-15",
+    "Birthtime": null,
+    "Education": "Master's Degree in Computer Science",
+    "Physical_Appearance": "Average height, slim build, dark brown hair, brown eyes, usually wears glasses.",
+    "Hobbies": "Playing guitar, coding personal projects, hiking, exploring new restaurants.",
+    "Skills": "Proficient in Python, Java, and JavaScript. Experienced in full-stack development, database management, and algorithm design.",
+    "Languages": "English, Spanish",
+    "Health_Status": "Generally healthy, occasional allergies during pollen season.",
+    "Family_Background": "Middle-class family. Father is a retired accountant, mother is a teacher. Has one younger sister.",
+    "Life_Goals": "To contribute to open-source projects, start his own tech company, travel the world.",
+    "Notable_Achievements": "Developed a successful mobile app during his master's program that helped connect local farmers with consumers.",
+    "Fears": "Public speaking, failure, heights.",
+    "Strengths": "Problem-solving abilities, attention to detail, strong work ethic, adaptability.",
+    "Weaknesses": "Can be overly critical of himself, struggles with delegating tasks, sometimes too introverted.",
+    "Ethnicity": "Hispanic",
+    "Religion": null,
+    "Political_Views": "Liberal",
+    "Favorite_Foods": "Cuban sandwiches, pizza, sushi",
+    "Favorite_Music": "Indie rock, classic rock, jazz",
+    "Favorite_Books": "Neuromancer by William Gibson, The Lord of the Rings by J.R.R. Tolkien",
+    "Favorite_Movies": "Blade Runner, The Matrix, Back to the Future",
+    "Pet_Peeves": "Loud chewing, people being late, disorganized code.",
+    "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
+    "Past_Traumas": null
+  },
+  "generation_info": {
+    "generated_at": "2025-05-19T20:33:46.012424+00:00",
+    "current_year": 2025,
+    "current_month": 5,
+    "current_day": 19,
+    "current_hour": 20
+  },
+  "birth_year": 1991,
+  "birth_month": 7,
+  "birth_day": 15,
+  "initial_relationships": {
+    "parents": [
+      {
+        "name": "Ricardo Rodriguez",
+        "relationship": "Father",
+        "details": "Retired accountant, enjoys gardening."
+      },
+      {
+        "name": "Elena Rodriguez",
+        "relationship": "Mother",
+        "details": "High school teacher, passionate about literature."
+      }
+    ],
+    "siblings": [
+      {
+        "name": "Sofia Rodriguez",
+        "relationship": "Younger Sister",
+        "details": "Currently studying graphic design in college."
+      }
+    ]
+  },
+  "yearly_summaries": {
+    "1991": {
+      "summary": "Daniel Rodriguez was born on July 15, 1991, in Miami, Florida. The year was marked by the dissolution of the Soviet Union and the start of the Gulf War.",
+      "location": "Miami, Florida",
+      "news": "- 1991 - Wikipedia: 1991 was a common year starting on Tuesday of the Gregorian calendar, the ... The first major ground...\n- What Happened In 1991 - Historical Events 1991 - EventsHistory: Historical Events for the Year 1991. 5th January » Georgia (country) named Georgian forces enter Tsk...\n- Historical Events in 1991 - On This Day: Historical events from year 1991. Learn about 886 famous, scandalous and important events that happe...\n- Major Events of 1991 - Historical Moments That Defined the Year ...: Major Events of 1991: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- A Year in History: 1991 Timeline | Historic Newspapers: The 90s were full of political change and advances in knowledge, and so we've comprised here a full ..."
+    },
+    "1992": {
+      "summary": "Daniel is one year old and continues to live in Miami with his parents. The Summer Olympics were held in Barcelona, and Bill Clinton was elected President of the United States.",
+      "location": "Miami, Florida",
+      "news": "- What Happened In 1992 - Historical Events 1992 - EventsHistory: What happened in the year 1992 in history? Famous historical events that shook and changed the world...\n- 1992 - Wikipedia: 1992 (MCMXCII) was a leap year starting on Wednesday of the Gregorian calendar, the 1992nd year of t...\n- Major Events of 1992 - Historical Moments That Defined the Year ...: Major Events of 1992: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- Historical Events in 1992 - On This Day: Historical events from year 1992. Learn about 761 famous, scandalous and important events that happe...\n- A Year in History: 1992 Timeline - Historic Newspapers: 25th Olympic Games One of the key 1992 world events was the Olympic Games. The 25th Olympics took pl..."
+    },
+    "1993": {
+      "summary": "Daniel is two years old, living in Miami. The World Trade Center bombing occurred in New York City, and Czechoslovakia dissolved.",
+      "location": "Miami, Florida",
+      "news": "- 1993 - Wikipedia: 1993 was a common year ... International Year for the World's Indigenous People; The year 1993 in th...\n- Major Events of 1993 - Historical Moments That Defined the Year ...: Major Events of 1993: Key Historical Moments You Need to Know ... 26 Feb 1993 World Trade Center Bom...\n- Historical Events in 1993 - On This Day: Historical events from year 1993. Learn about 682 famous, scandalous and important events that happe...\n- What Happened In 1993 - Historical Events 1993 - EventsHistory: Historical Events for the Year 1993. 1st January » Dissolution of Czechoslovakia: Czechoslovakia is ...\n- A Year in History: 1993 Timeline | Historic Newspapers: February 26: One of the most major events in 1993; six people die and over 1,000 are injured when a ..."
+    },
+    "1994": {
+      "summary": "Daniel is three years old, growing up in Miami. Nelson Mandela was inaugurated as President of South Africa, and the FIFA World Cup was held in the United States.",
+      "location": "Miami, Florida",
+      "news": "- 1994 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 7 May 202...\n- What Happened In 1994 - Historical Events 1994 - EventsHistory: 12th August » Major League Baseball players go on 1994-95 Major League Baseball strike e.g strike. T...\n- Historical Events in 1994 - On This Day: Historical events from year 1994. Learn about 819 famous, scandalous and important events that happe...\n- Major Events of 1994 - Historical Moments That Defined the Year ...: Major Events of 1994: Key Historical Moments You Need to Know ... 17 Jul Brazil Wins 1994 FIFA World...\n- 25 Moments That Defined 1994: Quentin Tarantino's Pulp Fiction hit cinemas in September 1994, proving a massive box office hit. Ju..."
+    },
+    "1995": {
+      "summary": "Daniel is four years old. The World Trade Organization was established, and the 'trial of the century' involving O.J. Simpson captivated the United States.",
+      "location": "Miami, Florida",
+      "news": "- Major Events of 1995 - Historical Moments That Defined the Year ...: Major Events of 1995: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 1995 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 14 May 20...\n- What Happened In 1995 - Historical Events 1995 - EventsHistory: Historical Events for the Year 1995. 1st January » The World Trade Organization goes into effect.; 1...\n- Historical Events in 1995 - On This Day: Historical events from year 1995. Learn about 604 famous, scandalous and important events that happe...\n- A Year in History: 1995 Timeline | Historic Newspapers: The year that brought us the 'trial of the century', iconic films, and scientific discoveries; 1995 ..."
+    },
+    "1996": {
+      "summary": "Daniel is five years old. The Summer Olympics were held in Atlanta, and Dolly the sheep became the first mammal to be cloned from an adult somatic cell.",
+      "location": "Miami, Florida",
+      "news": "- Major Events of 1996 - Historical Moments That Defined the Year ...: Major Events of 1996: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 1996 - Wikipedia: 1996 was a leap year starting on Monday of the Gregorian calendar, the 1996th year of the Common Era...\n- What Happened In 1996 - Historical Events 1996 - EventsHistory: Historical Events for the Year 1996. 1st January » Curaçao gains limited self-government, though it ...\n- Historical Events in 1996 - On This Day: Historical events from year 1996. Learn about 506 famous, scandalous and important events that happe...\n- 1996 Archives - HISTORY: Discover what happened in this year with HISTORY's summaries of major events, anniversaries, famous ..."
+    },
+    "1997": {
+      "summary": "Daniel is six years old. Princess Diana died in a car accident in Paris, and Hong Kong was handed over to China by the United Kingdom.",
+      "location": "Miami, Florida",
+      "news": "- 1997 - Wikipedia: 1997 was a common year starting on Wednesday of the Gregorian calendar, the 1997th ... the first tim...\n- Historical Events in 1997 - On This Day: Historical events from year 1997. Learn about 670 famous, scandalous and important events that happe...\n- Top News Stories from 1997 - Infoplease: Current Events. View captivating images and news briefs about critical government decisions, medical...\n- Major Events of 1997 - Historical Moments That Defined the Year ...: Major Events of 1997: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- A Year in History: 1997 Timeline | Historic Newspapers: 1997 Timeline January. January 1: The Republic of Zaira joins the World Trade Organisations, as Zair..."
+    },
+    "1998": {
+      "summary": "Daniel is seven years old and attends elementary school. The Good Friday Agreement was signed in Northern Ireland, and the FIFA World Cup was held in France.",
+      "location": "Miami, Florida",
+      "news": "- 1998 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 11 May 20...\n- Historical Events in 1998 - On This Day: Historical events from year 1998. Learn about 345 famous, scandalous and important events that happe...\n- Major Events of 1998 - Historical Moments That Defined the Year ...: Major Events of 1998: Key Historical Moments You Need to Know. ... 06 Jun 1998 FIFA World Cup Final:...\n- What Happened In 1998 - Historical Events 1998 - EventsHistory: Historical Events for the Year 1998. 1st January » Russia begins to circulate new Russian ruble call...\n- A Year in History: 1998 Timeline - Historic Newspapers: 1998 Sporting Events. 1998 was a particularly eventful year for sport, with many different events ta..."
+    },
+    "1999": {
+      "summary": "Daniel is eight years old. The Euro currency was introduced in 11 European countries, and the Columbine High School massacre occurred in Colorado.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 1999 - On This Day: Historical events from year 1999. Learn about 295 famous, scandalous and important events that happe...\n- 1999 - Wikipedia: Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1.5 May. 1.6 June. 1.7 Ju...\n- 20 Things You Won't Believe Happened in 1999 - Best Life: But before 1999, a standardized monetary system across Europe was just a utopian idea. After decades...\n- What Happened In 1999 - Historical Events 1999 - EventsHistory: Historical Events for the Year 1999. 1st January » The Euro currency is introduced in 11 countries -...\n- 1999 Archives - HISTORY: On April 20, 1999, two teenage gunmen kill 13 people in a shooting spree at Columbine High School in..."
+    },
+    "2000": {
+      "summary": "Daniel is nine years old. George W. Bush was elected President of the United States in a controversial election, and the Sydney Olympics took place.",
+      "location": "Miami, Florida",
+      "news": "- What Happened In 2000 - Historical Events 2000 - EventsHistory: Historical Events for the Year 2000. 3rd January » The last original weekday 'Peanuts' comic strip i...\n- Major Events of 2000 - Historical Moments That Defined the Year ...: Major Events of 2000: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 2000 - Wikipedia: 2000 was a century leap year starting on Saturday of the Gregorian calendar, the 2000th year of the ...\n- Historical Events in 2000 - On This Day: Historical events from year 2000. Learn about 240 famous, scandalous and important events that happe...\n- Timeline of the 2000s | Britannica - Encyclopedia Britannica: In a discussion of potential names for the 2000s, American author and journalist Walter Isaacson sug..."
+    },
+    "2001": {
+      "summary": "Daniel is ten years old. The September 11 attacks occurred in New York City, and the United States launched the War in Afghanistan.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 2001 - On This Day: Historical events from year 2001. Learn about 305 famous, scandalous and important events that happe...\n- 2001 - Wikipedia: Qualifications for the 2002 FIFA World Cup were the main football events in 2001. [15]: 534 The worl...\n- Major events in 2001 timeline: A timeline of major events in 2001 - business, politics, technology, space, disasters ... On 26th Ja...\n- What Happened In 2001 - Historical Events 2001 - EventsHistory: Historical Events for the Year 2001. 12th January » Downtown Disney (Disneyland Resort) known as Dow...\n- Major Events of 2001 - Historical Moments That Defined the Year ...: Major Events of 2001: Key Historical Moments You Need to Know. ... In a thrilling conclusion to the ..."
+    },
+    "2002": {
+      "summary": "Daniel is eleven years old. East Timor gained independence, and the FIFA World Cup was held in South Korea and Japan.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 2002 - On This Day: Historical events from year 2002. Learn about 275 famous, scandalous and important events that happe...\n- 2002 - Wikipedia: The world population on January 1, 2002, was estimated to be 6.272 billion people, and it increased ...\n- What Happened In 2002 - Historical Events 2002 - EventsHistory: Historical Events for the Year 2002. 1st January » Taiwan officially joins the World Trade Organizat...\n- 29 Moments And Things That Happened In 2002 - BuzzFeed: 29. And finally, the Sanyo SCP-5300 became the very first cell phone to have a built-in camera to be...\n- Major Events of 2002 - Historical Moments That Defined the Year ...: Major Events of 2002: Key Historical Moments You Need to Know. ... 29 Jun 2002 FIFA World Cup Final ..."
+    },
+    "2003": {
+      "summary": "Daniel is twelve years old. The United States invaded Iraq, and the Human Genome Project was completed.",
+      "location": "Miami, Florida",
+      "news": "- What Happened In 2003 - Historical Events 2003 - EventsHistory: Historical Events for the Year 2003. 8th January » Turkish Airlines Flight 634 crashes near Diyarbak...\n- 2003 major events - Future Timeline: Major events of 2003 - a timeline of business, politics, technology, and other notable events of the...\n- 2003 - Wikipedia: The world population on January 1, 2003, was estimated to be 6.272 billion people and increased to 6...\n- Historical Events in 2003 - On This Day: Historical events from year 2003. Learn about 256 famous, scandalous and important events that happe...\n- Major Events of 2003 - Historical Moments That Defined the Year ...: Major Events of 2003: Key Historical Moments You Need to Know. Every year brings its own set of pivo..."
+    },
+    "2004": {
+      "summary": "Daniel is thirteen years old and attends middle school. Mark Zuckerberg launched Facebook, and the Summer Olympics were held in Athens.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 2004 - On This Day: Historical events from year 2004. Learn about 349 famous, scandalous and important events that happe...\n- 2004 - Wikipedia: 2004 was a year marked by many popular and highly grossing film releases such as Shrek 2, Spider Man...\n- Major Events of 2004 - Historical Moments That Defined the Year ...: Major Events of 2004: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 50 Things That Happened In 2004 - BuzzFeed: 50 Pop Culture Moments From 20 Years Ago That Make 2004 Feel Like It Was A Whole Different Universe ...\n- 2004: Facts & Events That Happened in This Year - The Fact Site: 2004 is a Harshad number, which is a number that can be evenly divided by the sum of its digits. It'..."
+    },
+    "2005": {
+      "summary": "Daniel is fourteen years old. Hurricane Katrina devastated New Orleans, and YouTube was founded.",
+      "location": "Miami, Florida",
+      "news": "- Major Events of 2005 - Historical Moments That Defined the Year ...: Major Events of 2005: Key Historical Moments You Need to Know. ... 10 Sep 2005 World Summit Preparat...\n- Historical Events in 2005 - On This Day: Historical events from year 2005. Learn about 299 famous, scandalous and important events that happe...\n- 2005 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 15 May 20...\n- 2005: Facts & Events That Happened in This Year - The Fact Site: Meanwhile, in the tech world, Mark Zuckerberg almost changed the course of social media history by c...\n- 2005 major events - Future Timeline: Major events of 2005 - a timeline of business, politics, technology, and other notable events of the..."
+    },
+    "2006": {
+      "summary": "Daniel is fifteen years old and attending high school. Nintendo released the Wii, and Montenegro declared independence.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 2006 - On This Day: Historical events from year 2006. Learn about 275 famous, scandalous and important events that happe...\n- Major Events of 2006 - Historical Moments That Defined the Year ...: Major Events of 2006: Key Historical Moments You Need to Know Every year brings its own set of pivot...\n- 2006 - Wikipedia: 2006 (MMVI) was a common year starting on Sunday of the Gregorian calendar, the 2006th year of the C...\n- What Happened In 2006 - Historical Events 2006 - EventsHistory: What happened in the year 2006 in history? Famous historical events that shook and changed the world...\n- 2006: Facts & Events That Happened in This Year - The Fact Site: Continue reading to uncover the remarkable events, chart-topping music hits, inspiring quotes, and i..."
+    },
+    "2007": {
+      "summary": "Daniel is sixteen years old. Apple released the first iPhone, and the global financial crisis began.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 2007 - On This Day: Historical events from year 2007. Learn about 278 famous, scandalous and important events that happe...\n- 2007 - Wikipedia: 2007 (MMVII) was a common year starting on Monday of the Gregorian calendar, the 2007th year of the ...\n- 2007: Facts & Events That Happened in This Year - The Fact Site: 2007 was, in many ways, a turning point for the world, with major milestones occurring in science an...\n- What Happened In 2007 - Historical Events 2007 - EventsHistory: What happened in the year 2007 in history? Famous historical events that shook and changed the world...\n- Major Events of 2007 - Historical Moments That Defined the Year ...: Major Events of 2007: Key Historical Moments You Need to Know Every year brings its own set of pivot..."
+    },
+    "2008": {
+      "summary": "Daniel is seventeen years old and preparing for college. Barack Obama was elected President of the United States, and the Summer Olympics were held in Beijing.",
+      "location": "Miami, Florida",
+      "news": "- 25 Major Historical Events That Happened in 2008: This article will feature 25 major historical events that happened in 2008. 1. Barack Obama is chose...\n- 2008 - Wikipedia: 2008 was a leap year starting on Tuesday of the Gregorian calendar, the 2008th year of the Common Er...\n- What Happened In 2008 - Historical Events 2008 - EventsHistory: Historical Events for the Year 2008. 1st January » Cyprus and Malta join the Eurozone.; 17th January...\n- Major Events of 2008 - Historical Moments That Defined the Year ...: Major Events of 2008: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- Historical Events in 2008 - On This Day: Historical events from year 2008. Learn about 304 famous, scandalous and important events that happe..."
+    },
+    "2009": {
+      "summary": "Daniel is eighteen years old and graduates high school. He begins considering universities for his Computer Science degree. The swine flu pandemic occurred, and Usain Bolt set a new world record in the 100m.",
+      "location": "Miami, Florida",
+      "news": "- Facts About 50 Major Events That Happened In 2009 - Facts.net: 16 Aug 2009: Usain Bolt won 100m with a new world record of 9.58s. During the finals of the World At...\n- Historical Events in 2009 - On This Day: Historical events from year 2009. Learn about 251 famous, scandalous and important events that happe...\n- 2009 - Wikipedia: Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1. ... reactions to the e...\n- 2009: Facts & Events That Happened in This Year - The Fact Site: 2009 also saw Michael Jackson's final performance, just days before his death. Meanwhile, the world ...\n- Top 10 stories of 2009 - WORLD: By the third quarter of 2009 there were halting signs that the nation's worst recession since the Gr..."
+    },
+    "2010": {
+      "summary": "Daniel is nineteen years old and begins his undergraduate studies in Computer Science. A major earthquake struck Haiti, and the FIFA World Cup was held in South Africa.",
+      "location": "Miami, Florida",
+      "news": "- 2010 - Wikipedia: It is the first in a series of earthquakes between 2010 and 2012 that resulted in the deaths of 187 ...\n- Historical Events in 2010 - On This Day: Historical events from year 2010. Learn about 184 famous, scandalous and important events that happe...\n- Major Events of 2010 - Historical Moments That Defined the Year ...: Major Events of 2010: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 14 Major Events of the 2010s - HISTORY: The deadliest natural disaster of the decade happened in the first month of 2010, ... the scourge of...\n- 2010: Facts & Events That Happened in This Year - The Fact Site: 2010 is a Harshad number, which is a number that can be evenly divided by the sum of its digits. It'..."
+    },
+    "2011": {
+      "summary": "Daniel is twenty years old and continues his undergraduate studies. He begins learning Python. The Arab Spring uprisings occurred, and Osama bin Laden was killed.",
+      "location": "Miami, Florida",
+      "news": "- What Happened In 2011 - Historical Events 2011 - EventsHistory: Historical Events for the Year 2011. 1st January » A bomb 2011 Alexandria bombing e.g explodes as Co...\n- 2011 - Wikipedia: Toggle Events subsection. 1.1 January. 1.2 February. 1.3 March. 1.4 April. 1.5 May. 1.6 June. 1.7 Ju...\n- 2011: Facts & Events That Happened in This Year - The Fact Site: 2011 was full of world-changing events! The series of anti-government protests in the Middle East an...\n- Major Events of 2011 - Historical Moments That Defined the Year ...: Major Events of 2011: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- Historical Events in 2011 - On This Day: Jun 30 China opens the world's longest bridge the Danyang-Kunshan Grand Bridge for the Beijing-Shang..."
+    },
+    "2012": {
+      "summary": "Daniel is twenty-one years old and continues his undergraduate studies. He begins working on small personal coding projects. The Summer Olympics were held in London, and the world did not end according to the Mayan calendar predictions.",
+      "location": "Miami, Florida",
+      "news": "- 2012's Top 10 moments in world news: On July 27, London officially kicked-off the world's biggest sporting event with a star-studded open...\n- Historical Events in 2012 - On This Day: Historical events from year 2012. Learn about 745 famous, scandalous and important events that happe...\n- 2012 - Wikipedia: December 21 - 2012 phenomenon: End of 13th b'ak'tun in the Mayan calendar, supposed end of the world...\n- What Happened In 2012 - Historical Events 2012 - EventsHistory: Historical Events for the Year 2012. 1st January » A Moldovan civilian is 2012 Moldova security zone...\n- 10 Historical Events that Happened in 2012 - Discover Walks: The year 2012 saw the sensational changes in Bedouin nations ignited by the Middle Easterner Spring ..."
+    },
+    "2013": {
+      "summary": "Daniel is twenty-two years old and graduates with his Bachelor's Degree in Computer Science. He begins to consider Master's programs. Edward Snowden leaked classified information from the NSA.",
+      "location": "Miami, Florida",
+      "news": "- Historical Events in 2013 - On This Day: Historical events from year 2013. Learn about 757 famous, scandalous and important events that happe...\n- 2013 - Wikipedia: 2013 was a common year starting on Tuesday of the Gregorian calendar, the 2013th year of the Common ...\n- Top 10 International News Stories | Top 10 Everything of 2013 - World ...: The quarrel came to a head in November when China declared an \"East China Sea air-defense identifica...\n- The Year in Review: the biggest stories of 2013 - The Verge: The once-reigning king of the smartphone world finally launched its much-delayed next-generation Bla...\n- 2013: Facts & Events That Happened in This Year - The Fact Site: 2013 In Music. 2013 was a year filled with chart-topping hits that became instant classics! From the..."
+    },
+    "2014": {
+      "summary": "Daniel is twenty-three years old and enrolls in a Master's program in Computer Science. He begins learning Java and JavaScript. Malaysia Airlines Flight MH370 disappeared, and Germany won the FIFA World Cup.",
+      "location": "Miami, Florida",
+      "news": "- Ten Most Significant World Events in 2014 - Council on Foreign Relations: As 2014 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 15 Major Historical Events That Happened in 2014: This article will investigate fifteen major historical events that happened in 2014. We will take a ...\n- Year in Review: The Top Stories of 2014 - NBC News: Four months later, Malaysia's national carrier suffered a second major loss when one of its planes, ...\n- Historical Events in 2014 - On This Day: Historical events from year 2014. Learn about 567 famous, scandalous and important events that happe...\n- Major Events of 2014 - Historical Moments That Defined the Year ...: Major Events of 2014: Key Historical Moments You Need to Know. ... 13 Jul Germany Wins 2014 FIFA Wor..."
+    },
+    "2015": {
+      "summary": "Daniel is twenty-four years old and continues his Master's studies. He begins working on a mobile app to connect local farmers with consumers as part of his Master's program. The Iran nuclear deal was reached.",
+      "location": "Miami, Florida",
+      "news": "- Ten Most Significant World Events in 2015 - Council on Foreign Relations: As 2015 comes to a close, here are the top ten most notable world events of the past year....\n- 15 Important Historical Events That Happened In 2015: 15 Important Historical Events That Happened In 2015 2015 was an eventful year in history. From the ...\n- Major global events that shook 2015 - CNBC: This year saw some major political, economic, military and cultural events take place around the wor...\n- 2015: Facts & Events That Happened in This Year - The Fact Site: Unveil 2015's defining moments: climate action, landmark court rulings, pop culture sensations, and ...\n- Year in Review: 13 Biggest News Stories of 2015 - ABC News: Year in Review: 13 Biggest News Stories of 2015 From crashes and shootings, to the pope's visit and ..."
+    },
+    "2016": {
+      "summary": "Daniel is twenty-five years old and completes his Master's Degree in Computer Science. His mobile app gains traction. Donald Trump was elected President of the United States, and the Summer Olympics were held in Rio de Janeiro.",
+      "location": "Miami, Florida",
+      "news": "- Ten Most Significant World Events in 2016 - Council on Foreign Relations: As 2016 comes to a close, here are the top ten most notable world events of the past year....\n- 16 stories that defined 2016 - CBS News: 2016 WTF? 59:43 It's nearly impossible to sum up the year 2016 with a single word, phrase, or story....\n- 2016 - Wikipedia: 2016 (MMXVI) was a leap year starting on Friday of the Gregorian calendar, the 2016th year of the Co...\n- The 10 Most Significant World Events in 2016: The stakes are high. Brazil and South Korea are the ninth- and 11th-largest economies in the world, ...\n- Historical Events in 2016 - On This Day: Historical events from year 2016. Learn about 492 famous, scandalous and important events that happe..."
+    },
+    "2017": {
+      "summary": "Daniel is twenty-six years old and moves to Brooklyn, New York to work as a Software Engineer. He enjoys exploring new restaurants in the city. The #MeToo movement gained prominence.",
+      "location": "New York, New York",
+      "news": "- Ten Most Significant World Events in 2017 - Council on Foreign Relations: As 2017 comes to a close, here are the top ten most notable world events of the past year. Last year...\n- 2017 Events - Pop Culture, U.S. Politics & World - HISTORY: 2017 yielded a special counsel investigation into President Trump, protests over Confederate monumen...\n- 2017 Year in Review: Here are the top 10 biggest news stories: Authorities stand near a damaged Home Depot truck after a motorist drove onto a bike path near the W...\n- 2017 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 5 May 202...\n- Major Events of 2017 - Historical Moments That Defined the Year ...: Major Events of 2017: Key Historical Moments You Need to Know. Every year brings its own set of pivo..."
+    },
+    "2018": {
+      "summary": "Daniel is twenty-seven years old and continues working as a Software Engineer in Brooklyn. He starts playing guitar as a hobby. The FIFA World Cup was held in Russia.",
+      "location": "Brooklyn, New York",
+      "news": "- Ten Most Significant World Events in 2018 - Council on Foreign Relations: As 2018 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 15 Major Historical Events That Happened in 2018 - Discover Walks: 15 Major Historical Events That Happened in 2018 2018 was a time of major historical events that wil...\n- 2018 Events - Pop Culture, U.S. Politics & World - HISTORY: Super Blue Blood Moon: Three lunar events coincided early in 2018 producing a rare \"super blue blood...\n- 2018 - Wikipedia: Clockwise from top-left: the 2018 Winter Olympics are held in PyeongChang, South Korea; protests eru...\n- Major Events of 2018 - Historical Moments That Defined the Year ...: Major Events of 2018: Key Historical Moments You Need to Know ... 11 Jul 2018 FIFA World Cup: Croati..."
+    },
+    "2019": {
+      "summary": "Daniel is twenty-eight years old and becomes proficient in full-stack development at his job. He also starts hiking on weekends. The Notre-Dame Cathedral in Paris caught fire.",
+      "location": "Brooklyn, New York",
+      "news": "- Ten Most Significant World Events in 2019 - Council on Foreign Relations: As 2019 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 2019: Facts & Events That Happened in This Year - The Fact Site: Explore the events of 2019, from political turmoil to climate activism, and royal births, as we bid ...\n- 2019 Events - Pop Culture, U.S. Politics & World - HISTORY: USA players lifts their trophy after winning the 2019 FIFA Women's World Cup France Final match betw...\n- Major Events of 2019 - Historical Moments That Defined the Year ...: Major Events of 2019: Key Historical Moments You Need to Know ... 07 Jul 2019 FIFA Women's World Cup...\n- 2019 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 5 May 202..."
+    },
+    "2020": {
+      "summary": "Daniel is twenty-nine years old. The COVID-19 pandemic significantly impacts life in New York City, and he works from home. He spends more time coding personal projects.",
+      "location": "Brooklyn, New York",
+      "news": "- Ten Most Significant World Events in 2020: As 2020 comes to a close, here are the top ten most notable world events of the past year. Four year...\n- 2020 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 6 May 202...\n- 2020 events: Yep, these all happened in the year from hell - New York Post: From a deadly pandemic to a global movement for racial justice, the year 2020 certainly experienced ...\n- 2020 Events - Pop Culture, U.S. Politics & World | HISTORY: Politics and World Events President Donald Trump (R) and Democratic Presidential candidate, former U...\n- 15 Major Historical Events That Happened Between 2010 And 2020: The past decade, from 2010 to 2020, has seen a wide range of historical events and milestones that h..."
+    },
+    "2021": {
+      "summary": "Daniel is thirty years old and continues working as a Software Engineer, with a gradual return to the office. He becomes more involved in contributing to open-source projects. The U.S. withdrawal from Afghanistan occurred.",
+      "location": "Brooklyn, New York",
+      "news": "- Ten Most Significant World Events in 2021 - Council on Foreign Relations: As 2021 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- 2021 - Wikipedia: The major global rollout of COVID-19 vaccines, which began at the end of 2020, continued in 2021. Mo...\n- 15 Crucial Historical Events That Happened in 2021: The Covid-19 pandemic was one of the significant events of 2020, and its effects were still being fe...\n- Major Events of 2021 - Historical Moments That Defined the Year ...: Major Events of 2021: Key Historical Moments You Need to Know. Every year brings its own set of pivo...\n- 2021 Events - Pop Culture, U.S. Politics & World | HISTORY: In 2021, the United States—and the world—continued to confront the consequences of the momentous eve..."
+    },
+    "2022": {
+      "summary": "Daniel is thirty-one years old. He begins to feel comfortable with his current work and starts to dream of starting his own tech company. Russia invaded Ukraine.",
+      "location": "Brooklyn, New York",
+      "news": "- Ten Most Significant World Events in 2022 - Council on Foreign Relations: As 2022 comes to a close, here are the top ten most notable world events of the past year. Post by J...\n- The year in review: Top news stories of 2022 month-by-month: Top headlines of 2022 month-by-month 02:56 \"Sunday Morning\" host Jane Pauley looks back on key event...\n- 2022 - Wikipedia: This is an accepted version of this page This is the latest accepted revision, reviewed on 14 May 20...\n- 2022 recap: This year's most notable events - Deseret News: 2022 was a year both heartbreaking and hopeful, as the country felt the loosening of the grasp of CO...\n- The biggest news events of 2022 - in pictures | World Economic Forum: The year 2022 has been full of rapid and unexpected changes. From severe flooding in Pakistan to the..."
+    },
+    "2023": {
+      "summary": "Daniel is thirty-two years old. He experiences occasional allergies during pollen season, and he remains relatively healthy. He spends his spare time thinking through different business models for his startup. Tensions flared in various parts of the world; advancements in AI became more mainstream.",
+      "location": "Brooklyn, New York",
+      "news": "- Ten Most Significant World Events in 2023 - Council on Foreign Relations: As 2023 comes to a close, here are the top ten most notable world events of the year. Post by James ...\n- 2023 Year in Review | Timeline of Historical Events | Britannica: Explore the defining historical milestones of 2023, from technological advancements to international...\n- Top 10 Biggest Events of 2023 - TheTopTens: This was the worst event of 2023, and the most impactful on the world, possibly even causing a World...\n- 2023: Facts & Events That Happened in This Year - The Fact Site: Here you'll discover a collection of fascinating and unforgettable events that shaped the world in 2...\n- Year in Review: The Events That Shaped Our World in 2023: A blog post by the UN Foundation that reflects on the global challenges and achievements of 2023, fr..."
+    },
+    "2024": {
+      "summary": "Daniel is thirty-three years old and continues to work as a Software Engineer. He has become a senior member of his team and is respected by his coworkers. He starts taking online courses to learn more about business and entrepreneurship, to help achieve his goal of starting his own tech company. Global food insecurity increased, partially due to ongoing conflicts.",
+      "location": "Brooklyn, New York",
+      "news": "- Trump calls for 'major investigation' into Kamala Harris campaign ...: President Donald Trump called for a \"major investigation\" into former Vice President Kamala Harris, ...\n- Ten Most Significant World Events in 2024 - Council on Foreign Relations: As 2024 comes to a close, here are the ten most notable world events of the year. Article by James M...\n- Year in Review: the Events That Shaped the Un and Our World in 2024: The blog reviews the major geopolitical events of 2024, from the Pact for the Future to the conflict...\n- World Economic Outlook, April 2025: A Critical Juncture amid ... - IMF: The latest World Economic Outlook reports a slowdown in global growth as downside risks intensify. W...\n- Conflict and climate drive record global hunger in 2024, UN says: Acute food insecurity and child malnutrition rose for a sixth consecutive year in 2024, affecting mo..."
+    }
+  },
+  "monthly_summaries": {},
+  "daily_summaries": {
+    "2024": {
+      "7": {
+        "9": {
+          "summary": "Daniel finished his assignments at work. He practiced playing his guitar when he got home.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        },
+        "10": {
+          "summary": "Daniel attended a company lunch meeting and spent the day working on Java projects.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        },
+        "11": {
+          "summary": "Daniel made progress on his work assignments. He also began to research local farmers and markets for his personal project.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        },
+        "12": {
+          "summary": "Daniel spent the day at work and made progress on current assignments. Later that evening, he started looking at possible online business courses.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        },
+        "13": {
+          "summary": "Daniel went hiking with some friends outside of the city. He then spent the evening relaxing at home.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        },
+        "14": {
+          "summary": "Daniel did some more research on business courses. He also practiced guitar. In the evening, he watched the movie Blade Runner.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        },
+        "15": {
+          "summary": "Daniel spent the day coding. He had lunch with friends and looked into more business course options.",
+          "location": "Brooklyn, New York",
+          "news": "No external context used."
+        }
+      }
+    }
+  },
+  "hourly_breakdowns": {
+    "2024": {
+      "7": {
+        "15": {
+          "activities": {
+            "0": [
+              "Sound asleep, dreaming about code optimization.",
+              "Brooklyn Apartment"
+            ],
+            "1": [
+              "Still sleeping soundly, occasionally shifting positions.",
+              "Brooklyn Apartment"
+            ],
+            "2": [
+              "Deep sleep, completely unaware of the outside world.",
+              "Brooklyn Apartment"
+            ],
+            "3": [
+              "Restless sleep, possibly dreaming about debugging.",
+              "Brooklyn Apartment"
+            ],
+            "4": [
+              "Light sleep, starting to stir slightly.",
+              "Brooklyn Apartment"
+            ],
+            "5": [
+              "Beginning to wake up, stretching and yawning.",
+              "Brooklyn Apartment"
+            ],
+            "6": [
+              "Waking up fully, checking his phone for any overnight notifications.",
+              "Brooklyn Apartment"
+            ],
+            "7": [
+              "Making coffee and a light breakfast of toast and avocado.",
+              "Brooklyn Apartment"
+            ],
+            "8": [
+              "Reviewing emails and planning out his day's coding tasks.",
+              "Brooklyn Apartment"
+            ],
+            "9": [
+              "Starting work, tackling the most challenging coding task first.",
+              "Remote Work Office"
+            ],
+            "10": [
+              "Collaborating with a colleague on a bug fix via video call.",
+              "Remote Work Office"
+            ],
+            "11": [
+              "Working on implementing new features for a software project.",
+              "Remote Work Office"
+            ],
+            "12": [
+              "Meeting friends for lunch at a nearby cafe, discussing their recent projects.",
+              "Local Cafe"
+            ],
+            "13": [
+              "Back to work, focusing on documentation for his recent code changes.",
+              "Remote Work Office"
+            ],
+            "14": [
+              "Attending a virtual team meeting to discuss project progress.",
+              "Remote Work Office"
+            ],
+            "15": [
+              "Debugging code based on feedback from the team meeting.",
+              "Remote Work Office"
+            ],
+            "16": [
+              "Researching new technologies and methodologies for improving his coding skills.",
+              "Remote Work Office"
+            ],
+            "17": [
+              "Wrapping up work for the day, submitting his code changes.",
+              "Remote Work Office"
+            ],
+            "18": [
+              "Looking into business course options online.",
+              "Brooklyn Apartment"
+            ],
+            "19": [
+              "Practicing guitar, working on a new indie rock song.",
+              "Brooklyn Apartment"
+            ],
+            "20": [
+              "Grabbing pizza for dinner at a local pizzeria.",
+              "Local Pizzeria"
+            ],
+            "21": [
+              "Reading Neuromancer before bed.",
+              "Brooklyn Apartment"
+            ],
+            "22": [
+              "Getting ready for bed, brushing his teeth and washing his face.",
+              "Brooklyn Apartment"
+            ],
+            "23": [
+              "In bed, falling asleep while listening to a jazz playlist.",
+              "Brooklyn Apartment"
+            ]
+          },
+          "news": "No external context used."
+        },
+        "14": {
+          "activities": {
+            "0": [
+              "Sleeping soundly after a long day.",
+              "Brooklyn Apartment"
+            ],
+            "1": [
+              "Deep sleep, dreaming about code and mountain cabins.",
+              "Brooklyn Apartment"
+            ],
+            "2": [
+              "Still asleep, occasionally shifting in bed.",
+              "Brooklyn Apartment"
+            ],
+            "3": [
+              "Uninterrupted sleep, recharging for the day.",
+              "Brooklyn Apartment"
+            ],
+            "4": [
+              "Restful sleep, almost time to wake up.",
+              "Brooklyn Apartment"
+            ],
+            "5": [
+              "Starting to stir, subconscious mind processing coding challenges.",
+              "Brooklyn Apartment"
+            ],
+            "6": [
+              "Waking up, stretching, and starting to feel alert.",
+              "Brooklyn Apartment"
+            ],
+            "7": [
+              "Making coffee and a light breakfast (toast with avocado).",
+              "Brooklyn Apartment"
+            ],
+            "8": [
+              "Commuting to work via subway, reading a tech blog on his phone.",
+              "Brooklyn Apartment"
+            ],
+            "9": [
+              "Arriving at the office, checking emails and planning the day's tasks.",
+              "Software Company Office, Brooklyn"
+            ],
+            "10": [
+              "Working on debugging a critical piece of code for a client project.",
+              "Software Company Office, Brooklyn"
+            ],
+            "11": [
+              "Participating in a team meeting to discuss project progress and roadblocks.",
+              "Software Company Office, Brooklyn"
+            ],
+            "12": [
+              "Eating lunch at his desk while browsing a business course catalog.",
+              "Software Company Office, Brooklyn"
+            ],
+            "13": [
+              "Starting an online business course module.",
+              "Software Company Office, Brooklyn"
+            ],
+            "14": [
+              "Continuing work on the debugging task from the morning.",
+              "Software Company Office, Brooklyn"
+            ],
+            "15": [
+              "Pair programming with a junior developer to help them solve a coding problem.",
+              "Software Company Office, Brooklyn"
+            ],
+            "16": [
+              "Attending a short meeting about new security protocols.",
+              "Software Company Office, Brooklyn"
+            ],
+            "17": [
+              "Finishing up work for the day, submitting code changes.",
+              "Software Company Office, Brooklyn"
+            ],
+            "18": [
+              "Arriving home from work, relaxing for a few minutes.",
+              "Brooklyn Apartment"
+            ],
+            "19": [
+              "Practicing guitar, working on a new indie rock song.",
+              "Brooklyn Apartment"
+            ],
+            "20": [
+              "Preparing and eating dinner (Cuban sandwich).",
+              "Brooklyn Apartment"
+            ],
+            "21": [
+              "Watching the movie Blade Runner.",
+              "Brooklyn Apartment"
+            ],
+            "22": [
+              "Reading a few chapters of Neuromancer before bed.",
+              "Brooklyn Apartment"
+            ],
+            "23": [
+              "Getting ready for bed, brushing teeth and setting an alarm.",
+              "Brooklyn Apartment"
+            ]
+          },
+          "news": "No external context used."
+        }
+      }
+    }
+  },
+  "sim_id": "sim_sustdj",
+  "world_instance_uuid": "669003d4-bce8-49d0-80c2-b58a081dd5f1"
+}

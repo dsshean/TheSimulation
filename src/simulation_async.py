@@ -1,10 +1,9 @@
 # src/simulation_async.py - Core Simulation Orchestrator
-
 import asyncio
 import datetime
 import glob  # Keep for run_simulation profile verification
 import json
-import logging
+import logging  # Explicitly import logging for type hinting
 import os
 import random  # Keep for interjection logic in simulacra_agent_task_llm
 import re
@@ -17,6 +16,7 @@ from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai  # For direct API config
+from atproto import Client, models  # Import atproto client and models
 from google import genai as genai_image  # For direct API config
 from google.adk.agents import LlmAgent
 from google.adk.memory import InMemoryMemoryService
@@ -32,40 +32,42 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
-import logging # Explicitly import logging for type hinting
+
 console = Console() # Keep a global console for direct prints if needed by run_simulation
 
 from .agents import create_narration_llm_agent  # Agent creation functions
 from .agents import (create_search_llm_agent, create_simulacra_llm_agent,
                      create_world_engine_llm_agent)
 # Import from our new/refactored modules
-from .config import (  # For run_simulation; For self-reflection; New constants for dynamic_interruption_task; PROB_INTERJECT_AS_NARRATIVE removed; from this import list
+from .config import (  # For run_simulation; For self-reflection; New constants for dynamic_interruption_task; PROB_INTERJECT_AS_NARRATIVE removed; from this import list; Import Bluesky and social post config; Import SIMULACRA_KEY
     ACTIVE_SIMULACRA_IDS_KEY, AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS,
     AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS, API_KEY, APP_NAME,
-    CURRENT_LOCATION_KEY, DEFAULT_HOME_DESCRIPTION, DEFAULT_HOME_LOCATION_NAME,
+    BLUESKY_APP_PASSWORD, BLUESKY_HANDLE, CURRENT_LOCATION_KEY,
+    DEFAULT_HOME_DESCRIPTION, DEFAULT_HOME_LOCATION_NAME,
     DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS, DYNAMIC_INTERRUPTION_MAX_PROB_CAP,
     DYNAMIC_INTERRUPTION_MIN_PROB,
     DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION,
-    DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS,
+    DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS, ENABLE_BLUESKY_POSTING,
     ENABLE_NARRATIVE_IMAGE_GENERATION, HOME_LOCATION_KEY,
-    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME, # SIMULACRA_KEY is now SIMULACRA_PROFILES_KEY
+    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME,
     IMAGE_GENERATION_OUTPUT_DIR, INTERJECTION_COOLDOWN_SIM_SECONDS,
     LIFE_SUMMARY_DIR, LOCATION_DETAILS_KEY, LOCATION_KEY,
     LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, MAX_MEMORY_LOG_ENTRIES,
     MAX_SIMULATION_TIME, MEMORY_LOG_CONTEXT_LENGTH,
     MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK, MODEL_NAME,
     PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, SEARCH_AGENT_MODEL_NAME,
-    SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR, STATE_DIR,
-    UPDATE_INTERVAL, USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY, SIMULACRA_KEY) # Import SIMULACRA_KEY
+    SIMULACRA_KEY, SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR,
+    SOCIAL_POST_HASHTAGS, SOCIAL_POST_TEXT_LIMIT, STATE_DIR, UPDATE_INTERVAL,
+    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
 from .core_tasks import interaction_dispatcher_task  # ADK-independent tasks
 from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (get_nested, load_json_file,
                          load_or_initialize_simulation, parse_json_output_last,
                          save_json_file)
-from .models import (NarratorOutput,  # Pydantic models for tasks in this file
-    SimulacraIntentResponse, WorldEngineResponse)
+from .models import NarratorOutput  # Pydantic models for tasks in this file
+from .models import SimulacraIntentResponse, WorldEngineResponse
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
-    _update_state_value, generate_table, get_time_string_for_prompt )
+    _update_state_value, generate_table, get_time_string_for_prompt)
 from .state_loader import parse_location_string  # Used in run_simulation
 
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
@@ -156,8 +158,8 @@ async def narration_task():
             results_json = json.dumps(results, indent=2)
             time_for_narrator_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=completion_time)
             original_narration_agent_instruction = narration_agent_instance.instruction
-            narration_agent_instance.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_narrator_prompt)
-            adk_runner.agent = narration_agent_instance 
+            narration_agent_instance.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_narrator_prompt).replace("{DYNAMIC_CURRENT_WEATHER}", weather_summary_narrator).replace("{DYNAMIC_CURRENT_NEWS}", news_summary_narrator)
+            adk_runner.agent = narration_agent_instance
 
             prompt = f"""
 Actor ID: {actor_id}
@@ -356,7 +358,8 @@ Resolve this intent based on your instructions and the provided context.
 
             original_narration_agent_instruction = world_engine_agent.instruction
             # aaa = original_narration_agent_instruction.replace("{{DYNAMIC_CURRENT_TIME}}", time_for_world_engine_prompt)
-            world_engine_agent.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_world_engine_prompt)
+            world_engine_agent.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_world_engine_prompt).replace("{DYNAMIC_CURRENT_WEATHER}", weather_summary_we).replace("{DYNAMIC_CURRENT_NEWS}", news_summary_we)
+            # world_engine_agent.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_world_engine_prompt)
             adk_runner.agent = world_engine_agent
 
             response_text = ""
@@ -653,9 +656,14 @@ async def simulacra_agent_task_llm(agent_id: str):
             current_sim_time = state.get("world_time", 0.0)
             time_for_simulacra = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)
 
+            # Fetch weather and news for instruction replacement
+            weather_for_instruction = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+            news_headlines_for_instruction = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:1]] # Keep it brief for instruction
+            news_for_instruction = news_headlines_for_instruction[0] if news_headlines_for_instruction else "No significant news."
+
             initial_trigger_content = genai_types.Content(parts=[genai_types.Part(text=initial_trigger_text)])
             original_simulacra_agent_instruction = sim_agent.instruction
-            sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra)
+            sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra).replace("{DYNAMIC_CURRENT_WEATHER}", weather_for_instruction).replace("{DYNAMIC_CURRENT_NEWS}", news_for_instruction)
             adk_runner.agent = sim_agent
             async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=initial_trigger_content):
                 if event.is_final_response() and event.content:
@@ -751,6 +759,13 @@ async def simulacra_agent_task_llm(agent_id: str):
                 ]
                 prompt_text = "\n".join(prompt_text_parts)
                 logger.debug(f"[{agent_name}] Sending subsequent prompt.")
+                
+                # Also update instruction for subsequent calls
+                time_for_simulacra_loop = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time_busy_loop)
+                weather_for_instruction_loop = weather_summary_loop # Already fetched for prompt
+                news_for_instruction_loop = news_summary_loop.split('.')[0] if news_summary_loop else "No significant news." # First sentence or default
+                sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra_loop).replace("{DYNAMIC_CURRENT_WEATHER}", weather_for_instruction_loop).replace("{DYNAMIC_CURRENT_NEWS}", news_for_instruction_loop)
+
                 trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt_text)])
                 adk_runner.agent = sim_agent 
                 async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
@@ -1067,6 +1082,149 @@ async def run_simulation(
             console.print("[yellow]State dictionary is empty.[/yellow]")
         console.rule("[bold green]Simulation Shutdown Complete[/]")
 
+def get_random_style_combination(
+    include_general=True,
+    num_general=1,
+    include_lighting=True,
+    num_lighting=1,
+    include_color=True,
+    num_color=1,
+    include_technique=True,
+    num_technique=1,
+    include_composition=True, # New category for composition
+    num_composition=1,
+    include_atmosphere=True,  # New category for atmosphere/mood
+    num_atmosphere=1
+):
+    """
+    Generates a random combination of photographic styles.
+
+    Args:
+        # ... (existing args) ...
+        include_general (bool): Whether to include general photographic styles.
+        num_general (int): Number of general styles to sample (if included).
+        include_lighting (bool): Whether to include lighting/mood styles.
+        num_lighting (int): Number of lighting/mood styles to sample (if included).
+        include_color (bool): Whether to include color/tone styles.
+        num_color (int): Number of color/tone styles to sample (if included).
+        include_technique (bool): Whether to include camera technique styles.
+        num_technique (int): Number of camera technique styles to sample (if included).
+        include_composition (bool): Whether to include compositional styles.
+        num_composition (int): Number of compositional styles to sample.
+        include_atmosphere (bool): Whether to include atmospheric/emotional styles.
+        num_atmosphere (int): Number of atmospheric styles to sample.
+
+    Returns:
+        str: A comma-separated string of randomly selected styles.
+             Returns an empty string if no categories are included or no styles are sampled.
+    """
+
+    # Define the lists of styles by category
+    general_styles = [
+        "Documentary Photography", "Street Photography", "Fine Art Photography",
+        "Environmental Portraiture", "Minimalist Photography", "Abstract Photography", "Photojournalism",
+        "Conceptual Photography", "Urban Photography", "Landscape Photography",
+        "Still Life Photography", "Fashion Photography", "Architectural Photography"
+    ]
+
+    lighting_styles = [
+        "Cinematic Lighting", "Soft Natural Light", "High Key", "Low Key",
+        "Golden Hour Photography", "Blue Hour Photography", "Dramatic Lighting",
+        "Rim Lighting", "Backlit", "Chiaroscuro", "Studio Lighting", "Available Light"
+    ]
+
+    color_styles = [
+        "Monochromatic (Black and White)", "Vibrant and Saturated", "Muted Tones",
+        "Sepia Tone", "High Contrast Color", "Pastel Colors", "Duotone", "Cross-processed look",
+        "Natural Color Palette", "Warm Tones", "Cool Tones"
+    ]
+
+    # Note: Bokeh/Shallow Depth are often implied by your prompt's requirement
+    # for a blurred background. Deep Depth is the opposite.
+    # Include these if you want to explicitly reinforce or add variety.
+    technique_styles = [
+        "Bokeh-rich", "Shallow Depth of Field", "Deep Depth of Field", "Long Exposure", "Motion Blur",
+        "Panning Shot", "High-Speed Photography", "Tilt-Shift Effect", "Lens Flare (subtle)",
+        "Wide-Angle Perspective", "Telephoto Compression", "Macro Detail", "Clean and Sharp"
+    ]
+
+    compositional_styles = [
+        "Rule of Thirds", "Leading Lines", "Symmetrical Composition", "Asymmetrical Balance",
+        "Frame within a Frame", "Dynamic Symmetry", "Golden Ratio", "Negative Space Emphasis",
+        "Pattern and Repetition", "Centered Subject", "Off-center Subject"
+    ]
+
+    atmospheric_styles = [
+        "Ethereal Mood", "Dreamlike Atmosphere", "Gritty Realism", "Nostalgic Feel",
+        "Serene and Calm", "Dynamic and Energetic", "Mysterious Ambiance", "Whimsical Charm",
+        "Dramatic and Intense", "Melancholic Tone", "Uplifting and Bright", "Crisp Morning Air",
+        "Humid Haze", "Foggy Overlay"
+    ]
+
+    selected_styles = []
+    style_categories_used = 0 # To track how many categories contributed
+
+    # Sample from each category based on the parameters
+    if include_general and num_general > 0:
+        # Ensure we don't try to sample more than available styles
+        k = min(num_general, len(general_styles))
+        selected_styles.extend(random.sample(general_styles, k))
+
+    if include_lighting and num_lighting > 0:
+        k = min(num_lighting, len(lighting_styles))
+        selected_styles.extend(random.sample(lighting_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_color and num_color > 0:
+        k = min(num_color, len(color_styles))
+        selected_styles.extend(random.sample(color_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_technique and include_technique > 0:
+        k = min(num_technique, len(technique_styles))
+        selected_styles.extend(random.sample(technique_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_composition and num_composition > 0:
+        k = min(num_composition, len(compositional_styles))
+        selected_styles.extend(random.sample(compositional_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_atmosphere and num_atmosphere > 0:
+        k = min(num_atmosphere, len(atmospheric_styles))
+        selected_styles.extend(random.sample(atmospheric_styles, k))
+        if k > 0: style_categories_used +=1
+
+    # Shuffle the final list to mix the order of styles
+    random.shuffle(selected_styles)
+    
+    # Log the selected styles for debugging/monitoring
+    # Ensure logger is defined in the scope where this function is defined,
+    # or pass it as an argument if necessary.
+    # For now, assuming 'logger' is accessible (e.g., module-level logger).
+    if selected_styles:
+        logger.info(f"Selected {len(selected_styles)} styles from {style_categories_used} categories: {', '.join(selected_styles)}")
+
+    # Join the selected styles into a comma-separated string
+    return ", ".join(selected_styles)
+
+# Get a combination with one general, one lighting, and one color style
+# random_style = get_random_style_combination(num_general=1, num_lighting=1, num_color=1, include_technique=False)
+# print(f"Random Style Combination 1: {random_style}")
+
+# Get a combination with two styles from any category
+# random_style_2 = get_random_style_combination(num_general=1, num_lighting=1, num_color=1, num_technique=1)
+# print(f"Random Style Combination 2: {random_style_2}")
+
+# Get a combination focusing only on lighting and technique
+# random_style_3 = get_random_style_combination(include_general=False, include_color=False, num_lighting=1, num_technique=1)
+# print(f"Random Style Combination 3: {random_style_3}")
+
+# Get just one random style from any category (approx)
+# random_style_4 = get_random_style_combination(num_general=1, num_lighting=1, num_color=1, num_technique=1)
+# print(f"Random Style Combination 4: {random_style_4}")
+
+
 async def narrative_image_generation_task():
     """
     Periodically generates an image based on the latest narrative log entry.
@@ -1088,7 +1246,23 @@ async def narrative_image_generation_task():
     # Initialize the image generation model (outside the loop for efficiency)
    
     client = genai_image.Client()
-    
+
+    # Initialize Bluesky client if enabled
+    bluesky_client = None
+    if ENABLE_BLUESKY_POSTING:
+        bluesky_client = Client()
+
+    # Updated example call to use new style categories for striking real-world photos
+    random_style = get_random_style_combination(
+        include_general=True, num_general=0,  # Often better to be specific than too general
+        include_lighting=True, num_lighting=1,
+        include_color=True, num_color=1,
+        include_technique=True, num_technique=1,
+        include_composition=True, num_composition=1,
+        include_atmosphere=True, num_atmosphere=1
+    )
+    logger.info(f"[NarrativeImageGenerator] Random style for image generation: {random_style}")
+    # Add a random delay before starting the image generation loop
     await asyncio.sleep(random.uniform(5.0, 10.0)) # Initial delay
 
     while True:
@@ -1105,9 +1279,9 @@ async def narrative_image_generation_task():
 
         latest_narrative_full = narrative_log_entries[-1] # Get the actual latest narrative entry
         # Strip the timestamp like "[T123.4] " from the narrative for a cleaner image prompt
-        narrative_prompt_text = re.sub(r'^\[T\d+\.\d+\]\s*', '', latest_narrative_full).strip()
+        original_narrative_prompt_text = re.sub(r'^\[T\d+\.\d+\]\s*', '', latest_narrative_full).strip()
 
-        if not narrative_prompt_text:
+        if not original_narrative_prompt_text:
             logger.debug("[NarrativeImageGenerator] Latest narrative entry is empty after stripping timestamp. Skipping.")
             continue
 
@@ -1115,75 +1289,209 @@ async def narrative_image_generation_task():
 
         # Attempt to extract an actor name from the narrative for a more personal prompt.
         # This is a heuristic and assumes the narrative often features the actor's name.
-        actor_name_in_narrative = "the character involved" # Default
-        match = re.match(r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)", narrative_prompt_text)
+        actor_name_in_narrative = "the observer" # Default, more generic
+        match = re.match(r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)", original_narrative_prompt_text)
         if match:
             # Avoid common sentence-starting words that aren't names
             common_words_to_avoid = ["As", "The", "A", "An", "It", "He", "She", "They", "Then", "Suddenly", "During", "While"]
             if match.group(1) not in common_words_to_avoid:
                 actor_name_in_narrative = match.group(1)
-
-        # Access the world mood from the global state, falling back to the global variable if not found in state
+        
+        # Get current time string, weather, and mood for grounding
+        time_string_for_image_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time_for_filename)
+        weather_condition_for_image_prompt = get_nested(state, 'world_feeds', 'weather', 'condition', default='The weather is unknown.')
         current_world_mood_ig = state.get(WORLD_TEMPLATE_DETAILS_KEY, {}).get('mood', world_mood_global)
+        
+        # --- LLM Call 1: Refine narrative for image generation ---
+        # Use the standard text model (MODEL_NAME from config) for this refinement task
+        refined_narrative_for_image = original_narrative_prompt_text # Fallback
+        try:
+            refinement_llm = genai.GenerativeModel(MODEL_NAME)
+            prompt_for_refinement = f"""You are an expert at transforming narrative text into concise, visually descriptive prompts ideal for an image generation model. Your goal is to focus on a single, clear subject, potentially with a naturally blurred background.
 
-        prompt_for_image = f"""
-Subject: A social media photo (like Instagram) taken by {actor_name_in_narrative}.
-
-Narrative Context: "{narrative_prompt_text}"
+Original Narrative Context: "{original_narrative_prompt_text}"
+Current Time: "{time_string_for_image_prompt}"
+Current Weather: "{weather_condition_for_image_prompt}"
 World Mood: "{current_world_mood_ig}"
 
+Instructions for Refinement:
+1.  Identify a single, compelling visual element or a very brief, static moment from the 'Original Narrative Context'.
+2.  Describe this single subject clearly and vividly. Use descriptive language for the subject and its relationship to any implied background.
+3.  If appropriate, suggest a composition that would naturally lead to a blurred background (e.g., "A close-up of...", "A detailed shot of...", "A lone figure with the background softly blurred...").
+4.  Keep the refined description concise (preferably 1-2 sentences).
+5.  The refined description should be purely visual and directly usable as an image prompt.
+6.  Do NOT include any instructions for the image generation model itself (like "Generate an image of..."). Just provide the refined descriptive text.
+
+Examples of good refined descriptions:
+- "A close-up photograph of a single red rose in a glass vase, with a soft, blurred background."
+- "A lone figure walking along a cobblestone street on a foggy morning, the background intentionally blurred to emphasize the person."
+- "A detailed shot of a vintage leather-bound book lying open on a wooden table, with a shallow depth of field creating a blurred background."
+
+Refined Visual Description:
+"""
+            logger.info(f"[NarrativeImageGenerator] Requesting LLM to refine narrative for image prompt. Original: '{original_narrative_prompt_text[:100]}...'")
+            response_refinement = await refinement_llm.generate_content_async(prompt_for_refinement)
+            if response_refinement.text:
+                refined_narrative_for_image = response_refinement.text.strip()
+                logger.info(f"[NarrativeImageGenerator] LLM refined narrative to: '{refined_narrative_for_image}'")
+            else:
+                logger.warning("[NarrativeImageGenerator] LLM refinement call returned no text. Using original narrative.")
+        except Exception as e_refine:
+            logger.error(f"[NarrativeImageGenerator] Error during LLM narrative refinement: {e_refine}. Using original narrative.", exc_info=True)
+        # --- End of LLM Call 1 ---
+
+        # --- LLM Call 2: Image Generation ---
+# World Mood: "{current_world_mood_ig}"
+        prompt_for_image = f"""
+Generate a high-quality, visually appealing, **photo-realistic** photograph of a scene or subject directly related to the following narrative context, as if captured by {actor_name_in_narrative}.
+Narrative Context: "{refined_narrative_for_image}" # Use the refined narrative
+Style: "{random_style}"
+
 Instructions for the Image:
-1.  **Perspective:** The image should be from {actor_name_in_narrative}'s point of view. This could be a first-person shot of what they are seeing, a selfie {actor_name_in_narrative} would take (showing their reaction to the narrative context), or a photo of an object, person, or scene {actor_name_in_narrative} finds interesting enough to post.
-2.  **Style & Realism:** The image must look like a photograph a person would realistically take with a phone or camera for social media. Consider common Instagram aesthetics (e.g., well-composed, interesting lighting, perhaps a subtle filter effect if appropriate for the mood). Avoid overly cartoonish styles unless the world mood itself is highly stylized that way. The image should feel authentic.
-3.  **Content & Focus:** The main subject of the photo should be clear and directly relevant to the narrative context. Incorporate details that {actor_name_in_narrative} would notice or want to share. If it's a selfie, {actor_name_in_narrative}'s expression and pose should match the narrative and their implied personality.
-4.  **Overall Feel:** The image should evoke the feeling of an authentic social media post made by an individual experiencing the described event.
+The image should feature:
+-   **Time of Day:** Reflect the lighting and atmosphere typical of "{time_string_for_image_prompt}".
+-   **Weather:** Depict the conditions described by "{weather_condition_for_image_prompt}".
+-   **Season:** Infer the season from the date in the time string and depict it (e.g., foliage, clothing).
+
+-   A clear subject directly related to the Narrative Context.
+-   Lighting, composition, and focus that give it the aesthetic of a professional, high-engagement social media photograph (like those popular on Instagram or Twitter).
+-   Details that align with the World Mood.
+-   A composition that is balanced and aesthetically pleasing, **with a strong emphasis on a clear, well-defined subject within a natural or slightly blurred background.**
+
+Style:
+-   The overall aesthetic should be that of a **modern, editorial-quality, photo-realistic photograph** suitable for a popular social media feed, emphasizing photographic quality, clarity, **authentic textures, and natural colors**.
+-   The image MUST represent what {actor_name_in_narrative} is seeing or a photograph they would take of their environment or an object of interest. This means it should be from a first-person perspective or a shot of the scene/subject in front of them.
+-   Consider an aspect ratio common on social media, such as **4:5 (portrait) or 1:1 (square) as a primary preference to ensure optimal display on mobile feeds.**
+
+Crucial Exclusions:
+-   **The image itself must NOT contain any digital overlays, app interfaces, Instagram/Twitter frames, borders, like buttons, comment icons, usernames, text captions, or any other UI elements.**
+-   **No watermarks or logos should be embedded in the image.**
+-   The output should be the pure photographic image of the subject as described.
+-   **The actor ({actor_name_in_narrative}) themselves MUST NOT be visible in the image. No selfies or third-person shots of the actor.**
 
 Generate this image.
 """
-        logger.info(f"[NarrativeImageGenerator] Requesting image for narrative (T{current_sim_time_for_filename:.1f}): \"{narrative_prompt_text[:100]}...\"")
+        logger.info(f"[NarrativeImageGenerator] Requesting image generation with prompt (T{current_sim_time_for_filename:.1f}): \"{refined_narrative_for_image}\"")
 
         try:
             response = await asyncio.to_thread(
-                client.models.generate_content,
+                client.models.generate_images,
                 model=IMAGE_GENERATION_MODEL_NAME,
-                contents=prompt_for_image,  # Pass as a list for contents
-                config=genai_types.GenerateContentConfig(
-                    response_modalities=['TEXT', 'IMAGE']
+                prompt=prompt_for_image,  # Pass as a list for contents
+                config=genai_types.GenerateImagesConfig(
+                    number_of_images=1,
                 )
             )
 
             image_generated = False
-            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if part.inline_data and part.inline_data.data:
-                        try:
-                            image_bytes = part.inline_data.data
-                            image = Image.open(BytesIO(image_bytes))
-                            
-                            # Create a unique filename
-                            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                            sim_time_str = f"T{current_sim_time_for_filename:.0f}"
-                            image_filename = f"narrative_{sim_time_str}_{timestamp_str}.png"
-                            image_path = os.path.join(IMAGE_GENERATION_OUTPUT_DIR, image_filename)
-                            
-                            image.save(image_path)
-                            logger.info(f"[NarrativeImageGenerator] Successfully generated and saved image: {image_path}")
-                            image_generated = True
-                            # image.show() # Optional: for interactive testing, but usually not for a background task
+            saved_image_path_for_social_post: Optional[str] = None # Store path of successfully saved image
 
-                            # --- Log Image Generation Event ---
-                            _log_event(
-                                sim_time=current_sim_time_for_filename,
-                                agent_id="ImageGenerator", # Or a more specific ID if you have one
-                                event_type="image_generation",
-                                data={"image_filename": image_filename, "prompt_snippet": narrative_prompt_text[:100] + "..."}
-                            )
-                            break # Assuming one image per request
-                        except Exception as e_img_proc:
-                            logger.error(f"[NarrativeImageGenerator] Error processing image data: {e_img_proc}")
+            for generated_image in response.generated_images:
+                try:
+                    image = Image.open(BytesIO(generated_image.image.image_bytes))
+                    
+                    # Create a unique filename
+                    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    sim_time_str = f"T{current_sim_time_for_filename:.0f}"
+                    image_filename = f"narrative_{sim_time_str}_{timestamp_str}.png"
+                    image_path = os.path.join(IMAGE_GENERATION_OUTPUT_DIR, image_filename)
+                    
+                    image.save(image_path)
+                    logger.info(f"[NarrativeImageGenerator] Successfully generated and saved image: {image_path}")
+                    image_generated = True # Mark success
+                    saved_image_path_for_social_post = image_path # Store for Bluesky
+
+                    # --- Log Image Generation Event ---
+                    _log_event(
+                        sim_time=current_sim_time_for_filename,
+                        agent_id="ImageGenerator", # Or a more specific ID if you have one
+                        event_type="image_generation",
+                        data={"image_filename": image_filename, "prompt_snippet": refined_narrative_for_image} # Log refined prompt
+                    )
+                    break # Assuming one image per request
+                except Exception as e_img_proc:
+                    logger.error(f"[NarrativeImageGenerator] Error processing image data (PIL/save): {e_img_proc}", exc_info=True)
+            
+            # --- Bluesky Posting (occurs if image_generated is True and we have a path) ---
+            if ENABLE_BLUESKY_POSTING and bluesky_client and image_generated and saved_image_path_for_social_post:
+                logger.info(f"[NarrativeImageGenerator] Attempting to post image to Bluesky: {saved_image_path_for_social_post}")
+                try:
+                    # Login to Bluesky (idempotent check)
+                    if not bluesky_client.me:
+                        logger.info("[NarrativeImageGenerator] Logging into Bluesky...")
+                        bluesky_client.login(BLUESKY_HANDLE, BLUESKY_APP_PASSWORD)
+                        logger.info("[NarrativeImageGenerator] Bluesky login successful.")
+
+                    # --- Image Resizing/Compression for Bluesky ---
+                    BLUESKY_MAX_IMAGE_SIZE_BYTES = 976 * 1024 # 976KB as a safe upper limit
+                    image_bytes_for_upload = None
+                    original_file_size = os.path.getsize(saved_image_path_for_social_post)
+
+                    if original_file_size > BLUESKY_MAX_IMAGE_SIZE_BYTES:
+                        logger.warning(f"[NarrativeImageGenerator] Image {saved_image_path_for_social_post} ({original_file_size / (1024*1024):.2f}MB) exceeds Bluesky limit ({BLUESKY_MAX_IMAGE_SIZE_BYTES / (1024*1024):.2f}MB). Attempting to compress/resize.")
+                        try:
+                            img_pil = Image.open(saved_image_path_for_social_post)
+                            # Convert to RGB if it's RGBA (PNGs can have alpha) to save as JPEG
+                            if img_pil.mode == 'RGBA':
+                                img_pil = img_pil.convert('RGB')
+
+                            temp_image_buffer = BytesIO()
+                            quality = 85 # Start with a decent quality for JPEG
+                            
+                            # Attempt to save with decreasing quality
+                            while quality >= 50:
+                                temp_image_buffer.seek(0) # Reset buffer
+                                temp_image_buffer.truncate() # Clear buffer
+                                img_pil.save(temp_image_buffer, format="JPEG", quality=quality, optimize=True)
+                                if temp_image_buffer.tell() <= BLUESKY_MAX_IMAGE_SIZE_BYTES:
+                                    logger.info(f"[NarrativeImageGenerator] Compressed image to {temp_image_buffer.tell() / 1024:.2f}KB with JPEG quality {quality}.")
+                                    image_bytes_for_upload = temp_image_buffer.getvalue()
+                                    break
+                                quality -= 10
+                            
+                            # If still too large after quality reduction, try resizing (optional, can be added if needed)
+                            # For now, if quality reduction isn't enough, we might fail or skip posting this image.
+                            if not image_bytes_for_upload:
+                                logger.error(f"[NarrativeImageGenerator] Could not compress {saved_image_path_for_social_post} sufficiently for Bluesky. Final attempt size: {temp_image_buffer.tell() / 1024:.2f}KB.")
+                                # Optionally, you could try resizing here as a further step.
+                                # For simplicity, we'll skip posting if compression alone isn't enough.
+
+                        except Exception as e_compress:
+                            logger.error(f"[NarrativeImageGenerator] Error during image compression for Bluesky: {e_compress}", exc_info=True)
+                    else:
+                        # Image is already small enough, read its bytes
+                        with open(saved_image_path_for_social_post, 'rb') as f:
+                            image_bytes_for_upload = f.read()
+                    
+                    if not image_bytes_for_upload:
+                        logger.error(f"[NarrativeImageGenerator] Failed to prepare image for Bluesky (too large or compression error). Skipping post for this image.")
+                        continue # Skip to the next image generation cycle
+
+                    # Prepare post text
+                    alt_text_for_image = f"Image from simulation at T{current_sim_time_for_filename:.0f}s: {original_narrative_prompt_text}"
+                    post_text_raw = alt_text_for_image # Use refined narrative for social post text as well
+                    # alt_text_for_image = f"Image from simulation at T{current_sim_time_for_filename:.0f}s: {refined_narrative_for_image[:250]}..."
+                    
+                    max_text_length = SOCIAL_POST_TEXT_LIMIT
+                    hashtags_str = SOCIAL_POST_HASHTAGS
+                    estimated_hashtag_space = len(hashtags_str) + (len(hashtags_str.split()) * 1) 
+                    effective_text_limit = max(0, max_text_length - estimated_hashtag_space)
+                    post_text = post_text_raw[:effective_text_limit]
+                    if len(post_text_raw) > effective_text_limit:
+                        post_text = post_text.rsplit(' ', 1)[0] + '...' if ' ' in post_text.rsplit(' ', 1)[0] else post_text + '...' # Ensure rsplit doesn't fail on no space
+                    final_post_content = f"{post_text}\n\n{hashtags_str}".strip()
+
+                    logger.info(f"[NarrativeImageGenerator] Sending image and text to Bluesky: '{final_post_content[:50]}...'")
+                    post_response = bluesky_client.send_image(text=final_post_content, image=image_bytes_for_upload, image_alt=alt_text_for_image)
+                    logger.info(f"[NarrativeImageGenerator] Successfully posted to Bluesky. Post URI: {post_response.uri}")
+
+                except Exception as e_bsky:
+                    logger.error(f"[NarrativeImageGenerator] Error posting image to Bluesky: {e_bsky}", exc_info=True)
+            elif ENABLE_BLUESKY_POSTING and not bluesky_client:
+                 logger.warning("[NarrativeImageGenerator] Bluesky posting is enabled but client failed to initialize.")
             
             if not image_generated:
-                logger.warning(f"[NarrativeImageGenerator] No image data found in response for prompt: {prompt_for_image[:100]}...")
+                logger.warning(f"[NarrativeImageGenerator] No image data found in response for prompt: {prompt_for_image}...")
                 if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
                     for part in response.candidates[0].content.parts:
                         if part.text:

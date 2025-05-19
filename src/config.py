@@ -4,6 +4,15 @@ import os
 from typing import Optional # Added for RANDOM_SEED type hint
 
 # --- Core API and Model Configuration ---
+
+ENABLE_BLUESKY_POSTING = os.getenv("ENABLE_BLUESKY_POSTING", "False").lower() == "true"
+BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE") # Your Bluesky handle (e.g., yourname.bsky.social)
+BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD") # An app-specific password
+# --- Hashtags for Social Posts ---
+SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#TheSimulation #AI #DigitalTwin #ProceduralStorytelling")
+# --- Character Limit for Social Posts (excluding image/hashtags) ---
+SOCIAL_POST_TEXT_LIMIT = int(os.getenv("SOCIAL_POST_TEXT_LIMIT", "300"))
+
 API_KEY = os.getenv("GOOGLE_API_KEY")
 MODEL_NAME = os.getenv("MODEL_GEMINI_PRO", "gemini-2.0-flash")
 SEARCH_AGENT_MODEL_NAME = os.getenv("SEARCH_AGENT_MODEL_NAME", "gemini-2.0-flash")
@@ -49,7 +58,7 @@ RANDOM_SEED: Optional[int] = int(RANDOM_SEED_VALUE) if RANDOM_SEED_VALUE and RAN
 # --- Narrative Image Generation Parameters ---
 ENABLE_NARRATIVE_IMAGE_GENERATION = os.getenv("ENABLE_NARRATIVE_IMAGE_GENERATION", "False").lower() == "true"
 IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 1800.0)) # How often to generate an image
-IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "gemini-2.0-flash-preview-image-generation") # Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
+IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "imagen-3.0-generate-002") # Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
 IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
 
 # --- Social Media Posting Configuration ---

@@ -1,0 +1,81 @@
+{
+  "world_instance_uuid": "669003d4-bce8-49d0-80c2-b58a081dd5f1",
+  "active_simulacra_ids": [
+    "sim_sustdj"
+  ],
+  "world_time": 0.0,
+  "narrative_log": [],
+  "world_template_details": {
+    "description": "A new world is beginning.",
+    "rules": {
+      "allow_teleportation": false,
+      "time_progression_rate": 1.0,
+      "weather_effects_travel": true,
+      "historical_date": null
+    },
+    "world_type": "real",
+    "sub_genre": "realtime",
+    "location": {
+      "city": "New York",
+      "state": null,
+      "country": "New York"
+    },
+    "mood": "The real world and general slice of life."
+  },
+  "simulacra_profiles": {
+    "sim_sustdj": {
+      "current_location": "Home_01",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "Waking up in Home_01.",
+      "goal": "Determine goals.",
+      "memory_log": [],
+      "home_location": "Home_01",
+      "status": "idle",
+      "current_action_end_time": 0.0,
+      "pending_results": {},
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0,
+      "persona_details": {
+        "Name": "Daniel Rodriguez",
+        "Age": 33,
+        "Gender": "male",
+        "Occupation": "Software Engineer",
+        "Current_location": "Brooklyn, New York",
+        "Personality_Traits": [
+          "Analytical",
+          "Reserved",
+          "Creative",
+          "Diligent",
+          "Loyal"
+        ],
+        "Birthplace": "Miami, Florida",
+        "Birthdate": "1991-07-15",
+        "Birthtime": null,
+        "Education": "Master's Degree in Computer Science",
+        "Physical_Appearance": "Average height, slim build, dark brown hair, brown eyes, usually wears glasses.",
+        "Hobbies": "Playing guitar, coding personal projects, hiking, exploring new restaurants.",
+        "Skills": "Proficient in Python, Java, and JavaScript. Experienced in full-stack development, database management, and algorithm design.",
+        "Languages": "English, Spanish",
+        "Health_Status": "Generally healthy, occasional allergies during pollen season.",
+        "Family_Background": "Middle-class family. Father is a retired accountant, mother is a teacher. Has one younger sister.",
+        "Life_Goals": "To contribute to open-source projects, start his own tech company, travel the world.",
+        "Notable_Achievements": "Developed a successful mobile app during his master's program that helped connect local farmers with consumers.",
+        "Fears": "Public speaking, failure, heights.",
+        "Strengths": "Problem-solving abilities, attention to detail, strong work ethic, adaptability.",
+        "Weaknesses": "Can be overly critical of himself, struggles with delegating tasks, sometimes too introverted.",
+        "Ethnicity": "Hispanic",
+        "Religion": null,
+        "Political_Views": "Liberal",
+        "Favorite_Foods": "Cuban sandwiches, pizza, sushi",
+        "Favorite_Music": "Indie rock, classic rock, jazz",
+        "Favorite_Books": "Neuromancer by William Gibson, The Lord of the Rings by J.R.R. Tolkien",
+        "Favorite_Movies": "Blade Runner, The Matrix, Back to the Future",
+        "Pet_Peeves": "Loud chewing, people being late, disorganized code.",
+        "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
+        "Past_Traumas": null
+      },
+      "location": "Home_01"
+    }
+  },
+  "objects": []
+}
