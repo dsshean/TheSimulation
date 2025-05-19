@@ -65,7 +65,7 @@ from .loop_utils import (get_nested, load_json_file,
 from .models import (NarratorOutput,  # Pydantic models for tasks in this file
     SimulacraIntentResponse, WorldEngineResponse)
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
-    _update_state_value, generate_table)
+    _update_state_value, generate_table, get_time_string_for_prompt )
 from .state_loader import parse_location_string  # Used in run_simulation
 
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
@@ -154,6 +154,10 @@ async def narration_task():
             logger.info(f"[NarrationTask] Generating narrative for {actor_name}'s action completion. Outcome: '{outcome_desc}'")
             intent_json = json.dumps(intent, indent=2)
             results_json = json.dumps(results, indent=2)
+            time_for_narrator_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=completion_time)
+            original_narration_agent_instruction = narration_agent_instance.instruction
+            narration_agent_instance.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_narrator_prompt)
+            adk_runner.agent = narration_agent_instance 
 
             prompt = f"""
 Actor ID: {actor_id}
@@ -161,7 +165,7 @@ Actor Name: {actor_name}
 Original Intent: {intent_json}
 Factual Outcome Description: {outcome_desc}
 State Changes (Results): {results_json}
-Current World Time: {completion_time:.1f}
+Current World Time: {time_for_narrator_prompt}
 Current Weather: {weather_summary_narrator}
 Latest News Headline: {news_summary_narrator}
 Recent Narrative History (Cleaned):
@@ -169,7 +173,7 @@ Recent Narrative History (Cleaned):
 
 Generate the narrative paragraph based on these details and your instructions (remembering the established world style '{world_mood_global}').
 """
-            adk_runner.agent = narration_agent_instance # Use the instance
+# Use the instance
             narrative_text = ""
             trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
 
@@ -318,6 +322,7 @@ async def world_engine_task_llm():
             location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={})
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
             location_state_data["objects_present"] = location_state_data.get("ephemeral_objects", [])
+            time_for_world_engine_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)
             
             target_id = get_nested(intent, "target_id")
             target_state_data = {}
@@ -337,7 +342,7 @@ async def world_engine_task_llm():
             prompt = f"""
 Actor Name and ID: {actor_name} ({actor_id})
 Current Location: {actor_location_id}
-Current World Time: {current_sim_time:.1f}
+Current World Time: {time_for_world_engine_prompt}
 Intent: {intent_json}
 Current Weather: {weather_summary_we}
 Latest News Headline: {news_summary_we}
@@ -348,7 +353,12 @@ World Rules: {world_rules_json}
 Resolve this intent based on your instructions and the provided context.
 """
             logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")
-            adk_runner.agent = world_engine_agent 
+
+            original_narration_agent_instruction = world_engine_agent.instruction
+            # aaa = original_narration_agent_instruction.replace("{{DYNAMIC_CURRENT_TIME}}", time_for_world_engine_prompt)
+            world_engine_agent.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_world_engine_prompt)
+            adk_runner.agent = world_engine_agent
+
             response_text = ""
             trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
 
@@ -628,7 +638,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                 f"- Current Weather: {weather_summary}",
                 f"- Recent News Snippet: {news_summary}",
                 f"- Current Goal: {current_sim_state_init.get('goal', 'Determine goal.')}",
-                f"- Current Time: {current_world_time_init:.1f}s",
+                f"- Current Time: {get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_world_time_init)}",
                 f"- Last Observation/Event: {current_sim_state_init.get('last_observation', 'None.')}",
                 f"- Recent History:\n{history_str_init if history_str_init else 'None.'}",
                 f"- Objects in area: {json.dumps(objects_in_room_for_prompt_init) if objects_in_room_for_prompt_init else 'None.'}",
@@ -640,8 +650,13 @@ async def simulacra_agent_task_llm(agent_id: str):
             ]
             initial_trigger_text = "\n".join(prompt_text_parts_init)
             logger.debug(f"[{agent_name}] Sending initial context prompt as agent is idle.")
+            current_sim_time = state.get("world_time", 0.0)
+            time_for_simulacra = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)
+
             initial_trigger_content = genai_types.Content(parts=[genai_types.Part(text=initial_trigger_text)])
-            adk_runner.agent = sim_agent 
+            original_simulacra_agent_instruction = sim_agent.instruction
+            sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra)
+            adk_runner.agent = sim_agent
             async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=initial_trigger_content):
                 if event.is_final_response() and event.content:
                     response_text = event.content.parts[0].text
@@ -725,7 +740,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                      f"- Current Weather: {weather_summary_loop}",
                      f"- Recent News Snippet: {news_summary_loop}",
                      f"- Current Goal: {agent_state_busy_loop.get('goal', 'Determine goal.')}",
-                     f"- Current Time: {current_sim_time_busy_loop:.1f}s",
+                     f"- Current Time: {get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time_busy_loop)}",
                      f"- Last Observation/Event: {agent_state_busy_loop.get('last_observation', 'None.')}",
                      f"- Recent History:\n{history_str if history_str else 'None.'}",
                      f"- Objects in Area: {json.dumps(objects_in_room_for_prompt_loop) if objects_in_room_for_prompt_loop else 'None.'}",

@@ -29,6 +29,7 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 **Your Goal:** You determine your own goals based on your persona and the situation.
 
 **Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output):**
+YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
 3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
@@ -102,7 +103,6 @@ def create_world_engine_llm_agent(
 **Input (Provided via trigger message):**
 - Actor Name & ID:{persona_name} ({sim_id})
 - Current Location
-- Current World Time
 - World Context:
 - Actor's Current Location State (Details of the specific location where the actor currently is, including its name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
 - World Context (Overall world settings: world_type, sub_genre, description, overall_location (city/state/country))
@@ -113,6 +113,7 @@ World Rules (e.g., allow_teleportation)
 
 **Your Task:**
 {world_engine_critical_knowledge_instruction}
+YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR RESULTS.
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
     *   For `move` actions, `intent.details` specifies the target location's ID or a well-known name.
 2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Entity State, Location State, and World Rules.
@@ -175,7 +176,7 @@ World Rules (e.g., allow_teleportation)
 3.  **Calculate Duration:** Realistic duration for valid actions. 0.0 for invalid.
     *   For `move` actions:
         *   If moving to a location listed in `Actor's Current Location State.connected_locations` which has explicit travel time, use that.
-        {world_engine_move_duration_instruction}
+        {world_engine_move_duration_instruction} # This instruction block already considers Current World Time for duration if real/realtime
         *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 5-30 seconds).
     *   For other actions, assign plausible durations (e.g., `talk` a few minutes, `use` object varies, `wait` as specified or short).
 4.  **Determine Results:** State changes in dot notation (e.g., `objects.lamp.power: "on"` or `simulacra_profiles.[sim_id].field: "value"`). Empty `{{}}` for invalid actions.
@@ -183,7 +184,7 @@ World Rules (e.g., allow_teleportation)
 5.  **Generate Factual Outcome Description:** STRICTLY FACTUAL. **Crucially, if the action is performed by an actor, the `outcome_description` MUST use the `Actor Name` exactly as provided in the input.** Examples:
 6.  **Determine `valid_action`:** Final boolean.
 
-**Output:**
+**Output (CRITICAL: Your `outcome_description` string in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the factual description. For example, if the dynamically inserted `Current World Time` was "03:30 PM (Local time for New York)", your `outcome_description` should start with "At 03:30 PM (Local time for New York), ...". If it was "67.7s elapsed", it should start "At 67.7s elapsed, ...".):**
 - Output ONLY a valid JSON object matching this exact structure: `{{"valid_action": bool, "duration": float, "results": dict, "outcome_description": "str"}}`. Your entire response MUST be this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure, regardless of the input or action type.
 - Example (Success): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "outcome_description": "The desk lamp turned on."}}`
 - Example (Failure): `{{"valid_action": true, "duration": 3.0, "results": {{}}, "outcome_description": "The vault door handle did not move; it is locked."}}`
@@ -213,8 +214,8 @@ def create_narration_llm_agent(
 
     if world_type == "real" and sub_genre == "realtime":
         narrator_intro_instruction = f"You are the Narrator for **TheSimulation**, currently focusing on events related to {persona_name} ({sim_id}). The established **World Style/Mood** for this simulation is **'{world_mood}'**. This is a **REAL WORLD, REALTIME** simulation. Your narrative MUST be grounded and realistic."
-        narrator_style_adherence_instruction = f"**Style Adherence:** STRICTLY adhere to **'{world_mood}'** and **REAL WORLD REALISM**. Infuse with appropriate atmosphere, plausible sensory details, and tone."
-        narrator_infuse_time_env_instruction = f"**Infuse with Time and Environment (Realistically):** Use the `Current World Time` (e.g., to describe realistic lighting, typical activity levels for that time of day) and `Current World Feeds` (weather, news) to add subtle, atmospheric details that are authentic to a real-world setting and align with the **'{world_mood}'**. Avoid fantastical elements unless explicitly part of a news feed or a very unusual weather event."
+        narrator_style_adherence_instruction = f"**Style Adherence:** STRICTLY adhere to **'{world_mood}'** and **REAL WORLD REALISM**. Infuse with appropriate atmosphere, plausible sensory details, and tone, all **critically consistent with the provided `Current World Time`**."
+        narrator_infuse_time_env_instruction = f"**Infuse with Time and Environment (Realistically):** The `Current World Time` provided in the input is the **absolute definitive time for the scene you are describing.** You MUST use this provided time as the primary basis for describing realistic lighting, typical activity levels for that specific time of day, and other time-dependent sensory details. **This provided `Current World Time` MUST take precedence over any general assumptions or typical scenarios suggested by the actor's actions or the overall mood.** For example, if the `Current World Time` is '08:25 PM (Local time for New York)' but the Factual Outcome Description is 'Isabella Rossi realized she was bored and decided to go to the park', your narrative MUST describe an evening scene of boredom and decision-making, reflecting an 8:25 PM atmosphere, not an afternoon one. Use `Current World Feeds` (weather, news) to add further subtle, atmospheric details that are authentic to a real-world setting and align with the **'{world_mood}'**. Avoid fantastical elements unless explicitly part of a news feed or a very unusual weather event."
     else:
         world_type_description = f"{world_type.capitalize()}{f' ({sub_genre.capitalize()})' if sub_genre else ''}"
         narrator_intro_instruction = f"You are the Narrator for **TheSimulation**, currently focusing on events related to {persona_name} ({sim_id}). The established **World Style/Mood** for this simulation is **'{world_mood}'**. This is a **{world_type_description}** simulation (e.g., Fictional, Fantasy, Sci-Fi, or Real World but not Realtime). Your narrative should align with this context and the specified mood."
@@ -229,12 +230,12 @@ def create_narration_llm_agent(
 - Original Intent
 - Factual Outcome Description
 - State Changes (Results)
-- Current World Time
 - Current World Feeds (Weather, recent major news - for subtle background flavor)
 - Recent Narrative History (Last ~5 entries)
 - Actor's Current Location ID (e.g., "eleanors_bedroom")
 
 **Your Task:**
+YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR NARRATIVE.
 1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description.
 2.  **Recall the Mood:** Remember the required narrative style is **'{world_mood}'**.
 3.  **Consider the Context:** Note Recent Narrative History. **IGNORE any `World Style/Mood` in `Recent Narrative History`. Prioritize the established '{world_mood}' style.**
@@ -245,7 +246,7 @@ def create_narration_llm_agent(
     *   Example: "As [Actor Name] entered the tavern, a grizzled man with an eye patch (npc_concept_old_pirate_01) at a corner table grunted a greeting."
     *   Example: "A street vendor (npc_concept_flower_seller_01) called out, '[Actor Name], lovely flowers for a lovely day?'"
 6.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
-    *   Write a single, engaging narrative paragraph in the **present tense**.
+    *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the rest of your narrative.** For example, if the dynamically inserted `Current World Time` was "07:33 PM (Local time for New York)", your `narrative` should start with "At 07:33 PM (Local time for New York), ...". If it was "120.5s elapsed", it should start "At 120.5s elapsed, ...".
     {narrator_style_adherence_instruction}
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**

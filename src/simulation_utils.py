@@ -6,6 +6,14 @@ import random
 import re
 from typing import Any, Dict, Optional, List
 
+from datetime import datetime, timezone # Added for get_time_string_for_prompt
+try:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError # For Python 3.9+
+except ImportError:
+    ZoneInfo, ZoneInfoNotFoundError = None, None # Fallback for older Python
+
+from geopy.geocoders import Nominatim
+from timezonefinder import TimezoneFinder
 import google.generativeai as genai
 from google.adk.runners import Runner # For type hinting
 from google.genai import types as genai_types # For type hinting
@@ -17,9 +25,10 @@ from rich.text import Text # For styled text in table
 # Import constants from the config module
 from .config import (
     MODEL_NAME, PROB_INTERJECT_AS_SELF_REFLECTION, # PROB_INTERJECT_AS_NARRATIVE removed
-    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, USER_ID,
+    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, USER_ID, 
+    APP_NAME, # Added APP_NAME for geopy user_agent
     # SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"
-    WORLD_STATE_KEY, LOCATION_DETAILS_KEY, SIMULACRA_KEY
+    WORLD_STATE_KEY, LOCATION_DETAILS_KEY, SIMULACRA_KEY, # Added SIMULACRA_KEY
 )
 from .loop_utils import get_nested # Assuming get_nested remains in loop_utils or is moved here
 
@@ -327,3 +336,68 @@ async def generate_simulated_world_feed_content(
     except Exception as e:
         logger_instance.error(f"Error generating LLM world feed for {category}: {e}", exc_info=True)
         return {"error": f"LLM generation error for {category}", "timestamp": simulation_time, "source_category": category}
+
+def get_time_string_for_prompt(
+    state: Dict[str, Any],
+    sim_elapsed_time_seconds: Optional[float] = None
+) -> str:
+    """
+    Gets the appropriate time string for agent prompts based on the global state.
+    If in "real/realtime" mode, returns the current real-world localized time.
+    Otherwise, returns the provided sim_elapsed_time_seconds formatted as elapsed time.
+    Requires sim_elapsed_time_seconds if not in real/realtime mode.
+    """
+    world_template_details_time = state.get(WORLD_TEMPLATE_DETAILS_KEY, {})
+    sim_world_type_time = world_template_details_time.get("world_type")
+    sim_sub_genre_time = world_template_details_time.get("sub_genre")
+
+    # Initialize geolocator and timezonefinder once if possible, or handle potential re-init
+    # For simplicity here, we'll init them inside the 'realtime' block.
+    # In a high-frequency scenario, you might initialize them once globally or pass them in.
+
+    if sim_world_type_time == "real" and sim_sub_genre_time == "realtime":
+        now_utc = datetime.now(timezone.utc)
+        overall_location_dict_time = world_template_details_time.get(LOCATION_KEY, {})
+        city_name_raw = overall_location_dict_time.get('city', 'Unknown City')
+        country_name_raw = overall_location_dict_time.get('country', '')
+        location_context_for_time_str = f"{city_name_raw}{', ' + country_name_raw if country_name_raw else ''}"
+
+        iana_tz_str = None
+        if city_name_raw != 'Unknown City':
+            location_query_for_geocoding = f"{city_name_raw}, {country_name_raw}".strip(", ")
+            try:
+                geolocator = Nominatim(user_agent=APP_NAME) # APP_NAME from your config
+                location_geo = geolocator.geocode(location_query_for_geocoding, timeout=5) # Reduced timeout
+
+                if location_geo:
+                    tf = TimezoneFinder()
+                    iana_tz_str = tf.timezone_at(lng=location_geo.longitude, lat=location_geo.latitude)
+                    if iana_tz_str:
+                        logger.info(f"Determined IANA timezone for '{location_query_for_geocoding}': {iana_tz_str}")
+                    else:
+                        logger.warning(f"TimezoneFinder could not determine timezone for {location_query_for_geocoding} at ({location_geo.latitude}, {location_geo.longitude}).")
+                else:
+                    logger.warning(f"Could not geocode location: '{location_query_for_geocoding}'")
+            except Exception as e_geo: # Catch broader exceptions from geopy/timezonefinder
+                logger.error(f"Error during geocoding/timezone finding for '{location_query_for_geocoding}': {e_geo}")
+
+        if ZoneInfo and iana_tz_str:
+            try:
+                city_tz = ZoneInfo(iana_tz_str)
+                now_local = now_utc.astimezone(city_tz)
+                return f"{now_local.strftime('%I:%M %p on %A, %B %d, %Y')} (Local time for {location_context_for_time_str})"
+            except ZoneInfoNotFoundError:
+                logger.warning(f"Dynamically found IANA timezone '{iana_tz_str}' for city '{city_name_raw}' not found by zoneinfo. Falling back to UTC.")
+            except Exception as e_tz:
+                logger.error(f"Error converting time for city '{city_name_raw}' with timezone '{iana_tz_str}': {e_tz}. Falling back to UTC.")
+        elif ZoneInfo and city_name_raw != 'Unknown City' and not iana_tz_str:
+             logger.warning(f"Could not dynamically determine IANA timezone for '{city_name_raw}'. Falling back to UTC.")
+        elif not ZoneInfo:
+            logger.warning("zoneinfo module not available (requires Python 3.9+). Falling back to UTC with context for time.")
+
+        # Fallback if dynamic lookup fails, ZoneInfo not available, or city is "Unknown City"
+        return f"{now_utc.strftime('%I:%M %p on %A, %B %d, %Y')} (UTC). The current local time in {location_context_for_time_str} should be inferred."
+
+    elif sim_elapsed_time_seconds is not None:
+        return f"{sim_elapsed_time_seconds:.1f}s elapsed"
+    return "Time unknown (elapsed not provided for non-realtime or state missing)"

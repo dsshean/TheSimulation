@@ -4,3 +4,5 @@ python-dotenv
 rich
 pillow
 duckduckgo_search
+geopy
+timezonefinder
