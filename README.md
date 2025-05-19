@@ -57,7 +57,7 @@ For instance, when we use the words "dog" or "cat," we convey an "invariant repr
 
 Because language is this compressed representation of reality, an LLM in theory learns our reality. It doesn't just learn vocabulary and grammar; it learns how concepts interrelate, how events typically unfold, and the underlying logic of the systems described in the text.
 
-Language is a functional, compressed model of reality, and if LLMs learns this model, then LLMs could potentially be used to simulate aspects of that reality with some degree of fidelity. This project is to investigate the creation of a "digital twin" of the world and an individual to see what happens.
+If LLMs learns this model, then LLMs could potentially be used to simulate aspects of that reality with some degree of fidelity. This project is to investigate the creation of a "digital twin" of the world and an individual to see what happens.
 
 Currently it gives interesting results with all the mundane activities we conduct in life, will be running the system 24/7 with integration to X and Bluesky for realtime live updates of the simulation.
 
