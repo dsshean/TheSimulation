@@ -45,9 +45,7 @@ This research has potential practical applications across various fields:
 
 This project explores the potential of Large Language Models (LLMs) in the context of the simulation theory. The premise is that language itself operates as a compressed, consensus-based representation of reality. This characteristic of language may enable LLMs to serve as a basis for simulating complex systems, including aspects of human experience and interaction, potentially extending to ancestral simulations.
 
-Language as a Consensus-Driven Model of Reality:
-
-At its core, human language is an efficient system for encoding and transmitting information about the world. It functions as a form of compression where complex phenomena, entities, and experiences are distilled into symbolic units—words and concepts. This system is built upon consensus: we, as users of a language, collectively agree on the general meaning and attributes associated with these symbols.
+Language is an efficient system for encoding and transmitting information about the world. It functions as a form of compression where complex phenomena, entities, and experiences are distilled into symbolic units—words and concepts. This system is built upon consensus: we, as users of a language, collectively agree on the general meaning and attributes associated with these symbols.
 
 For instance, when we use the words "dog" or "cat," we convey an "invariant representation"—a shared understanding of these animals—despite the vast individual differences in specific dogs or cats we might have encountered. This shared experience, encoded in language, allows for effective communication of complex ideas through relatively simple linguistic tokens. Language, therefore, can be seen as a collectively constructed and continuously refined model of reality.
 
