@@ -1,6 +1,6 @@
 # TheSimulation
 
-Exploring Simulation Theory through Large Language Models 
+Exploring Simulation Theory through Large Language Models
 
 Current state - Fully functional - Needs enhancements and contributions welcomed.
 
@@ -41,7 +41,19 @@ This research has potential practical applications across various fields:
 
 ### Language as Compressed Reality
 
-The conceptual basis is that language functions as a compressed representation of reality, developed through consensus. LLMs leverage this compression to understand and generate complex information, making them suitable for simulating aspects of reality. (The original concept discussed "Invariant Representations," like the shared understanding of "Dog," as an example of this compression).
+This project explores the potential of Large Language Models (LLMs) in the context of the simulation theory. The premise is that language itself operates as a compressed, consensus-based representation of reality. This characteristic of language may enable LLMs to serve as a basis for simulating complex systems, including aspects of human experience and interaction, potentially extending to ancestral simulations.
+
+Language as a Consensus-Driven Model of Reality:
+
+At its core, human language is an efficient system for encoding and transmitting information about the world. It functions as a form of compression where complex phenomena, entities, and experiences are distilled into symbolic units—words and concepts. This system is built upon consensus: we, as users of a language, collectively agree on the general meaning and attributes associated with these symbols.
+
+For instance, when we use the words "dog" or "cat," we convey an "invariant representation"—a shared understanding of these animals—despite the vast individual differences in specific dogs or cats we might have encountered. This shared experience, encoded in language, allows for effective communication of complex ideas through relatively simple linguistic tokens. Language, therefore, can be seen as a collectively constructed and continuously refined model of reality.
+
+Because language is this compressed representation of reality, an LLM in theory learns our reality. It doesn't just learn vocabulary and grammar; it learns how concepts interrelate, how events typically unfold, and the underlying logic of the systems described in the text.
+
+Language is a functional, compressed model of reality, and if LLMs learns this model, then LLMs could potentially be used to simulate aspects of that reality with some degree of fidelity. This project is to investigate the creation of a "digital twin" of the world and an individual to see what happens.
+
+Currently it gives interesting results with all the mundane activities we conduct in life, will be running the system 24/7 with integration to X and Bluesky for realtime live updates of the simulation.
 
 ### Design
 
@@ -320,7 +332,7 @@ While the core loop is functional, several areas need development:
 
 - Multi-Agent Interaction:
 
-  - Current State: All interactions with NPCS exists and works - NPCs are defined as non world objects, it can be people or say a computer.  A mountain wouldnt be considered an NPC.
+  - Current State: All interactions with NPCS exists and works - NPCs are defined as non world objects, it can be people or say a computer. A mountain wouldnt be considered an NPC.
   - Next Steps: Test multi-agent communication and collaboration/conflict. This includes refining how agents perceive and react to each other's actions, manage shared resources, and form social relationships.
 
 - Real-World Sync & Dynamic Environments:
