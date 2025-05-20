@@ -2,9 +2,15 @@
 
 Exploring Simulation Theory through Large Language Models
 
-Current state - Fully functional - Needs enhancements and contributions welcomed.
-
-World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
+Latest Update as of 5/19/2025
+* Current state - Fully functional - Needs enhancements and contributions welcomed.
+* World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
+* Image generation moved to Imagen 3 - Bluesky integration live
+* To DO:
+* Rework of life_generation.py using ADK - migrataion in progress and option to post entire life generation sequence to Bluesky
+* Posting of interactions to Bluesky - possibly to keep up with realtime updates.  Exploring feasibility or practicality
+* Life graph - all interactions mapping for Data Analysis in graph format.  TBD
+* Further tools use by simulacra ie. Email access / X(Twitter) / Blueksy etc... web browsing.
 
 ## Table of Contents
 
@@ -51,7 +57,7 @@ For instance, when we use the words "dog" or "cat," we convey an "invariant repr
 
 Because language is this compressed representation of reality, an LLM in theory learns our reality. It doesn't just learn vocabulary and grammar; it learns how concepts interrelate, how events typically unfold, and the underlying logic of the systems described in the text.
 
-Language is a functional, compressed model of reality, and if LLMs learns this model, then LLMs could potentially be used to simulate aspects of that reality with some degree of fidelity. This project is to investigate the creation of a "digital twin" of the world and an individual to see what happens.
+If LLMs learns this model, then LLMs could potentially be used to simulate aspects of that reality with some degree of fidelity. This project is to investigate the creation of a "digital twin" of the world and an individual to see what happens.
 
 Currently it gives interesting results with all the mundane activities we conduct in life, will be running the system 24/7 with integration to X and Bluesky for realtime live updates of the simulation.
 
@@ -306,10 +312,9 @@ to reset the world to starting conditions, remove the world_config_uuid.json fro
 
 ### Observing the Simulation
 
-Examine the output both from console and the log file, which you will find some interesting and weird interactions which points to the need for further refinement. For whatever reason the world_engine seems to always narrate extremely horror movie esque settings regardless of the initial conditions...
-"You wake up at home, a friend and cozy place"
+Examine the output both from console and the log file, which you will find some interesting and weird interactions which points to the need for further refinement. For whatever reason the world_engine seems to always narrate extremely horror movie esque settings if no initial conditions are given...
 
-To the narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
+Narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
 
 ![Alt text](output2.png)
 
