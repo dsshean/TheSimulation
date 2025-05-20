@@ -312,10 +312,9 @@ to reset the world to starting conditions, remove the world_config_uuid.json fro
 
 ### Observing the Simulation
 
-Examine the output both from console and the log file, which you will find some interesting and weird interactions which points to the need for further refinement. For whatever reason the world_engine seems to always narrate extremely horror movie esque settings regardless of the initial conditions...
-"You wake up at home, a friend and cozy place"
+Examine the output both from console and the log file, which you will find some interesting and weird interactions which points to the need for further refinement. For whatever reason the world_engine seems to always narrate extremely horror movie esque settings if no initial conditions are given...
 
-To the narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
+Narration agent: "The room is bleak without any features, there are no doors or windows..." or other strange and at times humours outputs.
 
 ![Alt text](output2.png)
 
