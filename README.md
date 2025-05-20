@@ -4,6 +4,7 @@ Exploring Simulation Theory through Large Language Models
 
 Update as of 5/20/2025
 * setup_simulation.py migrated to use ADK - use setup_simulation_adk.py for more robust simulacra generation.
+* Input mode:  The code is there to interact with the simulated world and simulacra, but cannot be accessed due to rich console.  Thinking of migrating the interface to streamlit or other webui to enable this mode. 
 
 Update as of 5/19/2025
 * Current state - Fully functional - Needs enhancements and contributions welcomed.
