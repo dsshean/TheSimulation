@@ -239,7 +239,7 @@ async def generate_yearly_summaries(
     **Instructions:**
     - Provide a summary of major events for each year from {birth_year} to {last_year_to_generate}.
     - Include the persona's primary location for that year and key life events (personal, professional, relationships).
-    - {context_instruction} # <<< Inject conditional instruction here
+    - {context_instruction}
     - If generating birth year summary, include plausible birth month and day.
 
     **Output Format:** Respond ONLY with JSON: {{"birth_month": int, "birth_day": int, "summaries": [{{"year": int, "location": str, "summary": str}}]}}
@@ -697,7 +697,7 @@ async def generate_life_summary_sequentially(
     # Note: actual_age can be negative if born in the future, but we still proceed.
     # The end_year_for_generation will correctly reflect their current age relative to birth.
 
-    end_year_for_generation = birth_year + actual_age
+    end_year_for_generation = simulated_current_year
     logger.info(f"Generation will proceed up to year: {end_year_for_generation} (Birth: {birth_year}, Age: {actual_age})")
 
     # --- Initialize main data structure ---

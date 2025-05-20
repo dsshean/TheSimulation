@@ -1,28 +1,33 @@
 # c:\Users\dshea\Desktop\TheSimulation\src\setup_simulation_adk.py
 import asyncio
-import os
-import uuid
 import json
 import logging
+import os
+import random  # Added for sim_id generation
+import string  # Added for sim_id generation
+import uuid
 from datetime import datetime, timezone
-
-# Import from the new ADK-enabled life generator
-from src.generation.life_generator_adk import generate_new_simulacra_background
-
-# Import the correct logging setup function and APP_NAME for logger naming
-from src.logger_config import setup_unique_logger
-from src.config import APP_NAME
 
 # For user input, similar to setup_simulation.py
 from rich.console import Console
-from rich.panel import Panel # For displaying config summary
-from rich.rule import Rule # For section breaks
-from src.state_loader import parse_location_string # Import from state_loader
+from rich.panel import Panel  # For displaying config summary
+from rich.rule import Rule  # For section breaks
+
+from src.config import APP_NAME
+# Import from the new ADK-enabled life generator
+from src.generation.life_generator_adk import generate_new_simulacra_background
+# Import the correct logging setup function and APP_NAME for logger naming
+from src.logger_config import setup_unique_logger
+from src.state_loader import parse_location_string  # Import from state_loader
 
 # Setup logging
-logger, log_filename = setup_unique_logger(logger_name=APP_NAME + "_SetupADK", file_prefix="setup_simulation_adk")
+logger, log_filename = setup_unique_logger(
+    logger_name=APP_NAME + "_SetupADK",
+    file_prefix="setup_simulation_adk",
+    console_level=logging.CRITICAL # Set console level high to minimize output
+)
 logger.info(f"Logging initialized for setup_simulation_adk.py. Log file: {log_filename}")
-
+logging.getLogger("google.adk").setLevel(logging.WARNING)
 # --- Configuration ---
 NUMBER_OF_SIMULACRA_TO_GENERATE = 1 # Or however many you want
 
@@ -201,7 +206,7 @@ async def setup_new_simulation_environment():
         results = [] # Store results or exceptions
 
         for i in range(number_of_simulacra):
-            sim_id = str(uuid.uuid4()) # Unique ID for the simulacra
+            sim_id = f"sim_{''.join(random.choices(string.ascii_lowercase + string.digits, k=6))}"
             sim_num_display = i + 1
             console.print(Rule(f"Generating Simulacra {sim_num_display}/{number_of_simulacra} (ID: {sim_id})", style="magenta"))
             logger.info(f"--- Generating Simulacra {i+1}/{number_of_simulacra} (SimID: {sim_id}) ---")

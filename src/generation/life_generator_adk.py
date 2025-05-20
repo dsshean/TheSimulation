@@ -7,18 +7,18 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
-from google.adk.agents import LlmAgent 
+from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
-from google.adk.tools import google_search 
+from google.adk.tools import google_search
 from google.genai import types as genai_types
-from pydantic import BaseModel, ValidationError, model_validator 
+from pydantic import BaseModel, ValidationError, model_validator
 # Removed LoopAgent and SequentialAgent as we are abandoning LoopAgent
-from src.agents import create_search_llm_agent 
+from src.agents import create_search_llm_agent
 from src.config import APP_NAME
-from src.generation.llm_service import LLMService 
-from src.generation.models import ( 
-    InitialRelationshipsResponse, Person, 
+from src.generation.llm_service import LLMService
+from src.generation.models import (
+    InitialRelationshipsResponse, Person,
     PersonaDetailsResponse,
 )
 # Rich imports
@@ -49,23 +49,6 @@ class SingleYearDataFromADK(BaseModel):
     year: int
     location: str
     summary: str
-    news_context_used: Optional[str] = None
-    birth_month: Optional[int] = None
-    birth_day: Optional[int] = None
-
-    @model_validator(mode='after')
-    def check_day_valid_for_month(self) -> 'SingleYearDataFromADK':
-        if self.birth_month is not None and self.birth_day is not None:
-            try:
-                ref_year = 2001 # Any non-leap year for general validation
-                if not (1 <= self.birth_month <= 12): # Validate month first
-                    raise ValueError(f"Birth month {self.birth_month} is invalid.")
-                days_in_month = calendar.monthrange(ref_year, self.birth_month)[1]
-                if not (1 <= self.birth_day <= days_in_month):
-                    raise ValueError(f"Birth day {self.birth_day} is invalid for month {self.birth_month} (max {days_in_month}).")
-            except Exception as e:
-                raise ValueError(f"Could not validate date components: {e}") from e
-        return self
 
 class SingleMonthDataFromADK(BaseModel):
     month: int
@@ -96,6 +79,10 @@ class SingleHourDataFromADK(BaseModel):
         if not (0 <= self.hour <= 23):
             raise ValueError(f"Hour {self.hour} is outside the valid range (0-23).")
         return self
+
+class DailyHourlyBreakdownADKResponse(BaseModel):
+    """Pydantic model for the ADK hourly agent to return a full day's activities."""
+    activities: List[SingleHourDataFromADK]
 
 # --- Pydantic models for ONE-SHOT ADK agent outputs (lists of the above) ---
 class YearlySummariesADKResponse(BaseModel):
@@ -173,43 +160,60 @@ async def _call_llm_and_get_validated_data(
 
 # --- ADK Google Search Helper ---
 async def perform_adk_search_via_components(
-    search_agent: LlmAgent, 
-    session_service: InMemorySessionService, 
+    search_agent: LlmAgent,
+    session_service: InMemorySessionService,
     search_query: str
-) -> Optional[str]: 
+) -> Optional[str]:
     if not search_agent or not session_service:
         logger.error("ADK components (search_agent, session_service) not provided for search helper.")
         return None
 
     search_helper_app_name = f"{APP_NAME}_SearchHelperSession_{uuid.uuid4().hex[:6]}"
-    search_runner = Runner(agent=search_agent, session_service=session_service, app_name=search_helper_app_name) 
+    search_runner = Runner(agent=search_agent, session_service=session_service, app_name=search_helper_app_name)
     search_session_id = session_service.create_session(
-        app_name=search_helper_app_name, 
+        app_name=search_helper_app_name,
         user_id="search_helper_user"
     ).id
     logger.info(f"Performing ADK Google Search for: '{search_query}' (using temp session: {search_session_id})")
-    
+
     trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=search_query)])
     formatted_search_results_string: Optional[str] = None
 
     try:
         async for event in search_runner.run_async(
-            user_id="search_helper_user", 
+            user_id="search_helper_user",
             session_id=search_session_id,
             new_message=trigger_content # Ensure new_message is used
         ):
             if event.is_final_response() and event.content:
                 if event.content.parts:
-                    formatted_search_results_string = event.content.parts[0].text
-                    logger.debug(f"ADK Google Search (helper) received final text: {formatted_search_results_string[:200]}...")
-                break 
+                    raw_search_text = event.content.parts[0].text
+                    # Attempt to format it nicely if it looks like a list of results
+                    # This is a simple heuristic; ADK search tool might return structured data or just text
+                    if raw_search_text and isinstance(raw_search_text, str) and ("\n-" in raw_search_text or "\n*" in raw_search_text or "Search results:" in raw_search_text.lower()):
+                        formatted_search_results_string = raw_search_text
+                        console.print(Panel(
+                            formatted_search_results_string,
+                            title=f"Search Results for: '{search_query}'",
+                            border_style="blue",
+                            expand=False # Keep it concise
+                        ))
+                    elif raw_search_text: # Otherwise, just use the raw text if it exists
+                        formatted_search_results_string = raw_search_text
+                        # Optionally print raw text if it's not empty but doesn't fit the "list" heuristic
+                        # console.print(Panel(formatted_search_results_string, title=f"Raw Search Output for: '{search_query}'", border_style="dim blue", expand=False))
+                    else:
+                        formatted_search_results_string = "Search returned no text content."
+
+                    logger.debug(f"ADK Google Search (helper) received final text: {str(formatted_search_results_string)[:200]}...")
+                break
         return formatted_search_results_string
     except Exception as e:
         logger.error(f"Error during ADK Google Search (helper) for '{search_query}': {e}", exc_info=True)
         return None
     finally:
         try:
-            session_service.delete_session(session_id=search_session_id, app_name=search_helper_app_name, user_id="search_helper_user") 
+            session_service.delete_session(session_id=search_session_id, app_name=search_helper_app_name, user_id="search_helper_user")
             logger.debug(f"Deleted temporary search session: {search_session_id}")
         except Exception as e_del:
             logger.warning(f"Could not delete temporary search session {search_session_id}: {e_del}")
@@ -220,14 +224,16 @@ def create_persona_generator_adk_agent(model_name: str = "gemini-1.5-flash-lates
     return LlmAgent(
         name="PersonaGeneratorAgent_ADK",
         model=model_name,
-        description="Generates a detailed random fictional persona.",
+        description="Generates a detailed random fictional persona based on a comprehensive input prompt.",
         instruction="""You are an expert character creator.
-Your input will be a JSON string containing "world_type", "world_description", and "gender_preference".
+You will receive a detailed prompt containing:
+- World Type
+- World Description
+- Gender Preference
 
-Your primary task is to use the provided "world_type" and "world_description" from the input JSON to generate a persona that is deeply consistent and plausible within THAT SPECIFIC world.
-The "gender_preference" from the input JSON should also be strictly followed. If "gender_preference" is null or "any", you may choose any gender appropriate for the world.
-
-Create a detailed fictional persona. Ensure the persona's details (occupation, background, location, etc.) are consistent with the provided world description.
+Your primary task is to use this information to generate a persona that is deeply consistent and plausible within THAT SPECIFIC world.
+The gender preference from the prompt should be strictly followed. If "gender_preference" is null or "any", you may choose any gender appropriate for the world.
+Ensure the persona's details (occupation, background, location, etc.) are consistent with the provided world description from the prompt.
 Age should be an integer between 1 and 120 (typically 18-65 for an adult).
 Generate a plausible birthdate (YYYY-MM-DD) consistent with the generated age and the world type (e.g., future year for SciFi, past year for Fantasy/Historical).
 
@@ -238,8 +244,8 @@ The output MUST be a single JSON object that directly matches the PersonaDetails
 Do NOT wrap the response in any other keys (e.g., do not use a "persona" key at the root of your JSON output).
 The JSON output should start directly with the fields of PersonaDetailsResponse (e.g., "Name": "...", "Age": ..., etc.).
 """,
-        input_schema=PersonaInitialInputSchema,
-        output_schema=PersonaDetailsResponse, 
+        # input_schema=PersonaInitialInputSchema, # Input is now via prompt text
+        output_schema=PersonaDetailsResponse,
         output_key="persona_details_json"
     )
 
@@ -247,15 +253,16 @@ def create_initial_relationships_adk_agent(model_name: str = "gemini-1.5-flash-l
     return LlmAgent(
         name="InitialRelationshipsAgent_ADK",
         model=model_name,
-        description="Establishes initial family structure.",
-        instruction="""Based on the input persona details: {persona_details_json}
-Establish a plausible immediate family structure (parents, siblings). For each person, include their 'name', 'relationship' to the main character, and brief 'details' (e.g., occupation, age relative to character, key personality trait) consistent with the persona's background and world.
+        description="Establishes initial family structure based on a prompt containing persona details.",
+        instruction="""You are a family tree specialist.
+You will receive a prompt containing persona details as a JSON string.
+Based on these details, establish a plausible immediate family structure (parents, siblings). For each person, include their 'name', 'relationship' to the main character, and brief 'details' (e.g., occupation, age relative to character, key personality trait) consistent with the persona's background and world.
 
 **Output Format (Respond ONLY with valid JSON matching the InitialRelationshipsResponse schema):**
 `{{"parents": [{{"name": "...", "relationship": "...", "details": "..."}}], "siblings": [{{"name": "...", "relationship": "...", "details": "..."}}]}}`
 If no siblings, provide an empty list for "siblings". Parents list should typically have 1 or 2 entries.
 """,
-        output_schema=InitialRelationshipsResponse, 
+        output_schema=InitialRelationshipsResponse,
         output_key="initial_relationships_json"
     )
 
@@ -264,29 +271,26 @@ def create_yearly_iteration_adk_agent(model_name: str = "gemini-1.5-flash-latest
     return LlmAgent(
         name="YearlyIterationAgent_ADK",
         model=model_name,
-        description="Generates summaries for a range of years.",
+        description="Generates summaries for a range of years based on a comprehensive input prompt.",
         instruction="""You are a biographer.
-You will receive the following data from the session state:
-- `persona_details_json`: JSON string of the persona.
-- `initial_relationships_json`: JSON string of initial family.
-- `world_details_json`: JSON string with "world_type" and "world_description".
-- `news_context_by_year_json`: JSON string of a dictionary mapping years (as strings) to news context strings. (Pre-fetched by orchestrator)
+You will receive a detailed prompt containing:
+- Persona details (JSON string)
+- Initial family relationships (JSON string)
+- Birth year and the last year to generate summaries for.
+- World Type and World Description.
+- News/External Context for the relevant years (JSON string or "No external context used.").
+- Instructions on whether to use real-world events or invent fictional ones.
 
-Task: Generate summaries for ALL years listed in `years_to_generate_list_int`.
-1. Parse all inputs.
-2. For each year in `years_to_generate_list_int`:
-    - Determine the persona's age in that year.
-    - Parse `news_context_by_year_json` (this is a JSON string of a dictionary where keys are year strings and values are news strings for that year).
-    - For the current year you are processing, retrieve the news string from this parsed dictionary. This string will either be actual news or a message like "No specific external events found or search failed." if the pre-fetch was unsuccessful. Use this retrieved news string as the value for the `news_context_used` field in your output for this year.
-    - Based on the persona's details, relationships, world context, and news, generate a summary of major events for that year.
-    - Include the persona's primary location for that year (be specific, e.g., "City, State/Country").
-    - If the year is the `birth_year_int`, include plausible `birth_month` (1-12) and `birth_day` (1-31, valid for month) in the output for that specific year's object.
+**Instructions:**
+- For each year from the birth year to the last year specified in the prompt, provide a rich, narrative summary of the persona's life. This summary should detail:
+    - **Major Life Events:** Significant personal milestones (e.g., education, relationships, family changes, personal achievements, setbacks, health issues).
+    - **Professional/Occupational Developments:** Career progression, job changes, skill acquisition, significant projects, or periods of unemployment, relevant to their age and the world.
+    - **Impact of External Context:** Weave in the provided "News/External Context" for the year. Show how these events might have directly impacted the persona's life, decisions, or outlook, or how they served as a backdrop to their personal story. If no direct impact, describe how the persona might have perceived or reacted to these events.
+- Include the persona's primary location for that year and key life events (personal, professional, relationships), consistent with all provided context.
+- If generating birth year summary, include plausible birth month and day.
 
-Respond ONLY with valid JSON matching the YearlySummariesADKResponse schema:
-`{{"birth_month": Optional[int], "birth_day": Optional[int], "summaries": [{{"year": int, "location": str, "summary": str, "news_context_used": str, "birth_month": Optional[int], "birth_day": Optional[int]}}]}}`
-The `birth_month` and `birth_day` fields at the top level should be the values for the birth year. The `summaries` list must contain an object for EACH year requested in `years_to_generate_list_int`.
+**Output Format:** Respond ONLY with JSON: {{"birth_month": int, "birth_day": int, "summaries": [{{"year": int, "location": str, "summary": str}}]}}
 """,
-        # Input schema could be a new model expecting years_to_generate_list_int, but for now, it's passed via session.
         output_schema=YearlySummariesADKResponse, # Output is now a list of summaries
         output_key="yearly_summaries_list_json"  # New output key
     )
@@ -295,25 +299,27 @@ def create_monthly_iteration_adk_agent(model_name: str = "gemini-1.5-flash-lates
     return LlmAgent(
         name="MonthlyIterationAgent_ADK",
         model=model_name,
-        description="Generates a summary for a single month.",
+        description="Generates a summary for a single month based on a comprehensive input prompt.",
         instruction="""You are a detailed chronicler.
-You will receive from session state:
-- `persona_details_json`, `world_details_json`, `initial_relationships_json`
-- `target_year_int`: The year for which months are being generated.
-- `yearly_summary_for_target_year_json`: JSON string of the SingleYearDataFromADK for `target_year_int`.
-- `loop_iteration_count`: 0-indexed month (0 for January, 1 for February, etc.).
-- `news_context_by_month_key_json`: JSON dict mapping "YYYY-MM" keys to news strings.
-- `allow_real_context_bool`.
+You will receive a detailed prompt containing all necessary information:
+- Persona details (JSON string)
+- World context (Type and Description)
+- Target year and month for the summary.
+- Yearly summary for the target year (JSON string).
+- Location for the year.
+- News context for the target month (if available, as a string).
+- Instructions on whether to use real context or invent fictional events.
 
-Task: Generate a summary for ONE month.
-1. `current_processing_month = loop_iteration_count + 1`.
-2. Parse inputs. Get `yearly_summary_text` and `yearly_location` from `yearly_summary_for_target_year_json`.
-3. Get `news_for_current_month`: From `news_context_by_month_key_json` for key `target_year_int`-`current_processing_month`. If no news or not allowed, use "Focus on personal development and fictional world events."
+Task: Based on ALL the information provided in the input prompt, generate a rich, narrative summary for the specified month of the specified year. This summary should detail:
+- **Key Personal Developments:** Significant changes in routine, mood, relationships, health, or personal projects.
+- **Notable Events or Activities:** Specific occurrences, outings, or experiences that stood out during the month.
+- **Connection to Yearly/World Context:** Briefly link the month's activities or mood to the broader yearly summary and any provided news/external context for the month. Show how these larger factors might have subtly influenced the persona's daily life or thoughts during this month.
+Include the persona's location (can usually be inferred from the year's location or specified in the prompt).
 
-Based on all info, provide a detailed summary for `current_processing_month` of `target_year_int`. The summary should cover significant personal events or developments.
 Respond ONLY with valid JSON matching SingleMonthDataFromADK:
 `{{"month": int, "location": str, "summary": str, "news_context_used": str}}`
-The "month" field MUST be `current_processing_month`. Location should be consistent with yearly location unless specified. The "summary" should be a comprehensive paragraph.
+The "month" field MUST be the target month from the prompt. Location should be consistent with yearly location unless specified. The "summary" should be a comprehensive paragraph.
+The "news_context_used" field should contain the news string that was provided in the prompt for this month, or a statement like "No external context used." if none was provided or applicable.
 """,
         output_schema=SingleMonthDataFromADK,
         output_key="current_month_data_json"
@@ -323,25 +329,28 @@ def create_daily_iteration_adk_agent(model_name: str = "gemini-1.5-flash-latest"
     return LlmAgent(
         name="DailyIterationAgent_ADK",
         model=model_name,
-        description="Generates a summary for a single day.",
+        description="Generates a summary for a single day based on a comprehensive input prompt.",
         instruction="""You are a meticulous diarist.
-You will receive from session state:
-- `persona_details_json`, `world_details_json`, `initial_relationships_json`
-- `target_year_int`, `target_month_int`.
-- `monthly_summary_for_target_month_json`: JSON string of SingleMonthDataFromADK for the target month.
-- `loop_iteration_count`: 0-indexed day of the month (0 for day 1, 1 for day 2, etc.).
-- `news_context_by_day_key_json`: JSON dict mapping "YYYY-MM-DD" keys to news strings.
-- `allow_real_context_bool`.
+You will receive a detailed prompt containing all necessary information:
+- Persona details (JSON string)
+- World context (Type and Description)
+- Target date (year, month, day) for the summary.
+- Monthly summary for the target month (JSON string).
+- Yearly summary for the target year (JSON string).
+- Location for the month/year.
+- News context for the target day (if available, as a string).
+- Instructions on whether to use real context or invent fictional events.
 
-Task: Generate a summary for ONE day.
-1. `current_processing_day = loop_iteration_count + 1`.
-2. Parse inputs. Get `monthly_summary_text` and `monthly_location` from `monthly_summary_for_target_month_json`.
-3. Get `news_for_current_day`: From `news_context_by_day_key_json` for key `target_year_int`-`target_month_int`-`current_processing_day`. If no news or not allowed, use "Focus on personal routines and fictional local events."
+Task: Based on ALL the information provided in the input prompt, generate a detailed, narrative summary for the specified day. This summary should describe:
+- **Main Activities & Events:** What did the persona primarily do? Were there any significant interactions, tasks, or occurrences?
+- **Mood and Reflections (Optional but encouraged):** Briefly touch upon the persona's likely mood or any brief reflections they might have had, consistent with their personality and the day's events.
+- **Integration of Context:** Subtly weave in elements from the monthly summary and any provided daily news/external context. How did the day fit into the month's flow? Did any external events affect their plans or thoughts?
+Include the persona's location (can usually be inferred from the month's location or specified in the prompt).
 
-Based on all info, provide a detailed summary for `current_processing_day` of `target_month_int`/`target_year_int`. The summary should cover key activities or events of the day.
 Respond ONLY with valid JSON matching SingleDayDataFromADK:
 `{{"day": int, "location": str, "summary": str, "news_context_used": str}}`
-The "day" field MUST be `current_processing_day`. Location should be consistent. The "summary" should be a comprehensive paragraph.
+The "day" field MUST be the target day from the prompt. Location should be consistent. The "summary" should be a comprehensive paragraph.
+The "news_context_used" field should contain the news string that was provided in the prompt for this day, or a statement like "No external context used." if none was provided or applicable.
 """,
         output_schema=SingleDayDataFromADK,
         output_key="current_day_data_json"
@@ -351,26 +360,33 @@ def create_hourly_iteration_adk_agent(model_name: str = "gemini-1.5-flash-latest
     return LlmAgent(
         name="HourlyIterationAgent_ADK",
         model=model_name,
-        description="Generates an activity for a single hour.",
+        description="Generates a full day's hourly activities (0-23) based on a comprehensive input prompt.",
         instruction="""You are an activity logger.
-You will receive from session state:
-- `persona_details_json`, `world_details_json`, `initial_relationships_json`
-- `target_year_int`, `target_month_int`, `target_day_int`.
-- `daily_summary_for_target_day_json`: JSON string of SingleDayDataFromADK for the target day.
-- `loop_iteration_count`: 0-indexed hour of the day (0 for 00:00-00:59, 1 for 01:00-01:59, etc.).
-- `news_context_for_this_hourly_day_str`: String containing news context for the target day (this is the news context from the daily summary).
+You will receive a detailed prompt containing all necessary information:
+- Persona details (JSON string)
+- World context (Type and Description)
+- Target date (year, month, day) for which to generate a full 24-hour breakdown.
+- Daily summary for the target day (JSON string).
+- Monthly and Yearly summaries for context.
+- Location for the day.
+- Immediate Local News/Events Context for this DAY (if available, as a string, freshly searched).
+- Instructions on whether to use real context or invent fictional events/activities.
 
-Task: Generate an activity for ONE hour.
-1. `current_processing_hour = loop_iteration_count`.
-2. Parse inputs. Get `daily_summary_text` and `daily_location` from `daily_summary_for_target_day_json`.
-3. Consider the `news_context_for_this_hourly_day_str` to inform the activities if relevant.
+Task: Based on ALL the information provided in the input prompt, generate a plausible primary activity for **each hour from 00:00 to 23:00** for the specified day.
+For each hour, the activity description should be specific. Include the persona's location for that hour (can often be inferred from the daily location).
+Consider how *immediate, small-scale local conditions and spontaneous occurrences* might affect the persona's activities or attention throughout the day. Examples include:
+    - **Environmental Factors:** Sudden changes in weather (e.g., a quick downpour, unexpected sunshine, a gust of wind), noticeable sounds (e.g., nearby construction, distant music, a car alarm), strong or unusual smells (e.g., food from a street vendor, blooming flowers, smoke), changes in lighting (e.g., a street light flickering on, the sun setting).
+    - **Logistical & Navigational Issues:** Minor public transportation delays (e.g., a bus running a few minutes late), an unexpected short detour due to road maintenance, a longer-than-expected queue for a planned activity (like coffee), a specific item they intended to interact with being temporarily unavailable (e.g., ATM out of order).
+    - **Social Micro-Interactions & Observations:** Briefly bumping into an acquaintance, a short, mundane exchange with a shopkeeper or barista, being asked for simple directions, observing a minor public spectacle (e.g., a street performer setting up, a dog chasing a squirrel, a brief, harmless commotion).
+    - **Personal Needs & Impulses:** Suddenly feeling hungry or thirsty and deciding to grab a quick snack or drink, needing to use a restroom, an impulse to check their phone for messages, a fleeting thought or memory triggered by something in the environment, a moment of people-watching.
+    - **Minor Opportunities & Obstacles:** Noticing an interesting item in a shop window, a street vendor with an appealing snack, a minor spill on the sidewalk to avoid, a dropped item they might notice or briefly consider picking up.
+This Immediate Local News/Events Context for the DAY should be interpreted for its *most direct and immediate local impact* on the hours of the day, if any. For example, news of a nearby traffic accident could explain transportation delays or unusual traffic noise during relevant hours.
 
-Based on all info, describe the primary activity for `current_processing_hour` on `target_day_int`/`target_month_int`/`target_year_int`. The activity description should be specific.
-Respond ONLY with valid JSON matching SingleHourDataFromADK: `{{"hour": int, "location": str, "activity": str}}`
-The "hour" field MUST be `current_processing_hour`. Location should be consistent. The "activity" should be a descriptive sentence.
+Respond ONLY with valid JSON matching DailyHourlyBreakdownADKResponse: `{{"activities": [{{"hour": int, "location": str, "activity": str}}, ...]}}`
+The "activities" list should contain an entry for each hour from 0 to 23.
 """,
-        output_schema=SingleHourDataFromADK,
-        output_key="current_hour_data_json"
+        output_schema=DailyHourlyBreakdownADKResponse, # Changed to the new schema
+        output_key="current_hour_data_json" # Output key remains the same, but content will be a list
     )
 
 # --- Fallback Python-based agent function (if ADK agent fails for persona) ---
@@ -407,8 +423,8 @@ async def run_adk_orchestrated_life_generation(
     persona_details_override: Optional[Dict],
     generation_params: Dict[str, Any],
     session_id_for_workflow: str,
-    session_app_name: str, 
-    session_user_id: str,  
+    session_app_name: str,
+    session_user_id: str,
     allow_real_context: bool,
 ) -> Optional[Dict[str, Any]]:
     console.print(Rule("Starting ADK-Orchestrated Life Generation", style="bold magenta"))
@@ -420,7 +436,7 @@ async def run_adk_orchestrated_life_generation(
     }
 
     generated_persona_data: Optional[Dict[str, Any]] = None
-    persona_details_json_str: Optional[str] = None 
+    persona_details_json_str: Optional[str] = None
 
     if persona_details_override:
         generated_persona_data = persona_details_override
@@ -440,12 +456,21 @@ async def run_adk_orchestrated_life_generation(
             session_service=session_service,
             app_name=session_app_name
         )
-        pipeline_input_text = json.dumps(initial_user_input)
-        pipeline_input_content = genai_types.UserContent(parts=[genai_types.Part(text=pipeline_input_text)])
+        # Construct the prompt for persona generation
+        persona_prompt_text = f"""
+World Type: {initial_user_input.get("world_type", "N/A")}
+World Description: {initial_user_input.get("world_description", "N/A")}
+Gender Preference: {initial_user_input.get("gender_preference", "any")}
+
+Task: Create a detailed fictional persona based on the above information.
+Follow the detailed instructions provided to the PersonaGeneratorAgent_ADK regarding output format and required fields.
+Respond ONLY with valid JSON matching the PersonaDetailsResponse schema.
+"""
+        persona_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=persona_prompt_text)])
 
         async for event in persona_runner.run_async(
             session_id=session_id_for_workflow,
-            new_message=pipeline_input_content, # Ensure new_message is used
+            new_message=persona_trigger_content,
             user_id=session_user_id
         ):
             logger.debug(f"ADK Persona Event: Author={event.author}, Final={event.is_final_response()}, Content={str(event.content)[:200]}, Actions={event.actions}")
@@ -459,18 +484,18 @@ async def run_adk_orchestrated_life_generation(
         retrieved_session_after_persona = session_service.get_session(
             session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id
         )
-        
+
         if retrieved_session_after_persona and retrieved_session_after_persona.state:
             final_session_state_after_persona = retrieved_session_after_persona.state
             logger.info("Retrieved session state after PersonaGeneratorAgent_ADK.")
-            console.print(Rule("Contents of Session State (After Persona Agent)", style="bold purple"))
-            console.print(pretty_repr(final_session_state_after_persona))
+            # console.print(Rule("Contents of Session State (After Persona Agent)", style="bold purple"))
+            # console.print(pretty_repr(final_session_state_after_persona)) # Too verbose
             generated_persona_data = final_session_state_after_persona.get(persona_agent.output_key)
-            
+
             if generated_persona_data and isinstance(generated_persona_data, dict):
                 try:
                     generated_persona_data = PersonaDetailsResponse.model_validate(generated_persona_data).model_dump()
-                    console.print(Panel(pretty_repr(generated_persona_data), title="ADK Persona (from Session State)", expand=False))
+                    # console.print(Panel(pretty_repr(generated_persona_data), title="ADK Persona (from Session State)", expand=False)) # Too verbose
                     persona_details_json_str = json.dumps(generated_persona_data)
                 except (ValidationError, TypeError) as e:
                     logger.error(f"ADK Persona (from Session State) re-validation/serialization error: {e}. Data: {str(generated_persona_data)[:500]}")
@@ -485,22 +510,25 @@ async def run_adk_orchestrated_life_generation(
             generated_persona_data = None
             persona_details_json_str = None
 
-    relationships_data_dict = None 
+    relationships_data_dict = None
     if generated_persona_data and persona_details_json_str:
         console.print(Rule("ADK Standalone Agent: Initial Relationships", style="yellow"))
         relationships_agent = create_initial_relationships_adk_agent()
         relationships_runner = Runner(
             agent=relationships_agent, session_service=session_service, app_name=session_app_name
         )
-        current_session_for_rel = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-        if current_session_for_rel:
-            current_session_for_rel.state[persona_agent.output_key] = persona_details_json_str 
-            logger.info(f"Primed session state with persona_details_json (string) for relationships agent using key '{persona_agent.output_key}'.")
-        else:
-            logger.error(f"Session {session_id_for_workflow} not found to prime state for relationships agent.")
 
-        if current_session_for_rel:
-            relationships_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=persona_details_json_str)])
+        relationships_prompt_text = f"""
+Persona Details (JSON):
+{persona_details_json_str}
+
+Task: Based on the provided persona details, establish a plausible immediate family structure (parents, siblings).
+Follow the detailed instructions provided to the InitialRelationshipsAgent_ADK regarding output format (InitialRelationshipsResponse schema).
+Respond ONLY with valid JSON.
+"""
+        relationships_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=relationships_prompt_text)])
+
+        if persona_details_json_str: # Only run if persona_details_json_str is valid
             async for event in relationships_runner.run_async(
                 session_id=session_id_for_workflow, user_id=session_user_id, new_message=relationships_trigger_content # Ensure new_message is used
             ):
@@ -518,27 +546,27 @@ async def run_adk_orchestrated_life_generation(
             if retrieved_session_after_relationships and retrieved_session_after_relationships.state:
                 final_session_state_after_relationships = retrieved_session_after_relationships.state
                 logger.info("Retrieved session state after InitialRelationshipsAgent_ADK.")
-                console.print(Rule("Contents of Session State (After Relationships Agent)", style="bold purple"))
-                console.print(pretty_repr(final_session_state_after_relationships))
+                # console.print(Rule("Contents of Session State (After Relationships Agent)", style="bold purple"))
+                # console.print(pretty_repr(final_session_state_after_relationships)) # Too verbose
                 relationships_data_dict = final_session_state_after_relationships.get(relationships_agent.output_key)
             else:
                  logger.error(f"Could not retrieve session or session state after InitialRelationshipsAgent_ADK execution.")
     elif generated_persona_data and not persona_details_json_str:
         logger.error("Persona data was generated but failed to serialize to JSON string. Skipping relationships generation.")
-    else: 
+    else:
         logger.warning("Skipping relationships generation because persona generation failed or produced no valid data.")
 
     if relationships_data_dict and isinstance(relationships_data_dict, dict):
         try:
             life_summary["initial_relationships"] = InitialRelationshipsResponse.model_validate(relationships_data_dict).model_dump()
             logger.info("Successfully validated relationships from session state.")
-            console.print(Panel(pretty_repr(life_summary["initial_relationships"]), title="Processed Relationships (from Session State)", expand=False, border_style="green"))
+            # console.print(Panel(pretty_repr(life_summary["initial_relationships"]), title="Processed Relationships (from Session State)", expand=False, border_style="green")) # Too verbose
         except (ValidationError, TypeError) as e:
             logger.error(f"ADK Relationships (from Session State) validation error: {e}. Data: {str(relationships_data_dict)[:500]}")
-            life_summary["initial_relationships"] = None 
-    elif generated_persona_data: 
+            life_summary["initial_relationships"] = None
+    elif generated_persona_data:
         logger.warning("Relationships agent did not produce output or output was not a dict, though persona was generated.")
-        life_summary["initial_relationships"] = None 
+        life_summary["initial_relationships"] = None
 
     if not generated_persona_data:
         if not persona_details_override:
@@ -555,15 +583,21 @@ async def run_adk_orchestrated_life_generation(
                     relationships_runner_fallback = Runner(
                         agent=relationships_agent_fallback, session_service=session_service, app_name=session_app_name
                     )
-                    current_session_for_fallback_rel = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-                    if current_session_for_fallback_rel:
-                        current_session_for_fallback_rel.state[persona_agent.output_key] = persona_details_json_str 
-                        logger.info(f"Primed session state with FALLBACK persona_details_json for relationships agent.")
-                        fallback_rel_trigger = genai_types.UserContent(parts=[genai_types.Part(text=persona_details_json_str)])
+
+                    fallback_relationships_prompt_text = f"""
+Persona Details (JSON):
+{persona_details_json_str}
+
+Task: Based on the provided persona details (this is for a fallback persona), establish a plausible immediate family structure.
+Follow the detailed instructions provided to the InitialRelationshipsAgent_ADK regarding output format.
+Respond ONLY with valid JSON.
+"""
+                    fallback_rel_trigger = genai_types.UserContent(parts=[genai_types.Part(text=fallback_relationships_prompt_text)])
+                    if persona_details_json_str:
                         async for event in relationships_runner_fallback.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=fallback_rel_trigger): # Ensure new_message
                             if event.is_final_response(): break
                             if event.error_message: logger.error(f"Error during relationships for fallback: {event.error_message}"); break
-                        
+
                         retrieved_session_after_fallback_rel = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
                         if retrieved_session_after_fallback_rel and retrieved_session_after_fallback_rel.state:
                             relationships_output_dict_fallback = retrieved_session_after_fallback_rel.state.get(relationships_agent_fallback.output_key)
@@ -571,7 +605,7 @@ async def run_adk_orchestrated_life_generation(
                                 try:
                                     life_summary["initial_relationships"] = InitialRelationshipsResponse.model_validate(relationships_output_dict_fallback).model_dump()
                                 except Exception as e_rel_fallback: logger.error(f"Error processing relationships for fallback: {e_rel_fallback}")
-    
+
     if not generated_persona_data:
         logger.error("All persona generation attempts failed.")
         return None
@@ -579,22 +613,22 @@ async def run_adk_orchestrated_life_generation(
 
     simulated_current_dt = generation_params["generation_timestamp"]
     birthdate_str_from_persona = generated_persona_data.get("Birthdate")
-    
+
     try:
         birthdate_obj = datetime.strptime(str(birthdate_str_from_persona), "%Y-%m-%d").date()
         birth_year = birthdate_obj.year
         birth_month_initial = birthdate_obj.month
         birth_day_initial = birthdate_obj.day
-        
+
         actual_age = simulated_current_dt.year - birth_year - \
                      ((simulated_current_dt.month, simulated_current_dt.day) < (birth_month_initial, birth_day_initial))
         end_year_for_generation = birth_year + actual_age
-        
+
         life_summary["generation_info"].update({
-            "birth_year": birth_year, 
+            "birth_year": birth_year,
             "birth_month": birth_month_initial,
             "birth_day": birth_day_initial,
-            "actual_age_at_generation": actual_age, 
+            "actual_age_at_generation": actual_age,
             "end_year_for_generation": end_year_for_generation
         })
         logger.info(f"Orchestrator Date Setup: Birth {birthdate_obj}, Actual Age {actual_age}, End Year {end_year_for_generation}")
@@ -603,7 +637,7 @@ async def run_adk_orchestrated_life_generation(
         return life_summary
 
     initial_relationships_str = json.dumps(life_summary["initial_relationships"] or {})
-    persona_details_json_str_for_loop = json.dumps(generated_persona_data) 
+    persona_details_json_str_for_loop = json.dumps(generated_persona_data)
 
     console.print(Rule("Generating Yearly Summaries (One-Shot ADK Call)", style="bold yellow"))
     news_context_by_year_with_str_keys: Dict[str, str] = {} # Changed to Dict[str, str]
@@ -618,7 +652,6 @@ async def run_adk_orchestrated_life_generation(
                 news_context_by_year_with_str_keys[str(year_to_search)] = search_results_string # Use string key
             else:
                 news_context_by_year_with_str_keys[str(year_to_search)] = "No specific external events found or search failed." # Use string key
-    # news_context_by_year_json = json.dumps(news_context_by_year_with_str_keys) # This is not needed if passing the dict directly
 
     world_details_json = json.dumps({
         "world_type": initial_user_input.get("world_type"),
@@ -627,36 +660,48 @@ async def run_adk_orchestrated_life_generation(
 
     yearly_iteration_agent = create_yearly_iteration_adk_agent()
     yearly_iteration_runner = Runner(agent=yearly_iteration_agent, session_service=session_service, app_name=session_app_name)
-    
+
     years_to_generate_list = list(range(birth_year, end_year_for_generation + 1))
     num_years_to_generate = len(years_to_generate_list)
 
     if num_years_to_generate > 0:
-        console.print(Rule(f"Generating {num_years_to_generate} Years ({birth_year}-{end_year_for_generation})", style="cyan"))
-        current_session_for_yearly = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-        if not current_session_for_yearly:
+        # console.print(Rule(f"Generating {num_years_to_generate} Years ({birth_year}-{end_year_for_generation})", style="cyan")) # Covered by main rule
+
+        context_instruction_for_yearly = ""
+        if allow_real_context:
+            context_instruction_for_yearly = "Use the provided News Context and your internal knowledge of real-world events for these years."
+        else:
+            context_instruction_for_yearly = f"Invent plausible fictional events or details for these years, consistent with the world type and description provided. Do NOT use real-world events."
+
+        yearly_prompt_text = f"""
+Persona Details (JSON): {persona_details_json_str_for_loop}
+Initial family: {initial_relationships_str}
+Born in {birth_year}. Summaries needed up to end of {end_year_for_generation}.
+World Details: {world_details_json}
+News/External Context (or 'No external context used.'):
+{json.dumps(news_context_by_year_with_str_keys)}
+
+Contextual Instruction: {context_instruction_for_yearly}
+
+Task: Generate yearly summaries for the persona from {birth_year} to {end_year_for_generation}.
+Follow the detailed instructions provided to the YearlyIterationAgent_ADK regarding output format (YearlySummariesADKResponse schema),
+including birth month/day if it's the birth year summary.
+Respond ONLY with valid JSON.
+"""
+        yearly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=yearly_prompt_text)])
+
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error("Session lost before yearly one-shot call. Aborting yearly summaries.")
         else:
-            current_session_for_yearly.state.update({
-                "persona_details_json": persona_details_json_str_for_loop,
-                "initial_relationships_json": initial_relationships_str,
-                "world_details_json": world_details_json,
-                # "birth_year_int": birth_year,
-                # "years_to_generate_list_int": json.dumps(years_to_generate_list), # Pass the list of years
-                "news_context_by_year_json": news_context_by_year_with_str_keys, # Pass the dict with string keys
-                # "allow_real_context_bool": allow_real_context,
-                # No need for list_of_all_yearly_data_json as it's one shot
-            })
-            yearly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=f"Generate life summaries for years {birth_year} through {end_year_for_generation}. This is the news during those years: {json.dumps(news_context_by_year_with_str_keys)}")]) # Ensure new_message is used
             yearly_output_dict: Optional[Dict] = None
-            async for event in yearly_iteration_runner.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=yearly_trigger_content): # Ensure new_message
+            async for event in yearly_iteration_runner.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=yearly_trigger_content): # Ensure new_message is used
                 if event.is_final_response():
                     logger.info(f"YearlyIterationAgent_ADK finished.")
                     break
                 if event.error_message:
                     logger.error(f"Error during YearlyIterationAgent_ADK execution: {event.error_message}")
                     break
-            
+
             session_after_yearly = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
             if session_after_yearly and session_after_yearly.state:
                 yearly_output_dict = session_after_yearly.state.get(yearly_iteration_agent.output_key)
@@ -679,13 +724,13 @@ async def run_adk_orchestrated_life_generation(
             else:
                 logger.error(f"Could not retrieve session state after YearlyIterationAgent_ADK execution.")
 
-        if life_summary["yearly_summaries"]: # Check if any summaries were processed
-            console.print(Rule("Processing Accumulated Yearly Summaries", style="green"))
-            console.print(Panel(pretty_repr(life_summary["yearly_summaries"]), title="ADK Yearly Summaries (Accumulated)", expand=False))
+        # if life_summary["yearly_summaries"]: # Check if any summaries were processed
+            # console.print(Rule("Processing Accumulated Yearly Summaries", style="green")) # Covered by main step rule
+            # console.print(Panel(pretty_repr(life_summary["yearly_summaries"]), title="ADK Yearly Summaries (Accumulated)", expand=False)) # Too verbose
     else:
         logger.info("No years to generate for yearly summaries.")
 
-    console.print(Rule("Generating Monthly Summaries (Manual Loop)", style="bold yellow"))
+    console.print(Rule("Generating Monthly Summaries (Relevant Months)", style="bold yellow"))
     sim_curr_year = life_summary["generation_info"]["current_year"]
     sim_curr_month = life_summary["generation_info"]["current_month"]
     months_to_process_for_loop: List[Tuple[int, int]] = []
@@ -693,10 +738,10 @@ async def run_adk_orchestrated_life_generation(
     months_to_process_for_loop.append((current_sim_date_obj_m.year, current_sim_date_obj_m.month))
     prev_month_date_obj_m = current_sim_date_obj_m - timedelta(days=1)
     prev_month_date_obj_m = prev_month_date_obj_m.replace(day=1)
-    
+
     birth_month_for_compare = life_summary["generation_info"].get("birth_month", 1)
     if not (isinstance(birth_month_for_compare, int) and 1 <= birth_month_for_compare <= 12):
-        birth_month_for_compare = 1 
+        birth_month_for_compare = 1
         logger.warning(f"Invalid birth_month '{life_summary['generation_info'].get('birth_month')}' found. Using 1 for date comparison.")
 
     if date(prev_month_date_obj_m.year, prev_month_date_obj_m.month, 1) >= date(birth_year, birth_month_for_compare, 1):
@@ -706,9 +751,9 @@ async def run_adk_orchestrated_life_generation(
     monthly_iteration_runner = Runner(agent=monthly_iteration_agent, session_service=session_service, app_name=session_app_name)
 
     for target_year_for_months, target_month_for_loop_start in months_to_process_for_loop:
-        console.print(Rule(f"Generating Month {target_year_for_months}-{target_month_for_loop_start:02d}", style="cyan"))
+        # console.print(Rule(f"Generating Month {target_year_for_months}-{target_month_for_loop_start:02d}", style="cyan")) # Covered by main rule
         yearly_summary_for_target_year_dict = life_summary["yearly_summaries"].get(target_year_for_months)
-        if not yearly_summary_for_target_year_dict: 
+        if not yearly_summary_for_target_year_dict:
             logger.warning(f"No yearly summary for {target_year_for_months}, skipping monthly generation.")
             continue
         yearly_summary_for_target_year_json = json.dumps(yearly_summary_for_target_year_dict)
@@ -716,30 +761,43 @@ async def run_adk_orchestrated_life_generation(
         news_context_for_this_month_str = "No external context used."
         if allow_real_context and search_llm_agent:
             s_results_string = await perform_adk_search_via_components(
-                search_llm_agent, session_service, 
+                search_llm_agent, session_service,
                 f"major events {yearly_summary_for_target_year_dict.get('location', '')} {news_context_for_this_month_key}"
             )
             if s_results_string: news_context_for_this_month_str = s_results_string
-        
-        current_loop_session_m = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-        if not current_loop_session_m: 
+
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before monthly iteration for {target_year_for_months}-{target_month_for_loop_start}. Aborting.")
             break
-        current_loop_session_m.state.update({
-            "persona_details_json": persona_details_json_str_for_loop, 
-            "initial_relationships_json": initial_relationships_str,
-            "world_details_json": world_details_json, 
-            "target_year_int": target_year_for_months,
-            "yearly_summary_for_target_year_json": yearly_summary_for_target_year_json,
-            "loop_iteration_count": target_month_for_loop_start - 1,
-            "news_context_by_month_key_json": json.dumps({news_context_for_this_month_key: news_context_for_this_month_str}),
-            "allow_real_context_bool": allow_real_context
-        })
-        monthly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=f"Generate month {target_year_for_months}-{target_month_for_loop_start:02d}")])
+
+        monthly_context_instruction = ""
+        if allow_real_context:
+            monthly_context_instruction = "Use the provided News Context and your internal knowledge of real-world events for this month."
+        else:
+            monthly_context_instruction = f"Invent plausible fictional events or details for this month, consistent with the world type and description. Do NOT use real-world events."
+
+        monthly_prompt_text = f"""
+Persona Details (JSON): {persona_details_json_str_for_loop}
+World Details: {world_details_json}
+Target Year: {target_year_for_months}, Target Month: {target_month_for_loop_start}
+Yearly Summary for {target_year_for_months} (JSON): {yearly_summary_for_target_year_json}
+Location for Year {target_year_for_months}: {yearly_summary_for_target_year_dict.get('location', 'Unknown')}
+News Context for {news_context_for_this_month_key}: "{news_context_for_this_month_str}"
+
+Contextual Instruction: {monthly_context_instruction}
+
+Task: Generate a monthly summary for month {target_month_for_loop_start} of year {target_year_for_months}.
+Follow the detailed instructions provided to the MonthlyIterationAgent_ADK regarding output format (SingleMonthDataFromADK schema).
+The 'month' field in the output must be {target_month_for_loop_start}.
+The 'news_context_used' field should be "{news_context_for_this_month_str}".
+Respond ONLY with valid JSON.
+"""
+        monthly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=monthly_prompt_text)])
+
         async for event in monthly_iteration_runner.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=monthly_trigger_content): # Ensure new_message
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in MonthlyIterationAgent: {event.error_message}"); break
-        
+
         session_after_iteration_m = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_iteration_m and session_after_iteration_m.state:
             iteration_output_dict_m = session_after_iteration_m.state.get(monthly_iteration_agent.output_key)
@@ -747,7 +805,7 @@ async def run_adk_orchestrated_life_generation(
                 try:
                     month_data = SingleMonthDataFromADK.model_validate(iteration_output_dict_m).model_dump()
                     life_summary["monthly_summaries"].setdefault(target_year_for_months, {})[month_data["month"]] = month_data
-                    console.print(Panel(pretty_repr(month_data), title=f"ADK Monthly: {target_year_for_months}-{month_data['month']:02d}", expand=False))
+                    # console.print(Panel(pretty_repr(month_data), title=f"ADK Monthly: {target_year_for_months}-{month_data['month']:02d}", expand=False)) # Too verbose
                 except ValidationError as ve:
                     logger.error(f"Validation error for month {target_year_for_months}-{target_month_for_loop_start} output: {ve}. Data: {iteration_output_dict_m}")
             else:
@@ -756,7 +814,7 @@ async def run_adk_orchestrated_life_generation(
             logger.error(f"Could not retrieve session state after monthly iteration for {target_year_for_months}-{target_month_for_loop_start}.")
             break
 
-    console.print(Rule("Generating Daily Summaries (Manual Loop)", style="bold yellow"))
+    console.print(Rule("Generating Daily Summaries (Last 7 Simulated Days)", style="bold yellow"))
     sim_curr_day = life_summary["generation_info"]["current_day"]
     days_to_process_for_loop_d: List[date] = []
     character_current_sim_date_d = date(sim_curr_year, sim_curr_month, sim_curr_day)
@@ -769,10 +827,10 @@ async def run_adk_orchestrated_life_generation(
     daily_iteration_runner = Runner(agent=daily_iteration_agent, session_service=session_service, app_name=session_app_name)
 
     for target_date_for_daily in days_to_process_for_loop_d:
-        console.print(Rule(f"Generating Day {target_date_for_daily.isoformat()}", style="cyan"))
+        # console.print(Rule(f"Generating Day {target_date_for_daily.isoformat()}", style="cyan")) # Covered by main rule
         yr_d, m_d, d_d = target_date_for_daily.year, target_date_for_daily.month, target_date_for_daily.day
         monthly_summary_d_dict = life_summary["monthly_summaries"].get(yr_d, {}).get(m_d)
-        if not monthly_summary_d_dict: 
+        if not monthly_summary_d_dict:
             logger.warning(f"No monthly summary for {yr_d}-{m_d}, skipping daily generation for {target_date_for_daily.isoformat()}.")
             continue
         monthly_summary_d_json = json.dumps(monthly_summary_d_dict)
@@ -780,26 +838,42 @@ async def run_adk_orchestrated_life_generation(
         news_str_d = "No external context."
         if allow_real_context and search_llm_agent:
             s_res_d_string = await perform_adk_search_via_components(
-                search_llm_agent, session_service, 
-                f"local events {monthly_summary_d_dict.get('location','')} {news_key_d}"
+                search_llm_agent, session_service,
+                f"local events and news {monthly_summary_d_dict.get('location','')} {news_key_d}"
             )
             if s_res_d_string: news_str_d = s_res_d_string
-        
-        current_loop_session_d = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-        if not current_loop_session_d: 
+
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before daily iteration for {target_date_for_daily.isoformat()}. Aborting.")
             break
-        current_loop_session_d.state.update({
-            "persona_details_json": persona_details_json_str_for_loop, 
-            "initial_relationships_json": initial_relationships_str,
-            "world_details_json": world_details_json, 
-            "target_year_int": yr_d, "target_month_int": m_d,
-            "monthly_summary_for_target_month_json": monthly_summary_d_json, 
-            "loop_iteration_count": d_d - 1,
-            "news_context_by_day_key_json": json.dumps({news_key_d: news_str_d}),
-            "allow_real_context_bool": allow_real_context
-        })
-        daily_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=f"Generate day {target_date_for_daily.isoformat()}")])
+
+        daily_context_instruction = ""
+        if allow_real_context:
+            daily_context_instruction = "Use the provided News Context and your internal knowledge of real-world events for this day."
+        else:
+            daily_context_instruction = f"Invent plausible fictional events or details for this day, consistent with the world type and description. Do NOT use real-world events."
+
+        yearly_summary_for_daily_context_json = json.dumps(life_summary["yearly_summaries"].get(yr_d, {}))
+
+        daily_prompt_text = f"""
+Persona Details (JSON): {persona_details_json_str_for_loop}
+World Details: {world_details_json}
+Target Date: {target_date_for_daily.isoformat()} (Year: {yr_d}, Month: {m_d}, Day: {d_d})
+Monthly Summary for {yr_d}-{m_d:02d} (JSON): {monthly_summary_d_json}
+Yearly Summary for {yr_d} (JSON): {yearly_summary_for_daily_context_json}
+Location for Month {yr_d}-{m_d:02d}: {monthly_summary_d_dict.get('location', 'Unknown')}
+News Context for {news_key_d}: "{news_str_d}"
+
+Contextual Instruction: {daily_context_instruction}
+
+Task: Generate a daily summary for {target_date_for_daily.isoformat()}.
+Follow the detailed instructions provided to the DailyIterationAgent_ADK regarding output format (SingleDayDataFromADK schema).
+The 'day' field in the output must be {d_d}.
+The 'news_context_used' field should be "{news_str_d}".
+Respond ONLY with valid JSON.
+"""
+        daily_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=daily_prompt_text)])
+
         async for event in daily_iteration_runner.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=daily_trigger_content): # Ensure new_message
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in DailyIterationAgent for {target_date_for_daily.isoformat()}: {event.error_message}"); break
@@ -811,7 +885,7 @@ async def run_adk_orchestrated_life_generation(
                 try:
                     day_data = SingleDayDataFromADK.model_validate(iteration_output_dict_d).model_dump()
                     life_summary["daily_summaries"].setdefault(yr_d, {}).setdefault(m_d, {})[day_data["day"]] = day_data
-                    console.print(Panel(pretty_repr(day_data), title=f"ADK Daily: {target_date_for_daily.isoformat()}", expand=False))
+                    # console.print(Panel(pretty_repr(day_data), title=f"ADK Daily: {target_date_for_daily.isoformat()}", expand=False)) # Too verbose
                 except ValidationError as ve:
                     logger.error(f"Validation error for day {target_date_for_daily.isoformat()} output: {ve}. Data: {iteration_output_dict_d}")
             else:
@@ -820,7 +894,7 @@ async def run_adk_orchestrated_life_generation(
             logger.error(f"Could not retrieve session state after daily iteration for {target_date_for_daily.isoformat()}.")
             break
 
-    console.print(Rule("Generating Hourly Breakdowns (Manual Loop)", style="bold yellow"))
+    console.print(Rule("Generating Hourly Breakdowns (Simulated Today & Yesterday)", style="bold yellow"))
     sim_curr_hour = life_summary["generation_info"]["current_hour"]
     days_for_hourly_loop_h: List[date] = [character_current_sim_date_d]
     yesterday_sim_date_h = character_current_sim_date_d - timedelta(days=1)
@@ -830,62 +904,184 @@ async def run_adk_orchestrated_life_generation(
     hourly_iteration_runner = Runner(agent=hourly_iteration_agent, session_service=session_service, app_name=session_app_name)
 
     for target_date_for_hourly in days_for_hourly_loop_h:
-        console.print(Rule(f"Generating Hourly for Day {target_date_for_hourly.isoformat()}", style="cyan"))
+        # console.print(Rule(f"Generating Hourly for Day {target_date_for_hourly.isoformat()}", style="cyan")) # Covered by main rule
         yr_h, m_h, d_h = target_date_for_hourly.year, target_date_for_hourly.month, target_date_for_hourly.day
         daily_summary_h = life_summary["daily_summaries"].get(yr_h, {}).get(m_h, {}).get(d_h)
-        if not daily_summary_h: 
+        if not daily_summary_h:
             logger.warning(f"No daily summary for {target_date_for_hourly.isoformat()}, skipping hourly generation.")
             continue
         daily_summary_h_json = json.dumps(daily_summary_h)
-        news_for_this_hourly_day_str = daily_summary_h.get("news_context_used", "No external context available for this day.") # Get news from daily summary
-
-        max_h_for_this_day = sim_curr_hour + 1 if target_date_for_hourly == character_current_sim_date_d else 24
         
-        hourly_activities_for_day_accumulated: Dict[int, Dict] = {}
-        for hour_iteration in range(max_h_for_this_day): 
-            current_loop_session_h = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-            if not current_loop_session_h: 
-                logger.error(f"Session lost before hourly iteration {hour_iteration} for {target_date_for_hourly.isoformat()}. Aborting day.")
-                break
-            current_loop_session_h.state.update({
-                "persona_details_json": persona_details_json_str_for_loop, 
-                "initial_relationships_json": initial_relationships_str,
-                "world_details_json": world_details_json, 
-                "target_year_int": yr_h, "target_month_int": m_h, "target_day_int": d_h,
-                "daily_summary_for_target_day_json": daily_summary_h_json, 
-                "loop_iteration_count": hour_iteration,
-                "news_context_for_this_hourly_day_str": news_for_this_hourly_day_str # Pass daily news to hourly agent
-            })
-            hourly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=f"Generate hour {hour_iteration} for {target_date_for_hourly.isoformat()}")])
-            async for event in hourly_iteration_runner.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=hourly_trigger_content): # Ensure new_message
-                if event.is_final_response(): break
-                if event.error_message: logger.error(f"Error in HourlyIterationAgent for hour {hour_iteration} of {target_date_for_hourly.isoformat()}: {event.error_message}"); break
-            
-            session_after_iteration_h = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-            if session_after_iteration_h and session_after_iteration_h.state:
-                iteration_output_dict_h = session_after_iteration_h.state.get(hourly_iteration_agent.output_key)
-                if iteration_output_dict_h and isinstance(iteration_output_dict_h, dict):
-                    try:
-                        hour_data = SingleHourDataFromADK.model_validate(iteration_output_dict_h).model_dump()
-                        hourly_activities_for_day_accumulated[hour_data["hour"]] = hour_data
-                    except ValidationError as ve:
-                        logger.error(f"Validation error for hour {hour_iteration} of {target_date_for_hourly.isoformat()} output: {ve}. Data: {iteration_output_dict_h}")
-                else:
-                    logger.error(f"Hourly iteration {hour_iteration} for {target_date_for_hourly.isoformat()} did not produce valid output.")
+        # Fetch specific news for this day to be used for hourly generation
+        hourly_specific_news_str = "No external hourly context used."
+        if allow_real_context and search_llm_agent:
+            hourly_search_query = f"immediate local news or events affecting {daily_summary_h.get('location', 'this area')} on {target_date_for_hourly.strftime('%B %d, %Y')}"
+            logger.info(f"Performing ADK Google Search for daily context for hourly generation (day {target_date_for_hourly.isoformat()}): '{hourly_search_query}'")
+            s_results_hourly_string = await perform_adk_search_via_components(
+                search_llm_agent, session_service, hourly_search_query
+            )
+            if s_results_hourly_string:
+                hourly_specific_news_str = s_results_hourly_string
             else:
-                logger.error(f"Could not retrieve session state after hourly iteration {hour_iteration} for {target_date_for_hourly.isoformat()}.")
-                break 
-        
+                hourly_specific_news_str = "No specific hourly-relevant events found from daily search."
+
+        # Single call for the entire day's hourly breakdown
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
+            logger.error(f"Session lost before hourly generation for day {target_date_for_hourly.isoformat()}. Aborting day.")
+            continue # Skip to next day if session is lost
+
+        hourly_context_instruction_for_day = ""
+        if allow_real_context:
+            hourly_context_instruction_for_day = "Consider the provided local news context for the day. Invent plausible activities for each hour."
+        else:
+            hourly_context_instruction_for_day = f"Invent plausible fictional activities for each hour of this day, consistent with the world type and description. Do NOT use real-world events."
+
+        monthly_summary_for_hourly_context_json = json.dumps(life_summary["monthly_summaries"].get(yr_h, {}).get(m_h, {}))
+        yearly_summary_for_hourly_context_json = json.dumps(life_summary["yearly_summaries"].get(yr_h, {}))
+
+        hourly_prompt_text_for_day = f"""
+Persona Details (JSON): {persona_details_json_str_for_loop}
+World Details: {world_details_json}
+Target Date for Full Hourly Breakdown: {target_date_for_hourly.isoformat()}
+Daily Summary for {target_date_for_hourly.isoformat()} (JSON): {daily_summary_h_json}
+Monthly Summary for {yr_h}-{m_h:02d} (JSON): {monthly_summary_for_hourly_context_json}
+Yearly Summary for {yr_h} (JSON): {yearly_summary_for_hourly_context_json}
+Location for Day {target_date_for_hourly.isoformat()}: {daily_summary_h.get('location', 'Unknown')}
+Immediate Local News/Events Context for this DAY ({target_date_for_hourly.isoformat()}): "{hourly_specific_news_str}"
+
+Contextual Instruction for the Day: {hourly_context_instruction_for_day}
+
+Task: Generate a plausible primary activity for **each hour from 00:00 to 23:00** for day {target_date_for_hourly.isoformat()}.
+Follow the detailed instructions provided to the HourlyIterationAgent_ADK regarding output format (DailyHourlyBreakdownADKResponse schema), ensuring the 'activities' list contains entries for all 24 hours.
+Respond ONLY with valid JSON.
+"""
+        hourly_trigger_content_for_day = genai_types.UserContent(parts=[genai_types.Part(text=hourly_prompt_text_for_day)])
+
+        all_day_hourly_activities_dict: Optional[Dict] = None
+        async for event in hourly_iteration_runner.run_async(session_id=session_id_for_workflow, user_id=session_user_id, new_message=hourly_trigger_content_for_day):
+            if event.is_final_response(): break
+            if event.error_message: logger.error(f"Error in HourlyIterationAgent for day {target_date_for_hourly.isoformat()}: {event.error_message}"); break
+
+        session_after_hourly_day = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        if session_after_hourly_day and session_after_hourly_day.state:
+            all_day_hourly_activities_dict = session_after_hourly_day.state.get(hourly_iteration_agent.output_key)
+
+        hourly_activities_for_day_accumulated: Dict[int, Dict] = {}
+        if all_day_hourly_activities_dict and isinstance(all_day_hourly_activities_dict, dict):
+            try:
+                validated_daily_hourly_data = DailyHourlyBreakdownADKResponse.model_validate(all_day_hourly_activities_dict)
+                
+                # Determine how many hours to actually store based on whether it's the current simulated day
+                max_h_to_store = sim_curr_hour + 1 if target_date_for_hourly == character_current_sim_date_d else 24
+
+                for hour_data_model in validated_daily_hourly_data.activities:
+                    if hour_data_model.hour < max_h_to_store: # Truncate if it's the current day
+                        hourly_activities_for_day_accumulated[hour_data_model.hour] = hour_data_model.model_dump()
+                    elif hour_data_model.hour >= 24 : # Safety check for invalid hour from LLM
+                        logger.warning(f"Hourly agent returned activity for invalid hour {hour_data_model.hour} for day {target_date_for_hourly.isoformat()}. Skipping.")
+
+            except ValidationError as ve:
+                logger.error(f"Validation error for full day hourly output for {target_date_for_hourly.isoformat()}: {ve}. Data: {all_day_hourly_activities_dict}")
+        else:
+            logger.error(f"Hourly generation for day {target_date_for_hourly.isoformat()} did not produce valid output or output was not a dict.")
+
         if hourly_activities_for_day_accumulated:
             life_summary["hourly_breakdowns"].setdefault(yr_h, {}).setdefault(m_h, {})[d_h] = {
-                "activities": hourly_activities_for_day_accumulated, 
-                "news": news_for_this_hourly_day_str # Store the daily news context with the hourly breakdown
+                "activities": hourly_activities_for_day_accumulated,
+                "news_context_for_hour_generation": hourly_specific_news_str # Store the news context used for generating these hours
             }
-            console.print(Panel(pretty_repr(hourly_activities_for_day_accumulated), title=f"ADK Hourly: {target_date_for_hourly.isoformat()}", expand=False))
+            # console.print(Panel(pretty_repr(hourly_activities_for_day_accumulated), title=f"ADK Hourly: {target_date_for_hourly.isoformat()}", expand=False)) # Too verbose
         else:
             logger.warning(f"No hourly activities accumulated for {target_date_for_hourly.isoformat()}.")
+
+    console.print(Rule("ADK Orchestration Complete", style="bold green"))
+
+    # --- Final Output: Build and Print Summary Tree (similar to life_generator.py) ---
+    if life_summary.get("persona_details"):
+        summary_tree = Tree(f"[bold blue]Life Summary for {life_summary['persona_details'].get('Name', 'Unknown ADK Persona')}[/bold blue] (ADK Generated)")
         
-    console.print(Rule("ADK Orchestration Complete (All Levels Implemented)", style="bold green"))
+        # Persona Details
+        persona_node = summary_tree.add(f"[bold green]Persona Details[/bold green]")
+        for key, value in life_summary["persona_details"].items():
+            persona_node.add(f"{key}: {str(value)[:200]}") # Truncate long values for display
+        
+        # Birth Information
+        birth_info_node = summary_tree.add(f"[bold green]Birth Information[/bold green]")
+        gen_info = life_summary.get("generation_info", {})
+        birth_info_node.add(f"Year: {gen_info.get('birth_year')}")
+        birth_info_node.add(f"Month: {gen_info.get('birth_month')}")
+        birth_info_node.add(f"Day: {gen_info.get('birth_day')}")
+        birth_info_node.add(f"Actual Age at Generation: {gen_info.get('actual_age_at_generation')}")
+        
+        # Relationships
+        relationships_node = summary_tree.add(f"[bold green]Initial Relationships[/bold green]")
+        if life_summary.get("initial_relationships"):
+            parents = life_summary["initial_relationships"].get("parents", [])
+            siblings = life_summary["initial_relationships"].get("siblings", [])
+            if parents:
+                for parent in parents:
+                    relationships_node.add(f"Parent: {parent.get('name', 'Unknown')} ({parent.get('relationship', '')}) - {str(parent.get('details',''))[:100]}")
+            else:
+                relationships_node.add("No parents listed.")
+            if siblings:
+                for sibling in siblings:
+                    relationships_node.add(f"Sibling: {sibling.get('name', 'Unknown')} ({sibling.get('relationship', '')}) - {str(sibling.get('details',''))[:100]}")
+            else:
+                relationships_node.add("No siblings listed.")
+        else:
+            relationships_node.add("No relationship data.")
+
+        # Yearly Summaries
+        yearly_summaries_node = summary_tree.add(f"[bold green]Yearly Summaries[/bold green]")
+        if life_summary.get("yearly_summaries"):
+            for year, data in sorted(life_summary.get("yearly_summaries", {}).items()):
+                news_used = data.get('news_context_used', data.get('news', 'N/A')) # Check both keys for backward compatibility
+                yearly_summaries_node.add(f"[bold yellow]{year}[/bold yellow] ({data.get('location','N/A')}): {str(data.get('summary', 'No summary'))[:150]}... (News: {str(news_used)[:50]}...)")
+        else:
+            yearly_summaries_node.add("No yearly summaries generated.")
+
+        # Monthly Summaries
+        monthly_summaries_node = summary_tree.add(f"[bold green]Monthly Summaries[/bold green]")
+        if life_summary.get("monthly_summaries"):
+            for year, months in sorted(life_summary.get("monthly_summaries", {}).items()):
+                year_node = monthly_summaries_node.add(f"[bold yellow]{year}[/bold yellow]")
+                for month, data in sorted(months.items()):
+                    year_node.add(f"[bold cyan]{month:02d}[/bold cyan] ({data.get('location','N/A')}): {str(data.get('summary', 'No summary'))[:120]}... (News: {str(data.get('news_context_used','N/A'))[:50]}...)")
+        else:
+            monthly_summaries_node.add("No monthly summaries generated.")
+            
+        # Daily Summaries
+        daily_summaries_node = summary_tree.add(f"[bold green]Daily Summaries[/bold green]")
+        if life_summary.get("daily_summaries"):
+            for year, months in sorted(life_summary.get("daily_summaries", {}).items()):
+                year_node = daily_summaries_node.add(f"[bold yellow]{year}[/bold yellow]")
+                for month, days in sorted(months.items()):
+                    month_node = year_node.add(f"[bold cyan]{month:02d}[/bold cyan]")
+                    for day, data in sorted(days.items()):
+                        month_node.add(f"[bold magenta]{day:02d}[/bold magenta] ({data.get('location','N/A')}): {str(data.get('summary', 'No summary'))[:100]}... (News: {str(data.get('news_context_used','N/A'))[:50]}...)")
+        else:
+            daily_summaries_node.add("No daily summaries generated.")
+
+        # Hourly Breakdowns
+        hourly_breakdowns_node = summary_tree.add(f"[bold green]Hourly Breakdowns[/bold green]")
+        if life_summary.get("hourly_breakdowns"):
+            for year, months in sorted(life_summary.get("hourly_breakdowns", {}).items()):
+                year_node = hourly_breakdowns_node.add(f"[bold yellow]{year}[/bold yellow]")
+                for month, days in sorted(months.items()):
+                    month_node = year_node.add(f"[bold cyan]{month:02d}[/bold cyan]")
+                    for day, data in sorted(days.items()):
+                        day_node = month_node.add(f"[bold magenta]{day:02d}[/bold magenta] (News for day's hours: {str(data.get('news_context_for_hour_generation','N/A'))[:50]}...)")
+                        activities = data.get("activities", {})
+                        if activities:
+                            for hour, activity_data in sorted(activities.items()):
+                                day_node.add(f"[dim]{hour:02d}:00[/dim] ({activity_data.get('location','N/A')}): {str(activity_data.get('activity', 'Unknown Activity'))[:80]}")
+                        else:
+                            day_node.add("No hourly activities recorded.")
+        else:
+            hourly_breakdowns_node.add("No hourly breakdowns generated.")
+            
+        console.print(summary_tree)
+
     return life_summary
 
 # --- Main Entry Point ---
@@ -921,7 +1117,7 @@ async def generate_new_simulacra_background(
 
     if allow_real_context:
         try:
-            search_llm_agent_instance = create_search_llm_agent() 
+            search_llm_agent_instance = create_search_llm_agent() # This uses google_search tool
             logger.info("SearchLLMAgent instance (with google_search tool) initialized for this run.")
         except Exception as e_search_agent:
             logger.error(f"Failed to create SearchLLMAgent instance: {e_search_agent}. Real context searches will be disabled.", exc_info=True)
@@ -931,7 +1127,7 @@ async def generate_new_simulacra_background(
     main_workflow_session_id: Optional[str] = None
     app_name_for_session = f"{APP_NAME}_LifeGenWorkflowInstance_{uuid.uuid4().hex[:6]}"
     user_id_for_session = f"workflow_user_{sim_id}"
-    
+
     if session_service_instance:
         try:
             created_session = session_service_instance.create_session(
@@ -951,7 +1147,7 @@ async def generate_new_simulacra_background(
         "world_description": world_description,
         "gender_preference": gender_preference,
     }
-    
+
     generation_start_time = datetime.now(timezone.utc)
     logger.info(f"Initial reference timestamp for generation: {generation_start_time.isoformat()}")
 
@@ -967,15 +1163,15 @@ async def generate_new_simulacra_background(
     }
 
     life_data = await run_adk_orchestrated_life_generation(
-        session_service=session_service_instance, 
-        search_llm_agent=search_llm_agent_instance, 
+        session_service=session_service_instance,
+        search_llm_agent=search_llm_agent_instance,
         llm_service=llm_service_instance,
         initial_user_input=persona_initial_input,
         persona_details_override=None,
         generation_params=generation_params,
-        session_id_for_workflow=main_workflow_session_id, 
-        session_app_name=app_name_for_session, 
-        session_user_id=user_id_for_session,  
+        session_id_for_workflow=main_workflow_session_id,
+        session_app_name=app_name_for_session,
+        session_user_id=user_id_for_session,
         allow_real_context=allow_real_context
     )
 
