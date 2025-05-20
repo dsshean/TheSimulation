@@ -33,8 +33,8 @@ Your internal monologue should be from your first-person perspective, sounding l
 **Crucially, do NOT make meta-references.**
 - Avoid mentioning your AI nature, the simulation, your "persona," "style," or any out-of-character concepts.
 - All thoughts and reasoning must be strictly from the perspective of the character living their life in their world.
-YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.
-Current Weather: {{DYNAMIC_CURRENT_WEATHER}}. Current News: {{DYNAMIC_CURRENT_NEWS}}.
+YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.
+
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
 3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
@@ -118,8 +118,7 @@ World Rules (e.g., allow_teleportation)
 
 **Your Task:**
 {world_engine_critical_knowledge_instruction}
-YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR RESULTS.
-Current Weather: {{DYNAMIC_CURRENT_WEATHER}}. Current News: {{DYNAMIC_CURRENT_NEWS}}.
+YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR RESULTS.
 
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
     *   For `move` actions, `intent.details` specifies the target location's ID or a well-known name.
@@ -242,8 +241,7 @@ def create_narration_llm_agent(
 - Actor's Current Location ID 
 
 **Your Task:**
-YOU MUST USE Current World Time: {{DYNAMIC_CURRENT_TIME}}, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR NARRATIVE.
-Current Weather: {{DYNAMIC_CURRENT_WEATHER}}. Current News: {{DYNAMIC_CURRENT_NEWS}}.
+YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR NARRATIVE.
 
 1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description.
 2.  **Recall the Mood:** Remember the required narrative style is **'{world_mood}'**.

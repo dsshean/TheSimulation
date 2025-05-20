@@ -157,8 +157,8 @@ async def narration_task():
             intent_json = json.dumps(intent, indent=2)
             results_json = json.dumps(results, indent=2)
             time_for_narrator_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=completion_time)
-            original_narration_agent_instruction = narration_agent_instance.instruction
-            narration_agent_instance.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_narrator_prompt).replace("{DYNAMIC_CURRENT_WEATHER}", weather_summary_narrator).replace("{DYNAMIC_CURRENT_NEWS}", news_summary_narrator)
+            # original_narration_agent_instruction = narration_agent_instance.instruction
+            # narration_agent_instance.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_narrator_prompt).replace("{DYNAMIC_CURRENT_WEATHER}", weather_summary_narrator).replace("{DYNAMIC_CURRENT_NEWS}", news_summary_narrator)
             adk_runner.agent = narration_agent_instance
 
             prompt = f"""
@@ -177,7 +177,7 @@ Generate the narrative paragraph based on these details and your instructions (r
 """
 # Use the instance
             narrative_text = ""
-            trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
+            trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=prompt)])
 
             async for event_llm in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
                 if event_llm.is_final_response() and event_llm.content:
@@ -363,7 +363,7 @@ Resolve this intent based on your instructions and the provided context.
             adk_runner.agent = world_engine_agent
 
             response_text = ""
-            trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt)])
+            trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=prompt)])
 
             async for event_llm in adk_runner.run_async(
                 user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content
@@ -661,7 +661,7 @@ async def simulacra_agent_task_llm(agent_id: str):
             news_headlines_for_instruction = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:1]] # Keep it brief for instruction
             news_for_instruction = news_headlines_for_instruction[0] if news_headlines_for_instruction else "No significant news."
 
-            initial_trigger_content = genai_types.Content(parts=[genai_types.Part(text=initial_trigger_text)])
+            initial_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=initial_trigger_text)])
             original_simulacra_agent_instruction = sim_agent.instruction
             sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra).replace("{DYNAMIC_CURRENT_WEATHER}", weather_for_instruction).replace("{DYNAMIC_CURRENT_NEWS}", news_for_instruction)
             adk_runner.agent = sim_agent
@@ -766,7 +766,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                 news_for_instruction_loop = news_summary_loop.split('.')[0] if news_summary_loop else "No significant news." # First sentence or default
                 sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra_loop).replace("{DYNAMIC_CURRENT_WEATHER}", weather_for_instruction_loop).replace("{DYNAMIC_CURRENT_NEWS}", news_for_instruction_loop)
 
-                trigger_content = genai_types.Content(parts=[genai_types.Part(text=prompt_text)])
+                trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=prompt_text)])
                 adk_runner.agent = sim_agent 
                 async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
                     if event.is_final_response() and event.content:
@@ -829,7 +829,7 @@ Your `internal_monologue` should explain your reasoning.
 If you choose to continue, your `action_type` must be `continue_current_task`.
 If you choose to `initiate_change`, provide the `action_type` and `details` for that change as usual.
 Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`"""
-                        reflection_trigger_content = genai_types.Content(parts=[genai_types.Part(text=reflection_prompt_text)])
+                        reflection_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=reflection_prompt_text)])
                         adk_runner.agent = sim_agent 
                         async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=reflection_trigger_content):
                             if event.is_final_response() and event.content:
