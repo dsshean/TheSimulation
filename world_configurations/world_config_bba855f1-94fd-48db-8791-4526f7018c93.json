@@ -1,5 +1,5 @@
 {
-  "world_instance_uuid": "a05e178a-4e71-4d3e-9023-dfb63a8115ce",
+  "world_instance_uuid": "bba855f1-94fd-48db-8791-4526f7018c93",
   "world_type": "real",
   "sub_genre": "realtime",
   "description": "A simulation mirroring the current real world in New York, New York. Standard physics apply.",
@@ -14,5 +14,5 @@
     "state": null,
     "country": "New York"
   },
-  "setup_timestamp_utc": "2025-05-20T02:25:31.438913+00:00Z"
+  "setup_timestamp_utc": "2025-05-20T15:11:02.785826+00:00Z"
 }
