@@ -1,8 +1,10 @@
 # TheSimulation
 
 Exploring Simulation Theory through Large Language Models
+
 Update as of 5/20/2025
 * setup_simulation.py migrated to use ADK - use setup_simulation_adk.py for more robust simulacra generation.
+
 Update as of 5/19/2025
 * Current state - Fully functional - Needs enhancements and contributions welcomed.
 * World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
