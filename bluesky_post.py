@@ -4,6 +4,7 @@ import re
 import os
 import glob
 from io import BytesIO
+import argparse # Import argparse for command-line arguments
 from typing import Optional # Added import for Optional type hint
 from PIL import Image # For image compression
 from dotenv import load_dotenv
@@ -402,19 +403,31 @@ def process_events_file(filepath):
 
 
 if __name__ == "__main__":
-    # Define the directory where event logs are stored
-    # Assuming the script is run from a location where this relative path is valid,
-    # or use an absolute path if needed.
-    # For your specific case:
-    events_log_directory = r"c:\Users\dshea\Desktop\TheSimulation\logs\events"
-    events_file_pattern = "events_latest_*.jsonl"
+    parser = argparse.ArgumentParser(description="Process simulation event logs and post to Bluesky.")
+    parser.add_argument(
+        "logfile",
+        type=str,
+        nargs='?', # Makes the argument optional
+        help="Path to the specific .jsonl event log file to process. If omitted, the latest 'events_latest_*.jsonl' in the default directory will be used."
+    )
+    args = parser.parse_args()
 
-    print(f"Looking for the latest event log file in: {events_log_directory} with pattern: {events_file_pattern}")
-    latest_jsonl_file_path = find_latest_file_in_dir(events_log_directory, events_file_pattern)
+    target_jsonl_file_path = args.logfile
 
-    if not latest_jsonl_file_path:
-        print(f"FATAL ERROR: No event log files matching '{events_file_pattern}' found in {events_log_directory}.")
-    # os.path.exists check is implicitly handled by find_latest_file_in_dir returning None if no files match or dir doesn't exist
+    if not target_jsonl_file_path:
+        print("No specific log file provided. Looking for the latest event log file...")
+        # Default behavior: find the latest log file
+        events_log_directory = r"c:\Users\dshea\Desktop\TheSimulation\logs\events" # Default directory
+        events_file_pattern = "events_latest_*.jsonl"
+        print(f"Looking in: {events_log_directory} with pattern: {events_file_pattern}")
+        target_jsonl_file_path = find_latest_file_in_dir(events_log_directory, events_file_pattern)
+
+        if not target_jsonl_file_path:
+            print(f"FATAL ERROR: No event log files matching '{events_file_pattern}' found in {events_log_directory}.")
+            exit(1)
+
+    if not os.path.exists(target_jsonl_file_path):
+        print(f"FATAL ERROR: Specified log file not found: {target_jsonl_file_path}")
     else:
-        print(f"Processing events from the latest log file: {latest_jsonl_file_path}")
-        process_events_file(latest_jsonl_file_path)
+        print(f"Processing events from log file: {target_jsonl_file_path}")
+        process_events_file(target_jsonl_file_path)
