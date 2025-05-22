@@ -2,7 +2,17 @@
 
 Exploring Simulation Theory through Large Language Models
 
-Latest Update as of 5/19/2025
+Update as of:
+5/21/2025
+
+- fixed condition that drove simulacra insane due to the inability to move from an unknown location. see race_condition_log for details
+
+5/20/2025
+
+- setup_simulation.py migrated to use ADK - use setup_simulation_adk.py for more robust simulacra generation.
+- Input mode: The code is there to interact with the simulated world and simulacra, but cannot be accessed due to rich console. Thinking of migrating the interface to streamlit or other webui to enable this mode.
+
+5/19/2025
 
 - Current state - Fully functional - Needs enhancements and contributions welcomed.
 - World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
