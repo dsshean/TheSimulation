@@ -33,6 +33,8 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
 
+from .socket_server import socket_server_task
+
 console = Console() # Keep a global console for direct prints if needed by run_simulation
 
 from .agents import create_narration_llm_agent  # Agent creation functions
@@ -94,6 +96,9 @@ search_agent_session_id_val: Optional[str] = None # Renamed
 
 world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home."
 live_display_object: Optional[Live] = None
+
+def get_current_sim_time():
+    return state.get("world_time", 0.0)
 
 # --- Helper for Event Logging ---
 def _log_event(sim_time: float, agent_id: str, event_type: str, data: Dict[str, Any]):
@@ -305,6 +310,14 @@ async def world_engine_task_llm():
                 continue
 
             actor_id = get_nested(request_event, "actor_id")
+            
+            # Check if agent is in interaction mode
+            in_interaction_mode = get_nested(state, SIMULACRA_KEY, actor_id, "interaction_mode", default=False)
+            if in_interaction_mode:
+                logger.info(f"[WorldEngineLLM] Ignoring action request from {actor_id} as they are in interaction mode")
+                event_bus.task_done()
+                continue
+                
             intent = get_nested(request_event, "intent")
             interaction_class = get_nested(request_event, "interaction_class", default="environment")
             action_type = intent.get("action_type") if intent else None
@@ -588,6 +601,9 @@ async def simulacra_agent_task_llm(agent_id: str):
         logger.error(f"[{agent_name}] Could not find agent instance in simulacra_agents_map. Task cannot proceed.")
         return
 
+    # Store the original instruction here, at the beginning of the function
+    original_simulacra_agent_instruction = sim_agent.instruction
+    
     try:
         sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
         if "last_interjection_sim_time" not in sim_state_init:
@@ -983,6 +999,23 @@ async def run_simulation(
         simulacra_agents_map[sim_id_val] = sim_agent_instance
     logger.info(f"Created {len(simulacra_agents_map)} simulacra agents.")
 
+    # Register system agents to prevent "unknown agent" errors
+    simulacra_agents_map["WorldEngineLLMAgent"] = world_engine_agent
+    simulacra_agents_map["NarrationLLMAgent"] = narration_agent_instance  # Note: Changed from NarrationAgent to NarrationLLMAgent
+    if search_llm_agent_instance:
+        simulacra_agents_map["SearchAgent"] = search_llm_agent_instance
+        simulacra_agents_map["SearchLLMAgent"] = search_llm_agent_instance  # Add alternative name
+
+    # Also register simulacra with their LLM-prefixed names
+    for sim_id in final_active_sim_ids:
+        prefixed_sim_id = f"SimulacraLLM_{sim_id}"
+        # Register with prefixed ID if not already present
+        if prefixed_sim_id not in simulacra_agents_map and sim_id in simulacra_agents_map:
+            simulacra_agents_map[prefixed_sim_id] = simulacra_agents_map[sim_id]
+
+    logger.info(f"Added system agents to agent map: WorldEngineLLMAgent, NarrationLLMAgent, SearchAgent")
+    logger.info(f"Registered {len(simulacra_agents_map)} total agents (including prefixed variants)")
+
     adk_runner = Runner(
         agent=world_engine_agent, app_name=APP_NAME,
         session_service=adk_session_service, memory_service=adk_memory_service
@@ -1008,7 +1041,15 @@ async def run_simulation(
 
         with Live(get_current_table_for_live(), console=console, refresh_per_second=1.0/UPDATE_INTERVAL, vertical_overflow="visible") as live:
             live_display_object = live
-
+            tasks.append(asyncio.create_task(
+                socket_server_task(
+                    state=state,
+                    narration_queue=narration_queue,
+                    world_mood=world_mood_global,
+                    simulation_time_getter=get_current_sim_time
+                ), 
+                name="SocketServer"
+            ))
             tasks.append(asyncio.create_task(time_manager_task(
                 current_state=state, 
                 event_bus_qsize_func=lambda: event_bus.qsize(), 

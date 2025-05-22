@@ -517,11 +517,18 @@ def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict |
 
     return loaded_state_data, state_file_path
 
+
+
 def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
     """
-    Attempts to parse a JSON object from a string.
+    Attempts to parse a JSON object from a string, handling common LLM output issues.
     Prioritizes JSON within markdown code fences (```json ... ``` or ``` ... ```).
     If not found, attempts to find the last complete JSON object in the string.
+    
+    Handles common LLM JSON formatting issues including:
+    - Double quotes inside strings ("") which should be escaped (\")
+    - Extra backticks outside markdown fences
+    - Unbalanced brackets at the end of texts
     """
     if not text_output:
         logger.debug("parse_json_output_last received empty text_output.")
@@ -580,13 +587,38 @@ def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
 
     if json_to_parse:
         try:
-            logger.debug(f"Attempting to parse: '{json_to_parse[:200]}...'")
-            parsed_dict = json.loads(json_to_parse)
-            # We are now fine with it being a list or dict at this stage, as some LLM outputs might be lists of objects.
-            # The calling function will need to validate if it specifically needs a dict.
-            logger.debug(f"Successfully parsed JSON: Type {type(parsed_dict)}, Value: {str(parsed_dict)[:200]}")
-            return parsed_dict # Return whatever valid JSON was parsed
-        except json.JSONDecodeError as e:
+            # First attempt: Try direct parsing
+            try:
+                parsed_dict = json.loads(json_to_parse)
+                logger.debug(f"Successfully parsed JSON on first attempt: Type {type(parsed_dict)}")
+                return parsed_dict
+            except json.JSONDecodeError as e1:
+                logger.debug(f"Initial JSON parsing attempt failed: {e1}. Trying with fixups...")
+            
+            # Second attempt: Fix common issues with double quotes in JSON strings
+            fixed_json = json_to_parse
+            
+            # Fix 1: Replace patterns of "" within string values with \"
+            # This handles cases like: "key": "value with ""quotes"" inside"
+            fixed_json = re.sub(r'(": *")([^"]*?)""([^"]*?)""([^"]*?)(")', r'\1\2\"\3\"\4\5', fixed_json)
+            
+            # Fix 2: More aggressive - replaces all double double-quotes with escaped quotes
+            # This might over-correct but is worth trying
+            fixed_json = re.sub(r'""', r'\\"', fixed_json)
+            
+            # Try parsing the fixed JSON
+            try:
+                parsed_dict = json.loads(fixed_json)
+                logger.info(f"Successfully parsed JSON after fixing quotes: Type {type(parsed_dict)}")
+                return parsed_dict
+            except json.JSONDecodeError as e2:
+                logger.debug(f"Second JSON parsing attempt (after quote fixes) failed: {e2}")
+            
+            # Third attempt: Try more aggressive repairs (could add more methods here)
+            logger.warning(f"All JSON parsing attempts failed. Original: {json_to_parse[:200]}...")
+            return None
+            
+        except Exception as e:
             logger.warning(f"Final JSON parsing attempt failed for: '{json_to_parse[:200]}...'. Error: {e}")
             return None
     

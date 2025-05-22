@@ -3,8 +3,20 @@
   "active_simulacra_ids": [
     "sim_b797o8"
   ],
-  "world_time": 0.0,
-  "narrative_log": [],
+  "world_time": 89.95300000000861,
+  "narrative_log": [
+    "[T6.4] At 12:46 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava's eyes adjust to the light filtering through the blinds. Her bedroom, though tidy, has a lived-in feel. A queen-sized **bed (bed_01)** dominates the space, its blue duvet slightly rumpled. Beside it, a **nightstand (nightstand_01)** holds a reading lamp and her phone. Across from the bed, a **dresser (dresser_01)** stands against the wall, topped with a framed photo of her family. She spots a **doorway (doorway_01)** on the far wall, presumably leading to the rest of the apartment.",
+    "[T9.6] Ava Sharma's action failed: At 12:46 PM on Thursday, May 22, 2025 (Local time for New York, New York), world_action is not a valid action type.",
+    "[T19.9] At 12:46 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava walks through the doorway and finds herself in the apartment interior. It's a somewhat generic space, needing a bit of exploration to determine its precise layout. She can see a glimpse of a **living room (living_room_01)** with a comfortable-looking sofa. To her right, there seems to be an **opening (kitchen_area_01)** that probably leads to the kitchen, her destination for lunch. Straight ahead, another **doorway (hallway_01)** suggests a hallway leading to other parts of the apartment.",
+    "[T26.0] At 12:46 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava takes a moment to get her bearings in the apartment's main area. The space opens up into a combined living and dining area. To the left, she sees a comfortable **sofa (sofa_01)** and a **coffee table (coffee_table_01)**, forming a cozy living room setup. Directly ahead is a small **dining table (dining_table_01)** with two chairs. To the right, an open archway reveals the **kitchen (kitchen_01)**, gleaming with stainless steel appliances. She also notes a **hallway (hallway_01)** leading further into the apartment near the dining area, likely towards the bathroom and other rooms.",
+    "[T42.6] At 01:30 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava walks into the kitchen. Sunlight, diffused by the cloudy sky outside, streams through the window above the sink. The stainless steel appliances gleam softly in the muted light. She spots a **refrigerator (refrigerator_kitchen_01)** to her left and a **stove (stove_kitchen_01)** to her right. A **countertop (countertop_kitchen_01)** runs along the wall, offering ample space for meal preparation.",
+    "[T51.2] At 01:30 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava pulls open the refrigerator door. The cool air rushes out, carrying the faint scent of leftover takeout and fresh produce. Inside, she sees a carton of **eggs (eggs_01)** on the top shelf, a half-empty container of **yogurt (yogurt_01)**, and various **vegetables (vegetables_01)** in the crisper drawer. A bottle of **sparkling water (sparkling_water_01)** sits on the door.",
+    "[T57.6] At 01:30 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava peers into the refrigerator, its interior illuminated by the cool, white light. On the top shelf, behind the **carton of eggs (eggs_01)**, she notices a plastic container holding leftover **chicken tikka masala (tikka_masala_01)** from last night's takeout \u2013 perfect. Below, on the door, various condiments are neatly arranged: **mustard (mustard_01)**, **mayonnaise (mayonnaise_01)**, and a jar of **pickles (pickles_01)**. The crisper drawers are filled with slightly wilted **spinach (spinach_01)** and a lonely **tomato (tomato_01)**.",
+    "[T65.1] At 01:30 PM on Thursday, May 22, 2025 (Local time for New York, New York), reaching into the refrigerator, Ava bypasses the **carton of eggs (eggs_01)**, the **wilted spinach (spinach_01)**, and the **lonely tomato (tomato_01)**. She grabs the half-empty container of **yogurt (yogurt_01)** from the middle shelf. As she pulls it out, she notices a small, handwritten note (note_refrigerator_01) stuck to the side of the fridge with a magnet. It's a reminder to buy groceries.",
+    "[T71.4] At 01:31 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava grins as she lifts the container of **chicken tikka masala (tikka_masala_01)** from the refrigerator. The aroma of spiced tomato and tender chicken wafts up, already making her mouth water. She closes the refrigerator door, the dim kitchen momentarily illuminated before returning to its cloudy-day ambiance.",
+    "[T80.1] At 01:31 PM on Thursday, May 22, 2025 (Local time for New York, New York), with a slight sigh, Ava returns the container of **yogurt (yogurt_01)** to its place on the refrigerator shelf, nudging aside the **carton of eggs (eggs_01)** to make room. She briefly contemplates the **handwritten note (note_refrigerator_01)** reminding her to buy groceries before closing the door with a soft click.",
+    "[T86.9] At 01:31 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava opens the refrigerator once more. The cool air washes over her as she reaches past the **eggs (eggs_01)** and the **sparkling water (sparkling_water_01)**, carefully retrieving the container of **chicken tikka masala (tikka_masala_01)**. This time, she makes sure it's the right one."
+  ],
   "world_template_details": {
     "description": "A new world is beginning.",
     "rules": {
@@ -25,13 +37,13 @@
   "simulacra_profiles": {
     "sim_b797o8": {
       "current_location": "Home_01",
-      "location_details": "Your home and bedroom.",
-      "last_observation": "You are at Home_01.",
+      "location_details": "You have arrived in kitchen_01.",
+      "last_observation": "At 01:31 PM on Thursday, May 22, 2025 (Local time for New York, New York), Ava opens the refrigerator once more. The cool air washes over her as she reaches past the **eggs (eggs_01)** and the **sparkling water (sparkling_water_01)**, carefully retrieving the container of **chicken tikka masala (tikka_masala_01)**. This time, she makes sure it's the right one.",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 0.0,
+      "current_action_end_time": 86.93799999999464,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -74,7 +86,9 @@
         "Dreams": "To work on a space exploration project, to build a sustainable tech company, and to travel the world",
         "Past_Traumas": null
       },
-      "location": "Home_01"
+      "location": "kitchen_01",
+      "current_interrupt_probability": null,
+      "current_action_description": "Action: use - Details: Take the chicken tikka masala from the refrigerator."
     }
   },
   "objects": [],
@@ -87,6 +101,133 @@
         "ephemeral_objects": [],
         "ephemeral_npcs": [],
         "connected_locations": []
+      },
+      "kitchen_01": {
+        "id": "kitchen_01",
+        "name": "Kitchen",
+        "description": "This appears to be a kitchen.",
+        "ephemeral_objects": [
+          {
+            "id": "tikka_masala_01",
+            "name": "Chicken Tikka Masala",
+            "description": "A plastic container holding leftover chicken tikka masala.",
+            "is_interactive": true,
+            "properties": {
+              "is_food": true,
+              "is_leftover": true
+            }
+          },
+          {
+            "id": "mustard_01",
+            "name": "Mustard",
+            "description": "A bottle of mustard.",
+            "is_interactive": true,
+            "properties": {
+              "is_condiment": true
+            }
+          },
+          {
+            "id": "mayonnaise_01",
+            "name": "Mayonnaise",
+            "description": "A bottle of mayonnaise.",
+            "is_interactive": true,
+            "properties": {
+              "is_condiment": true
+            }
+          },
+          {
+            "id": "pickles_01",
+            "name": "Pickles",
+            "description": "A jar of pickles.",
+            "is_interactive": true,
+            "properties": {
+              "is_food": true,
+              "is_preserved": true
+            }
+          },
+          {
+            "id": "spinach_01",
+            "name": "Spinach",
+            "description": "Slightly wilted spinach in the crisper drawer.",
+            "is_interactive": true,
+            "properties": {
+              "is_vegetable": true,
+              "is_food": true
+            }
+          },
+          {
+            "id": "tomato_01",
+            "name": "Tomato",
+            "description": "A lonely tomato in the crisper drawer.",
+            "is_interactive": true,
+            "properties": {
+              "is_vegetable": true,
+              "is_food": true
+            }
+          }
+        ],
+        "ephemeral_npcs": [],
+        "connected_locations": [],
+        "objects_present": [
+          {
+            "id": "tikka_masala_01",
+            "name": "Chicken Tikka Masala",
+            "description": "A plastic container holding leftover chicken tikka masala.",
+            "is_interactive": true,
+            "properties": {
+              "is_food": true,
+              "is_leftover": true
+            }
+          },
+          {
+            "id": "mustard_01",
+            "name": "Mustard",
+            "description": "A bottle of mustard.",
+            "is_interactive": true,
+            "properties": {
+              "is_condiment": true
+            }
+          },
+          {
+            "id": "mayonnaise_01",
+            "name": "Mayonnaise",
+            "description": "A bottle of mayonnaise.",
+            "is_interactive": true,
+            "properties": {
+              "is_condiment": true
+            }
+          },
+          {
+            "id": "pickles_01",
+            "name": "Pickles",
+            "description": "A jar of pickles.",
+            "is_interactive": true,
+            "properties": {
+              "is_food": true,
+              "is_preserved": true
+            }
+          },
+          {
+            "id": "spinach_01",
+            "name": "Spinach",
+            "description": "Slightly wilted spinach in the crisper drawer.",
+            "is_interactive": true,
+            "properties": {
+              "is_vegetable": true,
+              "is_food": true
+            }
+          },
+          {
+            "id": "tomato_01",
+            "name": "Tomato",
+            "description": "A lonely tomato in the crisper drawer.",
+            "is_interactive": true,
+            "properties": {
+              "is_vegetable": true,
+              "is_food": true
+            }
+          }
+        ]
       }
     },
     "world_feeds": {
@@ -100,5 +241,61 @@
       "last_update_sim_time": 0.0
     }
   },
-  "pending_simulation_events": []
+  "pending_simulation_events": [],
+  "world_feeds": {
+    "last_update_sim_time": 39.219000000011874,
+    "weather": {
+      "condition": "cloudy",
+      "temperature_celsius": 11,
+      "forecast_short": "Rain today, light rain tomorrow, partly cloudy Saturday.",
+      "timestamp": 39.219000000011874,
+      "source_category": "weather"
+    },
+    "news_updates": [
+      {
+        "headline": "NY Headlines: Tax Bill, LIRR Tragedy, and Pride Cuts",
+        "summary": "New York faces a mix of political shifts, local transportation disruptions, crime, legal battles, sports disappointments, Pride event changes, a high-profile trial, and community response to a bridge incident.",
+        "timestamp": 39.219000000011874,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "Global Headlines: Gaza Violence, US-Iran Tensions, and International Incidents",
+        "summary": "Israeli-Palestinian conflict continues amid rising global tensions and tragedies, including a shooting in Washington D.C., flooding in Australia, and political disputes.",
+        "timestamp": 39.219000000011874,
+        "source_category": "world_news"
+      },
+      {
+        "headline": "NYC Crime Surge: Fatal Shootings & Robberies Reported",
+        "summary": "New York City grapples with a wave of violence as fatal shootings and brutal robberies plague Brooklyn and Randall's Island.",
+        "timestamp": 10.51500000001397,
+        "source_category": "local_news"
+      },
+      {
+        "headline": "NY News: Tax Cuts Pass, Embassy Shooting, Casino Costs Soar",
+        "summary": "New York faces national implications of tax cuts, mourns the loss of Israeli Embassy staff in a DC shooting while grappling with ballooning casino costs and a Knicks playoff loss.",
+        "timestamp": 10.51500000001397,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "World News: US Tax Bill, Gaza Aid, and Russia-Ukraine Impasse",
+        "summary": "Global headlines include US tax bill passage, stalled Russia-Ukraine peace talks, Gaza aid delivery after delays, a UN carbon pricing system, a deportation order dispute, and Tanzania blocking X access.",
+        "timestamp": 10.51500000001397,
+        "source_category": "world_news"
+      }
+    ],
+    "pop_culture_updates": [
+      {
+        "headline": "Global Tensions Rise Amid Conflicts and Crime",
+        "summary": "International conflicts escalate, U.S.-South Africa relations strain, and domestic security concerns increase following an embassy shooting and ongoing investigations.",
+        "timestamp": 39.219000000011874,
+        "source_category": "pop_culture"
+      },
+      {
+        "headline": "Global Unrest and Local Changes Dominate News",
+        "summary": "International tensions rise with embassy shooting and Gaza conflict, while New York faces Cuomo investigation and potential workweek changes.",
+        "timestamp": 10.51500000001397,
+        "source_category": "pop_culture"
+      }
+    ]
+  }
 }
