@@ -460,7 +460,7 @@ async def run_adk_orchestrated_life_generation(
         persona_prompt_text = f"""
 World Type: {initial_user_input.get("world_type", "N/A")}
 World Description: {initial_user_input.get("world_description", "N/A")}
-Gender Preference: {initial_user_input.get("gender_preference", "any")}
+Gender Preference: {initial_user_input.get("gender_preference", "male")}
 
 Task: Create a detailed fictional persona based on the above information.
 Follow the detailed instructions provided to the PersonaGeneratorAgent_ADK regarding output format and required fields.
@@ -1091,7 +1091,7 @@ async def generate_new_simulacra_background(
     world_type: str,
     world_description: str,
     allow_real_context: bool,
-    gender_preference: Optional[str] = "any"
+    gender_preference: Optional[str] = "male"
 ) -> Optional[Dict[str, Any]]:
     initial_allow_real_context = allow_real_context
     logger.info(f"Starting ADK-based Simulacra background generation for sim: {sim_id}...")
@@ -1187,7 +1187,8 @@ async def generate_new_simulacra_background(
     final_gen_info["generated_at_realworld"] = generation_start_time.isoformat()
 
     persona_name_safe = re.sub(r'[^\w\-]+', '_', life_data.get("persona_details", {}).get('Name', 'UnknownADK'))[:30]
-    output_filename = f"life_summary_ADK_{persona_name_safe}_{sim_id}_{world_instance_uuid}.json"
+    # Corrected filename format: life_summary_CharacterName_WorldUUID.json
+    output_filename = f"life_summary_{persona_name_safe}_{world_instance_uuid}.json"
     output_path = os.path.join(LIFE_SUMMARY_DIR, output_filename)
 
     console.print(Rule(f"Saving ADK results to [green]{output_path}[/green]", style="bold green"))

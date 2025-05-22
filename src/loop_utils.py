@@ -8,6 +8,10 @@ import copy
 from typing import Any, Dict, Optional, List, Tuple # Added Tuple
 from datetime import datetime, timezone # Added for real_world_start_utc
 from .file_utils import ensure_dir_exists, get_data_dir, get_states_dir, get_world_config_dir, get_life_summary_dir
+from .config import ( # Added imports from config
+    WORLD_STATE_KEY, LOCATION_DETAILS_KEY, DEFAULT_HOME_LOCATION_NAME, DEFAULT_HOME_DESCRIPTION,
+    WORLD_FEEDS_KEY # Added WORLD_FEEDS_KEY
+)
 from .state_loader import parse_location_string # Assuming this is correctly placed or imported
 import re
 # Configure logging
@@ -22,7 +26,7 @@ LIFE_SUMMARY_DIR = get_life_summary_dir()
 # --- Constants for New Simulation State ---
 DEFAULT_SIMULACRUM_CURRENT_LOCATION = "Home_01"
 DEFAULT_SIMULACRUM_LOCATION_DETAILS = "Your home and bedroom."
-DEFAULT_SIMULACRUM_LAST_OBSERVATION = "Waking up in Home_01."
+DEFAULT_SIMULACRUM_LAST_OBSERVATION = "You are at Home_01."
 DEFAULT_SIMULACRUM_GOAL = "Determine goals."
 DEFAULT_SIMULACRUM_HOME_LOCATION = "Home_01"
 DEFAULT_SIMULACRUM_STATUS = "idle"
@@ -50,7 +54,18 @@ NEW_SIMULATION_STATE_TEMPLATE = {
     "mood": "The real world and general slice of life."
   },
   "simulacra_profiles": {},
-  "objects": [] # Will be populated from world_config's initial_objects
+  "objects": [], # Will be populated from world_config's initial_objects
+  WORLD_STATE_KEY: { # Using constant for current_world_state
+      LOCATION_DETAILS_KEY: {}, # e.g., {"Home_01": {"id": "Home_01", "name": "Home", "description": "...", ...}}
+      WORLD_FEEDS_KEY: { # Using constant for world_feeds
+          "weather": {"condition": "Weather is calm.", "temperature_celsius": 20, "forecast_short": "Stable conditions."},
+          "news_updates": [],
+          "pop_culture_updates": [],
+          "last_update_sim_time": 0.0
+      }
+      # Add other world-specific state here if needed, e.g., world_context
+  },
+  "pending_simulation_events": [] # Added for scheduled events
 }
 
 DEFAULT_SIMULACRUM_RUNTIME_STATE = {
@@ -132,6 +147,28 @@ def create_blank_simulation_state(
     # Populate objects from world_config_data
     state["objects"] = world_config_data.get("initial_objects", [])
 
+    # Populate initial location definitions into the state
+    initial_locs = world_config_data.get("initial_location_definitions", {})
+    logger.debug(f"[CreateBlankState] Raw initial_locs from world_config_data: {json.dumps(initial_locs)}")
+    # Ensure the nested structure for location_details exists
+    state.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
+
+    if initial_locs:
+        for loc_id, loc_data in initial_locs.items():
+            state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY][loc_id] = copy.deepcopy(loc_data)
+            logger.info(f"Initialized location '{loc_id}' from world_config into state.")
+            logger.debug(f"[CreateBlankState] Copied loc_data for {loc_id}: {json.dumps(loc_data)}")
+    else:
+        logger.warning(f"[CreateBlankState] No 'initial_location_definitions' found or empty in world_config_data.")
+
+    # Ensure Home_01 has a basic entry if not in initial_location_definitions
+    if DEFAULT_HOME_LOCATION_NAME not in state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY]:
+        state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY][DEFAULT_HOME_LOCATION_NAME] = {
+            "id": DEFAULT_HOME_LOCATION_NAME, "name": "Home", "description": DEFAULT_HOME_DESCRIPTION,
+            "ephemeral_objects": [], "ephemeral_npcs": [], "connected_locations": []
+        }
+        logger.info(f"Initialized default '{DEFAULT_HOME_LOCATION_NAME}' in state as it was missing from world_config.")
+
     # For "real" and "realtime" simulations, anchor the narrative start time to the real world
     # using the timestamp from when the world_config was created.
     if state["world_template_details"].get("world_type") == "real" and \
@@ -176,7 +213,8 @@ def ensure_state_structure(state: dict, instance_uuid: str, active_sim_ids_from_
         "narrative_log": [],
         "world_template_details": {}, # Will be further checked
         "simulacra_profiles": {},   # Will be further checked
-        "objects": []
+        "objects": [],
+        WORLD_STATE_KEY: {} # Add basic check for current_world_state
     }
 
     for key, default_value in required_top_level_keys.items():
@@ -193,6 +231,16 @@ def ensure_state_structure(state: dict, instance_uuid: str, active_sim_ids_from_
     for key, default_value in details_template.items():
         if key not in state["world_template_details"]:
             state["world_template_details"][key] = copy.deepcopy(default_value)
+            modified = True
+
+    # Ensure current_world_state and its sub-keys (like location_details, world_feeds)
+    if WORLD_STATE_KEY not in state or not isinstance(state[WORLD_STATE_KEY], dict):
+        state[WORLD_STATE_KEY] = copy.deepcopy(NEW_SIMULATION_STATE_TEMPLATE[WORLD_STATE_KEY])
+        modified = True
+    current_world_state_template = NEW_SIMULATION_STATE_TEMPLATE[WORLD_STATE_KEY]
+    for key, default_value in current_world_state_template.items():
+        if key not in state[WORLD_STATE_KEY]:
+            state[WORLD_STATE_KEY][key] = copy.deepcopy(default_value)
             modified = True
 
     # Ensure simulacra_profiles structure
@@ -262,6 +310,34 @@ def sync_world_config_to_state(state: dict, world_config: dict) -> bool:
         modified = True
         logger.info("Updated state.objects from world_config.initial_objects.")
 
+    # Sync initial_location_definitions
+    config_initial_locs = world_config.get("initial_location_definitions", {})
+    logger.debug(f"[SyncWorldConfig] Raw config_initial_locs from world_config: {json.dumps(config_initial_locs)}")
+    state_loc_details_path_tuple = (WORLD_STATE_KEY, LOCATION_DETAILS_KEY)
+
+    # Ensure the path exists in state's current_world_state
+    if get_nested(state, *state_loc_details_path_tuple, default=None) is None:
+        state.setdefault(WORLD_STATE_KEY, {})[LOCATION_DETAILS_KEY] = {}
+        modified = True
+        logger.info(f"Initialized '{'.'.join(state_loc_details_path_tuple)}' in state during sync.")
+    else:
+        logger.debug(f"[SyncWorldConfig] State's current location details before sync: {json.dumps(get_nested(state, *state_loc_details_path_tuple))}")
+
+    config_locs_copy = copy.deepcopy(config_initial_locs)
+
+    if get_nested(state, *state_loc_details_path_tuple) != config_locs_copy:
+        state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY] = config_locs_copy
+        modified = True
+        logger.info(f"Updated state's '{'.'.join(state_loc_details_path_tuple)}' from world_config.initial_location_definitions.")
+    
+    logger.debug(f"[SyncWorldConfig] State's location details AFTER sync attempt: {json.dumps(get_nested(state, *state_loc_details_path_tuple))}")
+
+    # Fallback: Ensure Home_01 exists if it's somehow still missing after sync
+    if DEFAULT_HOME_LOCATION_NAME not in get_nested(state, *state_loc_details_path_tuple, default={}):
+        home_loc_data = { "id": DEFAULT_HOME_LOCATION_NAME, "name": "Home", "description": DEFAULT_HOME_DESCRIPTION, "ephemeral_objects": [], "ephemeral_npcs": [], "connected_locations": [] }
+        state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY][DEFAULT_HOME_LOCATION_NAME] = home_loc_data
+        modified = True
+        logger.info(f"Ensured default '{DEFAULT_HOME_LOCATION_NAME}' exists in state's location_details during sync.")
     return modified
 
 

@@ -1,0 +1,29 @@
+{
+  "world_instance_uuid": "cce7f369-f7dc-4e11-8136-5a142fa5d787",
+  "world_type": "real",
+  "sub_genre": "realtime",
+  "description": "A simulation mirroring the current real world in New York, New York. Standard physics apply.",
+  "rules": {
+    "allow_teleportation": false,
+    "time_progression_rate": 1.0,
+    "weather_effects_travel": true,
+    "historical_date": null
+  },
+  "location": {
+    "city": "New York",
+    "state": null,
+    "country": "New York"
+  },
+  "setup_timestamp_utc": "2025-05-22T00:46:08.369037+00:00Z",
+  "initial_objects": [],
+  "initial_location_definitions": {
+    "Home_01": {
+      "id": "Home_01",
+      "name": "Home",
+      "description": "A modern one-bedroom apartment in Long Island City, Queens, offering a convenient commute to Manhattan and stunning skyline views. The space is clean and organized, reflecting her analytical nature, with touches of warmth from travel souvenirs and potted plants.",
+      "ephemeral_objects": [],
+      "ephemeral_npcs": [],
+      "connected_locations": []
+    }
+  }
+}

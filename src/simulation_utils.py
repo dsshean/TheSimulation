@@ -190,6 +190,26 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
     for i, headline in enumerate(news_headlines_display):
         table.add_row(f"  News {i+1}", headline[:70] + "..." if len(headline) > 70 else headline)
     table.add_row(f"  Pop Culture", pop_culture_headline_display[:70] + "..." if len(pop_culture_headline_display) > 70 else pop_culture_headline_display)
+
+    # --- Pending Simulation Events ---
+    pending_events = get_nested(current_state, 'pending_simulation_events', default=[])
+    table.add_row(Text("--- Pending Events ---", style="bold yellow"), Text("---", style="bold yellow"))
+    table.add_row("  (Scheduled)", f"({len(pending_events)} total)")
+
+    if pending_events:
+        # Sort events by trigger time for better readability
+        sorted_pending_events = sorted(pending_events, key=lambda x: x.get('trigger_sim_time', float('inf')))
+        event_display_limit = 3 # How many pending events to show
+        for i, event_data in enumerate(sorted_pending_events):
+            if i >= event_display_limit:
+                table.add_row(f"    ... ({len(pending_events) - event_display_limit} more)", "")
+                break
+            event_type = event_data.get("event_type", "Unknown Event")
+            trigger_time = event_data.get("trigger_sim_time", 0.0)
+            target_agent = event_data.get("target_agent_id", "World")
+            details_snippet = str(event_data.get("details", {}))[:40] + "..." # Snippet of details
+            table.add_row(f"    {event_type} for {target_agent}", f"at {trigger_time:.1f}s ({details_snippet})")
+
     return table
 
 async def _fetch_and_summarize_real_feed(

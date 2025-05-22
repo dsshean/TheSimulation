@@ -23,7 +23,7 @@ SIMULACRA_KEY = "simulacra_profiles" # Changed from "simulacra"
 # --- Simulation Parameters ---
 SIMULATION_SPEED_FACTOR = float(os.getenv("SIMULATION_SPEED_FACTOR", 1))
 UPDATE_INTERVAL = float(os.getenv("UPDATE_INTERVAL", 0.1))
-MAX_SIMULATION_TIME = float(os.getenv("MAX_SIMULATION_TIME", 96000.0)) # Default to 30 minutes simulation time
+MAX_SIMULATION_TIME = float(os.getenv("MAX_SIMULATION_TIME", 9996000.0)) # Default to 30 minutes simulation time
 MEMORY_LOG_CONTEXT_LENGTH = 10
 MAX_MEMORY_LOG_ENTRIES = 500
 
@@ -58,7 +58,8 @@ RANDOM_SEED: Optional[int] = int(RANDOM_SEED_VALUE) if RANDOM_SEED_VALUE and RAN
 # --- Narrative Image Generation Parameters ---
 ENABLE_NARRATIVE_IMAGE_GENERATION = os.getenv("ENABLE_NARRATIVE_IMAGE_GENERATION", "False").lower() == "true"
 IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 1800.0)) # How often to generate an image
-IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "imagen-3.0-generate-002") # Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
+IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "imagen-3.0-generate-002") # #imagen-4.0-generate-preview-05-20 Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
+# IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "imagen-4.0-generate-preview-05-20") # #imagen-4.0-generate-preview-05-20
 IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
 
 # --- Social Media Posting Configuration ---
@@ -88,9 +89,12 @@ SIMULACRA_PROFILES_KEY = "simulacra_profiles" # This is the old constant, SIMULA
 CURRENT_LOCATION_KEY = "current_location"
 HOME_LOCATION_KEY = "home_location"
 WORLD_TEMPLATE_DETAILS_KEY = "world_template_details"
+INITIAL_LOCATION_DEFINITIONS_KEY = "initial_location_definitions" # New key for world_config
 LOCATION_KEY = "location" # Used in world_config and state[WORLD_TEMPLATE_DETAILS_KEY]
 DEFAULT_HOME_LOCATION_NAME = "Home_01"
 DEFAULT_HOME_DESCRIPTION = "You are at home. It's a cozy place with familiar surroundings."
+WORLD_FEEDS_KEY = "world_feeds" # Key for world feeds within WORLD_STATE_KEY
+WORLD_CONTEXT_KEY = "world_context" # Key for world context within WORLD_STATE_KEY
 
 # Ensure directories exist (safe check, though loop_utils also does this)
 os.makedirs(STATE_DIR, exist_ok=True)

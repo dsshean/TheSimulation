@@ -5,6 +5,7 @@ import logging
 import os
 import random  # Added for sim_id generation
 import string  # Added for sim_id generation
+import re # For cleaning LLM output for home description
 import uuid
 from datetime import datetime, timezone
 
@@ -13,7 +14,8 @@ from rich.console import Console
 from rich.panel import Panel  # For displaying config summary
 from rich.rule import Rule  # For section breaks
 
-from src.config import APP_NAME
+from src.config import APP_NAME, MODEL_NAME # Added MODEL_NAME
+import google.generativeai as genai # For direct LLM call for home description
 # Import from the new ADK-enabled life generator
 from src.generation.life_generator_adk import generate_new_simulacra_background
 # Import the correct logging setup function and APP_NAME for logger naming
@@ -53,6 +55,49 @@ def get_user_input(prompt: str, valid_options: list = None, allow_empty: bool = 
         except ValueError:
             console.print(f"[bold red]Invalid input type. Expected {input_type.__name__}.[/bold red]")
 
+async def _generate_home_description_llm(sim_persona: dict, city: str, world_type: str) -> str:
+    """Generates a plausible home description using an LLM."""
+    # Fallback description if LLM fails or API key is missing
+    fallback_description = f"A standard home dwelling in {city} where {sim_persona.get('Name', 'an individual')} resides."
+
+    if not os.getenv("GOOGLE_API_KEY"):
+        logger.warning("GOOGLE_API_KEY not set. LLM call for home description will use fallback.")
+        return fallback_description
+
+    try:
+        # Assuming genai is already configured by life_generator_adk or main app
+        # If not, you might need: genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        model = genai.GenerativeModel(MODEL_NAME)
+        
+        persona_str = json.dumps(sim_persona, indent=2)
+        prompt = f"""You are assisting in setting up a realistic simulation.
+Simulacra Persona Details:
+{persona_str}
+
+City: {city}
+World Type: {world_type}
+
+Based on the persona and the city (especially if World Type is 'real'), generate a concise (1-2 sentences) and plausible description for their primary residence (which will be referred to as 'Home_01'). This description will be used as the initial 'official' view of their home.
+Focus on the type of dwelling and a general feel or neighborhood character.
+Example for a 'writer' in 'New York' (real world): 'A cozy, slightly cluttered one-bedroom apartment in a brownstone in Park Slope, Brooklyn, filled with books and a worn armchair.'
+Example for an 'engineer' in 'San Francisco' (real world): 'A minimalist studio in a modern SoMa high-rise, with large windows offering a city view.'
+Example for a 'knight' in 'Aethelgard' (fantasy world): 'A modest stone cottage on the outskirts of the barracks, kept tidy and practical.'
+
+Respond ONLY with the 1-2 sentence description text. Do not include any other conversational text or labels like "Description:".
+Description:"""
+
+        logger.info(f"Requesting LLM for home description for persona in {city}...")
+        response = await model.generate_content_async(prompt)
+        
+        if response.text:
+            description = re.sub(r"^(Description:\s*)","", response.text.strip(), flags=re.IGNORECASE).strip()
+            logger.info(f"LLM generated home description: {description}")
+            return description if description else fallback_description
+        raise ValueError("LLM for home description returned no text.")
+    except Exception as e:
+        logger.error(f"Error generating home description via LLM: {e}", exc_info=True)
+        return fallback_description
+
 async def setup_new_simulation_environment():
     """
     Sets up a new simulation environment by:
@@ -82,7 +127,9 @@ async def setup_new_simulation_environment():
             "city": None, "state": None, "country": None,
             "coordinates": {"latitude": None, "longitude": None}
         },
-        "setup_timestamp_utc": datetime.now(timezone.utc).isoformat() + "Z"
+        "setup_timestamp_utc": datetime.now(timezone.utc).isoformat() + "Z",
+        "initial_objects": [], # Initialize early
+        "initial_location_definitions": {} # Initialize early
     }
 
     # --- Get User Input for Configuration ---
@@ -162,8 +209,8 @@ async def setup_new_simulation_environment():
         allow_real_context_for_life_generation = allow_real_context_input == "yes"
     
     gender_preference_input = get_user_input(
-        "Enter gender preference for simulacra (e.g., male, female, any) [Default: any]:",
-        valid_options=["male", "female", "any"], default_value="any"
+        "Enter gender preference for simulacra (e.g., male, female, any) [Default: male]:", # Updated prompt
+        valid_options=["male", "female", "any"], default_value="male" # Changed default
     ).lower()
     if gender_preference_input == "any":
         gender_preference_input = None # Pass None if "any" for life_generator_adk
@@ -172,17 +219,6 @@ async def setup_new_simulation_environment():
     logger.info(f"World Type: {config_data['world_type']}, Sub-Genre: {config_data['sub_genre']}, Description: {config_data['description']}")
     logger.info(f"Allow real context for life gen: {allow_real_context_for_life_generation}")
     logger.info(f"Simulacra gender preference: {gender_preference_input or 'any'}")
-
-    # Save the world configuration (similar to setup_simulation.py)
-    world_config_dir = "world_configurations"
-    os.makedirs(world_config_dir, exist_ok=True)
-    world_config_filename = f"{world_config_dir}/world_config_{instance_uuid}.json"
-    # config_data already holds all the necessary fields
-    with open(world_config_filename, 'w') as f:
-        json.dump(config_data, f, indent=2)
-    logger.info(f"World configuration saved to: {world_config_filename}")
-    console.print(f"\nSimulation config saved successfully to: [green]{world_config_filename}[/green]")
-    console.print(Panel(json.dumps(config_data, indent=2), title="World Config Summary", border_style="green"))
 
     # Generate Simulacra for the new world
     if instance_uuid:
@@ -252,9 +288,47 @@ async def setup_new_simulation_environment():
                 logger.error(f"Simulacra {sim_num_display} (SimID: {failed_sim_id_str}) generation failed: {e}", exc_info=e)
                 console.print(f"[bold red]Simulacra {sim_num_display} (SimID: {failed_sim_id_str}) generation failed:[/bold red] {e}")
 
+        # --- Generate Home_01 description AFTER simulacra generation ---
+        home_01_description = f"A typical home dwelling in {config_data.get('location', {}).get('city', 'this area')}." # Default
+        if success_count > 0 and config_data["world_type"] == "real":
+            first_successful_sim_result = None
+            for res_item in results: # Iterate through the results list
+                if isinstance(res_item, dict) and res_item.get("sim_id"): # Found a successful generation
+                    first_successful_sim_result = res_item
+                    break
+            
+            if first_successful_sim_result:
+                sim_persona_for_home = first_successful_sim_result.get("persona_details", {})
+                city_for_home = config_data.get("location", {}).get("city", "this city")
+                
+                console.print(Rule("Generating Home Description", style="yellow"))
+                home_01_description = await _generate_home_description_llm(
+                    sim_persona_for_home, city_for_home, config_data["world_type"]
+                )
+                console.print(f"Generated description for Home_01: [italic]{home_01_description}[/italic]")
+
+        config_data["initial_location_definitions"]["Home_01"] = {
+            "id": "Home_01",
+            "name": "Home", 
+            "description": home_01_description,
+            "ephemeral_objects": [], 
+            "ephemeral_npcs": [],    
+            "connected_locations": [] 
+        }
+        logger.info(f"Added Home_01 definition to config_data with description: {home_01_description}")
+
         console.print(f"\nGeneration Summary: {success_count} succeeded, {fail_count} failed.")
     else:
         logger.warning("Skipping simulacra generation as world instance creation failed.")
+
+    # --- Save the fully populated world configuration AT THE END ---
+    world_config_dir = "world_configurations" # As defined earlier
+    os.makedirs(world_config_dir, exist_ok=True)
+    world_config_filename = f"{world_config_dir}/world_config_{instance_uuid}.json"
+    with open(world_config_filename, 'w') as f:
+        json.dump(config_data, f, indent=2)
+    logger.info(f"World configuration saved to: {world_config_filename}")
+    console.print(f"\nSimulation config saved successfully to: [green]{world_config_filename}[/green]")
 
     console.print(Rule("ADK Setup Complete", style="bold blue"))
     logger.info("ADK Simulation environment setup process finished.")
