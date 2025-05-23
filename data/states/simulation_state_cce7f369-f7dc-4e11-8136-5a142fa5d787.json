@@ -1,0 +1,160 @@
+{
+  "world_instance_uuid": "cce7f369-f7dc-4e11-8136-5a142fa5d787",
+  "active_simulacra_ids": [
+    "sim_b797o8",
+    "sim_sustdj"
+  ],
+  "world_time": 0.0,
+  "narrative_log": [],
+  "world_template_details": {
+    "description": "A new world is beginning.",
+    "rules": {
+      "allow_teleportation": false,
+      "time_progression_rate": 1.0,
+      "weather_effects_travel": true,
+      "historical_date": null
+    },
+    "world_type": "real",
+    "sub_genre": "realtime",
+    "location": {
+      "city": "New York",
+      "state": null,
+      "country": "New York"
+    },
+    "mood": "The real world and general slice of life."
+  },
+  "simulacra_profiles": {
+    "sim_b797o8": {
+      "current_location": "Home_01",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "You are at Home_01.",
+      "goal": "Determine goals.",
+      "memory_log": [],
+      "home_location": "Home_01",
+      "status": "idle",
+      "current_action_end_time": 0.0,
+      "pending_results": {},
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0,
+      "persona_details": {
+        "Name": "Ava Sharma",
+        "Age": 32,
+        "Gender": "Female",
+        "Occupation": "Software Engineer",
+        "Current_location": "New York, NY",
+        "Personality_Traits": [
+          "Independent",
+          "Creative",
+          "Analytical",
+          "Ambitious",
+          "Compassionate"
+        ],
+        "Birthplace": "Brooklyn, NY",
+        "Birthdate": "1991-03-15",
+        "Birthtime": "14:30",
+        "Education": "Master's in Computer Science, Columbia University",
+        "Physical_Appearance": "5'4\", brown eyes, shoulder-length black hair, often seen in jeans and a t-shirt",
+        "Hobbies": "Hiking, photography, coding personal projects, reading science fiction",
+        "Skills": "Proficient in Java, Python, C++, data analysis, project management",
+        "Languages": "English, Hindi",
+        "Health_Status": "Good",
+        "Family_Background": "Close-knit family, parents are both retired teachers, one younger sister",
+        "Life_Goals": "To lead a team of engineers developing innovative software, and to contribute to positive technological advancements in the world",
+        "Notable_Achievements": "Won first prize in a national coding competition during college, successfully launched a personal app that gained 10,000 users",
+        "Fears": "Public speaking, failure, disappointing her family",
+        "Strengths": "Problem-solving skills, determination, resilience, creativity",
+        "Weaknesses": "Can be overly critical of herself, sometimes struggles to delegate tasks",
+        "Ethnicity": "Indian-American",
+        "Religion": "Hinduism",
+        "Political_Views": "Centrist",
+        "Favorite_Foods": "Indian cuisine, especially butter chicken and naan",
+        "Favorite_Music": "Indie pop, classic rock",
+        "Favorite_Books": "The Martian by Andy Weir, The Nightingale by Kristin Hannah",
+        "Favorite_Movies": "The Shawshank Redemption, Interstellar",
+        "Pet_Peeves": "People who are late, messy code, slow internet",
+        "Dreams": "To work on a space exploration project, to build a sustainable tech company, and to travel the world",
+        "Past_Traumas": null
+      },
+      "location": "Home_01",
+      "current_interrupt_probability": null
+    },
+    "sim_sustdj": {
+      "current_location": "Home_01",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "You are at Home_01.",
+      "goal": "Determine goals.",
+      "memory_log": [],
+      "home_location": "Home_01",
+      "status": "idle",
+      "current_action_end_time": 0.0,
+      "pending_results": {},
+      "last_interjection_sim_time": 0.0,
+      "next_simple_timer_interjection_sim_time": 0.0,
+      "persona_details": {
+        "Name": "Daniel Rodriguez",
+        "Age": 33,
+        "Gender": "male",
+        "Occupation": "Software Engineer",
+        "Current_location": "Brooklyn, New York",
+        "Personality_Traits": [
+          "Analytical",
+          "Reserved",
+          "Creative",
+          "Diligent",
+          "Loyal"
+        ],
+        "Birthplace": "Miami, Florida",
+        "Birthdate": "1991-07-15",
+        "Birthtime": null,
+        "Education": "Master's Degree in Computer Science",
+        "Physical_Appearance": "Average height, slim build, dark brown hair, brown eyes, usually wears glasses.",
+        "Hobbies": "Playing guitar, coding personal projects, hiking, exploring new restaurants.",
+        "Skills": "Proficient in Python, Java, and JavaScript. Experienced in full-stack development, database management, and algorithm design.",
+        "Languages": "English, Spanish",
+        "Health_Status": "Generally healthy, occasional allergies during pollen season.",
+        "Family_Background": "Middle-class family. Father is a retired accountant, mother is a teacher. Has one younger sister.",
+        "Life_Goals": "To contribute to open-source projects, start his own tech company, travel the world.",
+        "Notable_Achievements": "Developed a successful mobile app during his master's program that helped connect local farmers with consumers.",
+        "Fears": "Public speaking, failure, heights.",
+        "Strengths": "Problem-solving abilities, attention to detail, strong work ethic, adaptability.",
+        "Weaknesses": "Can be overly critical of himself, struggles with delegating tasks, sometimes too introverted.",
+        "Ethnicity": "Hispanic",
+        "Religion": null,
+        "Political_Views": "Liberal",
+        "Favorite_Foods": "Cuban sandwiches, pizza, sushi",
+        "Favorite_Music": "Indie rock, classic rock, jazz",
+        "Favorite_Books": "Neuromancer by William Gibson, The Lord of the Rings by J.R.R. Tolkien",
+        "Favorite_Movies": "Blade Runner, The Matrix, Back to the Future",
+        "Pet_Peeves": "Loud chewing, people being late, disorganized code.",
+        "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
+        "Past_Traumas": null
+      },
+      "location": "Home_01",
+      "current_interrupt_probability": null
+    }
+  },
+  "objects": [],
+  "current_world_state": {
+    "location_details": {
+      "Home_01": {
+        "id": "Home_01",
+        "name": "Home",
+        "description": "A modern one-bedroom apartment in Long Island City, Queens, offering a convenient commute to Manhattan and stunning skyline views. The space is clean and organized, reflecting her analytical nature, with touches of warmth from travel souvenirs and potted plants.",
+        "ephemeral_objects": [],
+        "ephemeral_npcs": [],
+        "connected_locations": []
+      }
+    },
+    "world_feeds": {
+      "weather": {
+        "condition": "Weather is calm.",
+        "temperature_celsius": 20,
+        "forecast_short": "Stable conditions."
+      },
+      "news_updates": [],
+      "pop_culture_updates": [],
+      "last_update_sim_time": 0.0
+    }
+  },
+  "pending_simulation_events": []
+}

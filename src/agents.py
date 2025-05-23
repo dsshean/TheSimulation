@@ -72,7 +72,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
-        tools=[load_memory],
+        # tools=[load_memory],
         instruction=instruction,
         description=f"LLM Simulacra agent for {persona_name} in a '{world_mood}' world."
     )
