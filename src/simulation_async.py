@@ -55,17 +55,15 @@ from .config import (  # For run_simulation; For self-reflection; New constants 
     IMAGE_GENERATION_OUTPUT_DIR, INTERJECTION_COOLDOWN_SIM_SECONDS,
     LIFE_SUMMARY_DIR, LOCATION_DETAILS_KEY, LOCATION_KEY,
     LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, MAX_MEMORY_LOG_ENTRIES,
-    MAX_SIMULATION_TIME, MEMORY_LOG_CONTEXT_LENGTH,
-    MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK, MODEL_NAME,
+    MAX_SIMULATION_TIME, MEMORY_LOG_CONTEXT_LENGTH, MODEL_NAME,
     PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, SEARCH_AGENT_MODEL_NAME,
     SIMULACRA_KEY, SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR,
     SOCIAL_POST_HASHTAGS, SOCIAL_POST_TEXT_LIMIT, STATE_DIR, UPDATE_INTERVAL,
     USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
-from .core_tasks import interaction_dispatcher_task  # ADK-independent tasks
 from .core_tasks import time_manager_task, world_info_gatherer_task
-from .loop_utils import (get_nested, load_json_file,
-                         load_or_initialize_simulation, parse_json_output_last,
-                         save_json_file)
+from .loop_utils import (  # MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK removed from config import
+    get_nested, load_json_file, load_or_initialize_simulation,
+    parse_json_output_last, save_json_file)
 from .models import NarratorOutput  # Pydantic models for tasks in this file
 from .models import SimulacraIntentResponse, WorldEngineResponse
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
@@ -304,7 +302,7 @@ async def world_engine_task_llm():
 
         try:
             request_event = await event_bus.get()
-            if get_nested(request_event, "type") != "resolve_action_request":
+            if get_nested(request_event, "type") != "intent_declared": # MODIFIED: Listen for intent_declared
                 logger.debug(f"[WorldEngineLLM] Ignoring event type: {get_nested(request_event, 'type')}")
                 event_bus.task_done()
                 continue
@@ -319,12 +317,28 @@ async def world_engine_task_llm():
                 continue
                 
             intent = get_nested(request_event, "intent")
-            interaction_class = get_nested(request_event, "interaction_class", default="environment")
             action_type = intent.get("action_type") if intent else None
             if not actor_id or not intent:
                 logger.warning(f"[WorldEngineLLM] Received invalid action request event: {request_event}")
                 event_bus.task_done()
                 continue
+
+            # --- BEGIN MOVED CLASSIFICATION LOGIC ---
+            target_id_for_classification = intent.get("target_id")
+            interaction_class = "environment" # Default
+
+            if target_id_for_classification:
+                # Check if target is another Simulacra
+                if target_id_for_classification in get_nested(state, SIMULACRA_KEY, default={}):
+                    interaction_class = "entity"
+                else:
+                    # Check if target is an interactive object
+                    objects_list = get_nested(state, "objects", default=[])
+                    for obj in objects_list:
+                        if isinstance(obj, dict) and obj.get("id") == target_id_for_classification and obj.get("interactive", False):
+                            interaction_class = "entity"
+                            break
+            # --- END MOVED CLASSIFICATION LOGIC ---
 
             logger.info(f"[WorldEngineLLM] Received '{interaction_class}' action request from {actor_id}: {intent}")
             # action_type already defined above
@@ -435,6 +449,31 @@ Resolve this intent based on your instructions and the provided context.
 
             if validated_data and validated_data.valid_action:
                 completion_time = current_sim_time + validated_data.duration
+                # --- BEGIN ADDITION: Handle scheduled_future_event ---
+                if validated_data.scheduled_future_event:
+                    sfe = validated_data.scheduled_future_event
+                    # The event should trigger relative to when the actor's action (speaking) completes.
+                    event_trigger_time = completion_time + sfe.get("estimated_delay_seconds", 0.1)
+
+                    event_to_schedule = {
+                        "event_type": sfe.get("event_type"),
+                        "target_agent_id": sfe.get("target_agent_id"),
+                        "location_id": sfe.get("location_id"), # From World Engine prompt
+                        "details": sfe.get("details"),
+                        "trigger_sim_time": event_trigger_time, # Absolute simulation time for the event
+                        "source_actor_id": actor_id # The one whose action generated this event
+                    }
+
+                    state.setdefault("pending_simulation_events", []).append(event_to_schedule)
+                    # Sort pending events by trigger time to process them in order
+                    state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
+
+                    logger.info(
+                        f"[WorldEngineLLM] Scheduled future event '{event_to_schedule.get('event_type')}' "
+                        f"for agent {event_to_schedule.get('target_agent_id')} at sim_time {event_trigger_time:.2f} "
+                        f"triggered by {actor_id}."
+                    )
+                # --- END ADDITION ---
                 narration_event = {
                     "type": "action_complete", "actor_id": actor_id, "action": intent,
                     "results": validated_data.results, "outcome_description": validated_data.outcome_description,
@@ -1057,7 +1096,7 @@ async def run_simulation(
                 live_display=live, 
                 logger_instance=logger
             ), name="TimeManager"))
-            tasks.append(asyncio.create_task(interaction_dispatcher_task(state, event_bus, logger), name="InteractionDispatcher"))
+            # tasks.append(asyncio.create_task(interaction_dispatcher_task(state, event_bus, logger), name="InteractionDispatcher")) # REMOVED
             tasks.append(asyncio.create_task(world_info_gatherer_task(state, world_mood_global, search_agent_runner_instance, search_agent_session_id_val, logger), name="WorldInfoGatherer"))
             tasks.append(asyncio.create_task(narrative_image_generation_task(), name="NarrativeImageGenerator"))
             tasks.append(asyncio.create_task(dynamic_interruption_task(), name="DynamicInterruptionTask")) 

@@ -4,33 +4,33 @@ import json
 import logging
 import random
 import re
-from typing import Any, Dict, Optional, List
+from datetime import datetime, timezone  # Added for get_time_string_for_prompt
+from typing import Any, Dict, List, Optional
 
-from datetime import datetime, timezone # Added for get_time_string_for_prompt
 try:
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError # For Python 3.9+
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # For Python 3.9+
 except ImportError:
     ZoneInfo, ZoneInfoNotFoundError = None, None # Fallback for older Python
 
-from geopy.geocoders import Nominatim
-from timezonefinder import TimezoneFinder
 import google.generativeai as genai
-from google.adk.runners import Runner # For type hinting
-from google.genai import types as genai_types # For type hinting
-
-from rich.table import Table # For generate_table
-from rich.panel import Panel # For generate_table
-from rich.text import Text # For styled text in table
+from geopy.geocoders import Nominatim
+from google.adk.runners import Runner  # For type hinting
+from google.genai import types as genai_types  # For type hinting
+from rich import box
+from rich.columns import Columns  # Added for two-column layout
+from rich.panel import Panel  # For generate_table
+from rich.table import Table  # For generate_table
+from rich.text import Text  # For styled text in table
+from timezonefinder import TimezoneFinder
 
 # Import constants from the config module
-from .config import (
-    MODEL_NAME, PROB_INTERJECT_AS_SELF_REFLECTION, # PROB_INTERJECT_AS_NARRATIVE removed
-    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, USER_ID, 
-    APP_NAME, # Added APP_NAME for geopy user_agent
-    # SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"
-    WORLD_STATE_KEY, LOCATION_DETAILS_KEY, SIMULACRA_KEY, # Added SIMULACRA_KEY
-)
-from .loop_utils import get_nested # Assuming get_nested remains in loop_utils or is moved here
+from .config import APP_NAME  # Added APP_NAME for geopy user_agent
+from .config import (  # PROB_INTERJECT_AS_NARRATIVE removed; SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"; Added SIMULACRA_KEY
+    ACTIVE_SIMULACRA_IDS_KEY, LOCATION_DETAILS_KEY, LOCATION_KEY, MODEL_NAME,
+    PROB_INTERJECT_AS_SELF_REFLECTION, SIMULACRA_KEY, USER_ID, WORLD_STATE_KEY,
+    WORLD_TEMPLATE_DETAILS_KEY)
+from .loop_utils import \
+    get_nested  # Assuming get_nested remains in loop_utils or is moved here
 
 logger = logging.getLogger(__name__)
 
@@ -63,21 +63,32 @@ def _update_state_value(target_state: Dict[str, Any], key_path: str, value: Any,
         logger_instance.error(f"Error updating state for path '{key_path}' with value '{value}': {e}", exc_info=True)
         return False
 
-def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narration_qsize: int) -> Table:
+def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narration_qsize: int) -> Columns:
     """
-    Generates the Rich table for live display based on the provided current_state.
+    Generates a two-column Rich layout for live display based on the provided current_state.
     """
-    table = Table(title=f"Simulation State @ {current_state.get('world_time', 0.0):.2f}s",
-                  show_header=True, header_style="bold magenta", box=None,
-                  padding=(0, 1), expand=True)
-    table.add_column("Parameter", style="dim", no_wrap=True)
-    table.add_column("Value", overflow="fold", no_wrap=False)
+    sim_time_str = f"{current_state.get('world_time', 0.0):.2f}s"
+    overall_title = f"Simulation State @ {sim_time_str}"
 
-    table.add_row("World Time", f"{current_state.get('world_time', 0.0):.2f}s")
-    table.add_row("World UUID", str(get_nested(current_state, 'world_instance_uuid', default='N/A')))
+    # --- Table 1: General Info, System, World Feeds, Pending Events ---
+    table1 = Table(title="[bold cyan]World & System[/]", show_header=False, box=box.MINIMAL, padding=(0,1), expand=True)
+    table1.add_column("Parameter", style="dim", no_wrap=True, ratio=1)
+    table1.add_column("Value", overflow="fold", no_wrap=False, ratio=3)
+
+    table1.add_row("World Time", sim_time_str)
+    table1.add_row("World UUID", str(get_nested(current_state, 'world_instance_uuid', default='N/A')))
     world_desc = get_nested(current_state, WORLD_TEMPLATE_DETAILS_KEY, 'description', default='N/A')
-    table.add_row("World Desc", world_desc[:80] + ("..." if len(world_desc) > 80 else ""))
+    table1.add_row("World Desc", world_desc[:35] + ("..." if len(world_desc) > 35 else ""))
 
+    table1.add_row(Text("--- System ---", style="bold blue"), Text("---", style="bold blue"))
+    table1.add_row("Event Bus Size", str(event_bus_qsize))
+    table1.add_row("Narration Q Size", str(narration_qsize))
+
+    # --- Table 2: Simulacra, Location Objects & NPCs ---
+    table2 = Table(title="[bold yellow]Agents & Location[/]", show_header=False, box=box.MINIMAL, padding=(0,1), expand=True)
+    table2.add_column("Parameter", style="dim", no_wrap=True, ratio=1)
+    table2.add_column("Value", overflow="fold", no_wrap=False, ratio=3)
+    
     active_sim_ids = current_state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
     sim_limit = 3
     primary_actor_location_id: Optional[str] = None # To store the location of the first active sim
@@ -87,22 +98,22 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
             primary_actor_location_id = get_nested(current_state, SIMULACRA_KEY, sim_id, "location")
 
         if i >= sim_limit and sim_limit > 0 : # Add check for sim_limit > 0
-            table.add_row(f"... ({len(active_sim_ids) - sim_limit} more)", "...")
+            table2.add_row(f"... ({len(active_sim_ids) - sim_limit} more)", "...")
             break
         sim_state_data = get_nested(current_state, SIMULACRA_KEY, sim_id, default={})
-        table.add_row(f"--- Sim: {get_nested(sim_state_data, 'persona_details', 'Name', default=sim_id)} ---", "---")
-        table.add_row(f"  Status", get_nested(sim_state_data, 'status', default="Unknown"))
-        table.add_row(f"  Location", get_nested(sim_state_data, 'location', default="Unknown"))
+        table2.add_row(Text(f"--- Sim: {get_nested(sim_state_data, 'persona_details', 'Name', default=sim_id)} ---", style="bold magenta"), Text("---", style="bold magenta"))
+        table2.add_row(f"  Status", get_nested(sim_state_data, 'status', default="Unknown"))
+        table2.add_row(f"  Location", get_nested(sim_state_data, 'location', default="Unknown"))
         sim_goal = get_nested(sim_state_data, 'goal', default="Unknown")
-        table.add_row(f"  Goal", sim_goal[:60] + ("..." if len(sim_goal) > 60 else ""))
-        table.add_row(f"  Action End", f"{get_nested(sim_state_data, 'current_action_end_time', default=0.0):.2f}s" if get_nested(sim_state_data, 'status')=='busy' else "N/A")
+        table2.add_row(f"  Goal", sim_goal[:35] + ("..." if len(sim_goal) > 35 else ""))
+        table2.add_row(f"  Action End", f"{get_nested(sim_state_data, 'current_action_end_time', default=0.0):.2f}s" if get_nested(sim_state_data, 'status')=='busy' else "N/A")
         last_obs = get_nested(sim_state_data, 'last_observation', default="None")
-        table.add_row(f"  Last Obs.", last_obs[:80] + ("..." if len(last_obs) > 80 else ""))
+        table2.add_row(f"  Last Obs.", last_obs[:35] + ("..." if len(last_obs) > 35 else ""))
         action_desc = get_nested(sim_state_data, 'current_action_description', default="N/A")
-        table.add_row(f"  Curr. Action", action_desc[:70] + ("..." if len(action_desc) > 70 else ""))
+        table2.add_row(f"  Curr. Action", action_desc[:35] + ("..." if len(action_desc) > 35 else ""))
         interrupt_prob = get_nested(sim_state_data, 'current_interrupt_probability')
         if interrupt_prob is not None:
-            table.add_row(f"  Dyn.Int.Prob", f"{interrupt_prob:.2%}")
+            table2.add_row(f"  Dyn.Int.Prob", f"{interrupt_prob:.2%}")
         else:
             # Check if busy and potentially on cooldown
             if get_nested(sim_state_data, 'status') == 'busy':
@@ -110,12 +121,12 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
                 current_sim_time_table = get_nested(current_state, "world_time", 0.0) # Get current time for check
                 # INTERJECTION_COOLDOWN_SIM_SECONDS would need to be imported from config
                 # For simplicity, we'll just assume if it's None and busy, it might be cooldown or too short
-                table.add_row(f"  Dyn.Int.Prob", "[dim]N/A (Cooldown/Short)[/dim]")
+                table2.add_row(f"  Dyn.Int.Prob", "[dim]N/A (Cooldown/Short)[/dim]")
             # else: if not busy, don't show the line
 
     # --- Ephemeral Objects in Primary Actor's Location ---
     location_name_display = primary_actor_location_id if primary_actor_location_id else "Unknown Location"
-    table.add_row(Text(f"--- Objects in {location_name_display} ---", style="bold cyan"), Text("---", style="bold cyan"))
+    table2.add_row(Text(f"--- Objects in {location_name_display} ---", style="bold cyan"), Text("---", style="bold cyan"))
     
     ephemeral_objects_in_loc: List[Dict[str, Any]] = []
     if primary_actor_location_id:
@@ -128,20 +139,20 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
             default=[]
         )
     
-    table.add_row(f"  (Ephemeral)", f"({len(ephemeral_objects_in_loc)} total)")
+    table2.add_row(f"  (Ephemeral)", f"({len(ephemeral_objects_in_loc)} total)")
     if ephemeral_objects_in_loc:
         object_display_limit = 5 # How many ephemeral objects to show
         for i, obj_data in enumerate(ephemeral_objects_in_loc):
             if i >= object_display_limit:
-                table.add_row(f"    ... ({len(ephemeral_objects_in_loc) - object_display_limit} more)", "")
+                table2.add_row(f"    ... ({len(ephemeral_objects_in_loc) - object_display_limit} more)", "")
                 break
             obj_name = obj_data.get("name", "N/A")
             obj_id = obj_data.get("id", "N/A")
             obj_desc = obj_data.get('description', '')
-            table.add_row(f"    {obj_name} ({obj_id})", obj_desc[:60] + ("..." if len(obj_desc) > 60 else ""))
+            table2.add_row(f"    {obj_name} ({obj_id})", obj_desc[:35] + ("..." if len(obj_desc) > 35 else ""))
     
     # --- Ephemeral NPCs in Primary Actor's Location ---
-    table.add_row(Text(f"--- NPCs in {location_name_display} ---", style="bold green"), Text("---", style="bold green"))
+    table2.add_row(Text(f"--- NPCs in {location_name_display} ---", style="bold green"), Text("---", style="bold green"))
     ephemeral_npcs_in_loc: List[Dict[str, Any]] = []
     if primary_actor_location_id:
         ephemeral_npcs_in_loc = get_nested(
@@ -152,49 +163,44 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
             "ephemeral_npcs", # Key where ephemeral NPCs are stored
             default=[]
         )
-    table.add_row(f"  (Ephemeral)", f"({len(ephemeral_npcs_in_loc)} total)")
+    table2.add_row(f"  (Ephemeral)", f"({len(ephemeral_npcs_in_loc)} total)")
     if ephemeral_npcs_in_loc:
         npc_display_limit = 3 # How many ephemeral NPCs to show
         for i, npc_data in enumerate(ephemeral_npcs_in_loc):
             if i >= npc_display_limit:
-                table.add_row(f"    ... ({len(ephemeral_npcs_in_loc) - npc_display_limit} more)", "")
+                table2.add_row(f"    ... ({len(ephemeral_npcs_in_loc) - npc_display_limit} more)", "")
                 break
             npc_name = npc_data.get("name", "N/A")
             npc_id = npc_data.get("id", "N/A") 
             npc_desc = npc_data.get('description', '')
-            table.add_row(f"    {npc_name} ({npc_id})", npc_desc[:60] + ("..." if len(npc_desc) > 60 else ""))
-
-
-    table.add_row("--- System ---", "---")
-    table.add_row("Event Bus Size", str(event_bus_qsize))
-    table.add_row("Narration Q Size", str(narration_qsize))
+            table2.add_row(f"    {npc_name} ({npc_id})", npc_desc[:35] + ("..." if len(npc_desc) > 35 else ""))
 
     narrative_log_entries = get_nested(current_state, 'narrative_log', default=[])[-6:]
     truncated_log_entries = []
-    max_log_line_length = 70
+    max_log_line_length = 35 # Reduced from 70
     for entry in narrative_log_entries:
         if len(entry) > max_log_line_length:
             truncated_log_entries.append(entry[:max_log_line_length - 3] + "...")
         else:
             truncated_log_entries.append(entry)
     log_display = "\n".join(truncated_log_entries)
-    table.add_row("Narrative Log", log_display)
+    table1.add_row("Narrative Log", log_display)
 
     weather_feed = get_nested(current_state, 'world_feeds', 'weather', 'condition', default='N/A')
     news_updates = get_nested(current_state, 'world_feeds', 'news_updates', default=[])
     pop_culture_updates = get_nested(current_state, 'world_feeds', 'pop_culture_updates', default=[])
     news_headlines_display = [item.get('headline', 'N/A') for item in news_updates[:3]]
     pop_culture_headline_display = pop_culture_updates[0].get('headline', 'N/A') if pop_culture_updates else 'N/A'
-    table.add_row("--- World Feeds ---", "---")
-    table.add_row("  Weather", weather_feed)
+    table1.add_row(Text("--- World Feeds ---", style="bold yellow"), Text("---", style="bold yellow"))
+    table1.add_row("  Weather", weather_feed)
     for i, headline in enumerate(news_headlines_display):
-        table.add_row(f"  News {i+1}", headline[:70] + "..." if len(headline) > 70 else headline)
-    table.add_row(f"  Pop Culture", pop_culture_headline_display[:70] + "..." if len(pop_culture_headline_display) > 70 else pop_culture_headline_display)
+        table1.add_row(f"  News {i+1}", headline[:35] + "..." if len(headline) > 35 else headline)
+    table1.add_row(f"  Pop Culture", pop_culture_headline_display[:35] + "..." if len(pop_culture_headline_display) > 35 else pop_culture_headline_display)
 
     # --- Pending Simulation Events ---
     pending_events = get_nested(current_state, 'pending_simulation_events', default=[])
-    table.add_row(Text("--- Pending Events ---", style="bold yellow"), Text("---", style="bold yellow"))
-    table.add_row("  (Scheduled)", f"({len(pending_events)} total)")
+    table1.add_row(Text("--- Pending Events ---", style="bold orange_red1"), Text("---", style="bold orange_red1"))
+    table1.add_row("  (Scheduled)", f"({len(pending_events)} total)")
 
     if pending_events:
         # Sort events by trigger time for better readability
@@ -202,15 +208,16 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
         event_display_limit = 3 # How many pending events to show
         for i, event_data in enumerate(sorted_pending_events):
             if i >= event_display_limit:
-                table.add_row(f"    ... ({len(pending_events) - event_display_limit} more)", "")
+                table1.add_row(f"    ... ({len(pending_events) - event_display_limit} more)", "")
                 break
             event_type = event_data.get("event_type", "Unknown Event")
             trigger_time = event_data.get("trigger_sim_time", 0.0)
             target_agent = event_data.get("target_agent_id", "World")
-            details_snippet = str(event_data.get("details", {}))[:40] + "..." # Snippet of details
-            table.add_row(f"    {event_type} for {target_agent}", f"at {trigger_time:.1f}s ({details_snippet})")
+            details_snippet = str(event_data.get("details", {}))[:35] + "..." # Snippet of details
+            table1.add_row(f"    {event_type} for {target_agent}", f"at {trigger_time:.1f}s ({details_snippet})")
 
-    return table
+    # Combine tables into Columns
+    return Columns([table1, table2], title=overall_title, expand=True, padding=1)
 
 async def _fetch_and_summarize_real_feed(
     category_for_logging: str,
@@ -253,7 +260,7 @@ async def _fetch_and_summarize_real_feed(
             break 
     
     if search_tool_used_successfully and raw_search_results_text.strip():
-        logger_instance.info(f"[{category_for_logging}] REAL search returned: {raw_search_results_text.strip()[:500]}")
+        logger_instance.info(f"[{category_for_logging}] REAL search returned: {raw_search_results_text.strip()[:400]}")
         summarization_prompt = summarization_prompt_template.format(search_results=raw_search_results_text.strip()[:1000]) + f"\n{output_format_note}"
         response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
         return response_obj # Return the LLM response object

@@ -3,6 +3,13 @@
 Exploring Simulation Theory through Large Language Models
 
 Update as of:
+5/22/2025
+
+- All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
+- Interactive mode is functional also - use client.py and select a simulacra to interact with.
+- Next steps - code is bloated and very messy - since all major features are functioning correctly, most of the code will be refactored to be cleaner and more modular. Tackling global states also to be more in line with ADK patters for deployment in GCP in cloudrun environment to running 24/7.
+- Further enhancements - as in better async handling ops for multi agent interactiton and other interaces for say game design to use patterns in Unity/Unreal to create fully immersive NPCs or Research Purposus.
+
 5/21/2025
 
 - fixed condition that drove simulacra insane due to the inability to move from an unknown location. see race_condition_log for details

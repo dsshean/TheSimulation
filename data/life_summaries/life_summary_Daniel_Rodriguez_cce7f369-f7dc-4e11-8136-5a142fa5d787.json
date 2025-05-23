@@ -372,10 +372,7 @@
               "Grabbing pizza for dinner at a local pizzeria.",
               "Local Pizzeria"
             ],
-            "21": [
-              "Reading Neuromancer before bed.",
-              "Brooklyn Apartment"
-            ],
+            "21": ["Reading Neuromancer before bed.", "Brooklyn Apartment"],
             "22": [
               "Getting ready for bed, brushing his teeth and washing his face.",
               "Brooklyn Apartment"
@@ -389,10 +386,7 @@
         },
         "14": {
           "activities": {
-            "0": [
-              "Sleeping soundly after a long day.",
-              "Brooklyn Apartment"
-            ],
+            "0": ["Sleeping soundly after a long day.", "Brooklyn Apartment"],
             "1": [
               "Deep sleep, dreaming about code and mountain cabins.",
               "Brooklyn Apartment"
@@ -473,10 +467,7 @@
               "Preparing and eating dinner (Cuban sandwich).",
               "Brooklyn Apartment"
             ],
-            "21": [
-              "Watching the movie Blade Runner.",
-              "Brooklyn Apartment"
-            ],
+            "21": ["Watching the movie Blade Runner.", "Brooklyn Apartment"],
             "22": [
               "Reading a few chapters of Neuromancer before bed.",
               "Brooklyn Apartment"
@@ -492,5 +483,5 @@
     }
   },
   "sim_id": "sim_sustdj",
-  "world_instance_uuid": "669003d4-bce8-49d0-80c2-b58a081dd5f1"
+  "world_instance_uuid": "cce7f369-f7dc-4e11-8136-5a142fa5d787"
 }

@@ -1,0 +1,2 @@
+{"sim_time_s": 0.0, "agent_id": "sim_sustdj", "event_type": "intent", "data": {"action_type": "talk", "target_id": "sim_b797o8", "details": "Hey Ava, good afternoon. I was thinking about grabbing a coffee and a snack down at that new cafe, want to join me?"}}
+{"sim_time_s": 0.0, "agent_id": "sim_b797o8", "event_type": "intent", "data": {"action_type": "look_around", "target_id": null, "details": "Looking around the apartment to get a sense of things and check the weather."}}

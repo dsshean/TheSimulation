@@ -75,6 +75,7 @@ class WorldEngineResponse(BaseModel):
     duration: float = Field(ge=0.0)
     results: Dict[str, Any] = Field(default_factory=dict)
     outcome_description: str
+    scheduled_future_event: Optional[Dict[str, Any]] = None
 
     @validator('duration') # Pydantic v1 style validator
     @classmethod

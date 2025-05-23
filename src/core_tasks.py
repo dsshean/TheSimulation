@@ -55,9 +55,62 @@ async def time_manager_task(
                             _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.pending_results", {}, logger_instance)
                         else:
                             logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
+                        # Clear interrupt probability and set status to idle for agent-specific action completions
                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance)
                         logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
+
+            # --- BEGIN ADDITION: Process General Scheduled Events from pending_simulation_events ---
+            processed_event_indices = []
+            pending_events_list = current_state.get("pending_simulation_events", [])
+
+            for i, event_data in enumerate(pending_events_list):
+                if event_data.get("trigger_sim_time", float('inf')) <= new_sim_time:
+                    event_type = event_data.get("event_type")
+                    logger_instance.info(f"[TimeManager] Processing scheduled event: '{event_type}' at sim_time {new_sim_time:.2f} (due at {event_data.get('trigger_sim_time'):.2f})")
+
+                    if event_type == "simulacra_speech_received_as_interrupt":
+                        target_agent_id = event_data.get("target_agent_id")
+                        message_details = event_data.get("details", {})
+                        speech_content = message_details.get("message_content", "Someone spoke to you.")
+                        speaker_name = message_details.get("speaker_name", "Someone") # Fallback
+
+                        # Check if the target agent exists and is a simulacra
+                        if target_agent_id and target_agent_id in get_nested(current_state, SIMULACRA_KEY, default={}):
+                            logger_instance.info(
+                                f"[TimeManager] Applying 'simulacra_speech_received_as_interrupt' to {target_agent_id} "
+                                f"from {speaker_name}."
+                            )
+
+                            updates_for_interrupt = {
+                                f"{SIMULACRA_KEY}.{target_agent_id}.last_observation": speech_content,
+                                f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
+                                # Make them act very soon by setting their action end time to now + tiny delay
+                                f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": new_sim_time + 0.01,
+                                f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {}, # Clear any pending results from a potentially interrupted action
+                                f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
+                                f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None, # Reset interrupt probability
+                            }
+                            for key_path, value in updates_for_interrupt.items():
+                                _update_state_value(current_state, key_path, value, logger_instance)
+
+                            logger_instance.info(
+                                f"[TimeManager] Agent {target_agent_id} processed speech interrupt. New observation set. Status set to idle."
+                            )
+                            # Optional: Trigger narration for the *interrupted agent* here if desired (conceptual)
+                        else:
+                            logger_instance.warning(f"[TimeManager] Target agent '{target_agent_id}' for speech interrupt not found or invalid.")
+
+                    # Add other event_type handlers here if needed in the future
+                    # elif event_type == "another_event_type":
+                    #    ...
+
+                    processed_event_indices.append(i) # Mark event for removal
+
+            # Remove processed events (iterate in reverse to avoid index issues during pop)
+            for i in sorted(processed_event_indices, reverse=True):
+                pending_events_list.pop(i)
+            # --- END ADDITION ---
             
             live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
             await asyncio.sleep(UPDATE_INTERVAL)
@@ -69,63 +122,6 @@ async def time_manager_task(
     finally:
         logger_instance.info(f"[TimeManager] Loop finished at sim time {current_state.get('world_time', 0.0):.1f}")
 
-
-async def interaction_dispatcher_task(
-    current_state: Dict[str, Any],
-    event_bus_instance: asyncio.Queue,
-    logger_instance: logging.Logger
-):
-    """Listens for intents and classifies them before sending to World Engine."""
-    logger_instance.info("[InteractionDispatcher] Task started.")
-    while True:
-        intent_event = None
-        try:
-            intent_event = await event_bus_instance.get()
-            if get_nested(intent_event, "type") != "intent_declared":
-                logger_instance.debug(f"[InteractionDispatcher] Ignoring event type: {get_nested(intent_event, 'type')}")
-                event_bus_instance.task_done()
-                continue
-
-            actor_id = get_nested(intent_event, "actor_id")
-            intent = get_nested(intent_event, "intent")
-            if not actor_id or not intent:
-                logger_instance.warning(f"[InteractionDispatcher] Received invalid intent event: {intent_event}")
-                event_bus_instance.task_done()
-                continue
-
-            target_id = intent.get("target_id")
-            action_type = intent.get("action_type")
-            interaction_class = "environment"
-
-            if target_id:
-                # Check if target is another Simulacra
-                if target_id in get_nested(current_state, SIMULACRA_KEY, default={}): # SIMULACRA_KEY points to "simulacra_profiles"
-                    interaction_class = "entity"
-                else:
-                    # Check if target is an interactive object
-                    # state["objects"] is a list of dicts, so we need to iterate
-                    objects_list = get_nested(current_state, "objects", default=[])
-                    for obj in objects_list:
-                        if isinstance(obj, dict) and obj.get("id") == target_id and obj.get("interactive", False):
-                            interaction_class = "entity"
-                            break
-
-            logger_instance.info(f"[InteractionDispatcher] Intent from {actor_id} ({action_type} on {target_id or 'N/A'}) classified as '{interaction_class}'.")
-            await event_bus_instance.put({"type": "resolve_action_request", "actor_id": actor_id, "intent": intent, "interaction_class": interaction_class})
-            event_bus_instance.task_done()
-            await asyncio.sleep(0)
-
-        except asyncio.CancelledError:
-            logger_instance.info("[InteractionDispatcher] Task cancelled.")
-            if intent_event and event_bus_instance._unfinished_tasks > 0:
-                try: event_bus_instance.task_done()
-                except ValueError: pass
-            break
-        except Exception as e:
-            logger_instance.exception(f"[InteractionDispatcher] Error processing event: {e}")
-            if intent_event and event_bus_instance._unfinished_tasks > 0:
-                try: event_bus_instance.task_done()
-                except ValueError: pass
 
 async def world_info_gatherer_task(
     current_state: Dict[str, Any],

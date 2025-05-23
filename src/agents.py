@@ -38,6 +38,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
 3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
+    *   **Conversational Flow:** Pay close attention to the `Recent History` and `Last Observation/Event`. If you've just asked a question and received an answer, or if the other agent has made a clear statement, acknowledge it in your internal monologue and try to progress the conversation. Avoid re-asking questions that have just been answered or getting stuck in repetitive conversational loops. If a decision has been made (e.g., what to eat), move towards acting on that decision.
     *   **Entity Interactions:** `use [object_id]`, `talk [agent_id]`.
             *   **Talking to Ephemeral NPCs (introduced by Narrator):**
             *   If the Narrator described an NPC (e.g., "a street vendor," "a mysterious figure"), you can interact by setting `action_type: "talk"`.
@@ -145,8 +146,19 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
             *   `talk`:
                 *   **If target is a Simulacra:**
                     *   Check if Actor and Target Simulacra are in the same `Actor's Current Location ID`.
+                                *   **Note: Even if the `Target Entity State.status` is 'busy' (e.g., with their own 'talk' action, 'wait', or other short action) or 'thinking', this `talk` action can still be `valid_action: true`. The target might be interrupted or process the speech slightly later. Your `outcome_description` can reflect that the target was occupied, e.g., \"[Actor Name] spoke to [Target Name], who seemed preoccupied, saying: '{{intent.details}}'\"**
                     *   If not, `valid_action: false`, `duration: 0.0`, `results: {{}}`, `outcome_description: "[Actor Name] tried to talk to [Target Simulacra Name], but they are not in the same location."`
-                    *   If yes, `valid_action: true`, `duration: short (e.g., 30-120s)`, `results: {{"simulacra_profiles.[target_id].last_observation": "[Actor Name] said to you: '{{intent.details}}'"}}`, `outcome_description: "[Actor Name] spoke with [Target Simulacra Name]."`
+                    *   If yes:
+                        *   `valid_action: true`.
+                        *   `duration`: Estimate realistically the time it takes for the Actor to *say* the words in `intent.details`. A very brief utterance (1-5 words) might take 1-3 seconds. A typical sentence or two (e.g., "Hey, how are you? Want to grab lunch?") might take 3-7 seconds. This is ONLY the time the speaker is busy speaking.
+                        *   `results`: `{{}}` (The speaker's action of talking doesn't directly change other state immediately, beyond them being busy for the short `duration`).
+                        *   `outcome_description`: `"[Actor Name] said to [Target Simulacra Name]: '{{intent.details}}'"` (Factual statement of what the actor did).
+                        *   `scheduled_future_event`:
+                            *   `event_type`: "simulacra_speech_received_as_interrupt"
+                            *   `target_agent_id`: The `intent.target_id` (the Simulacra being spoken to).
+                            *   `location_id`: The `Actor's Current Location ID`.
+                            *   `details`: `{{"speaker_id": "[Actor ID]", "speaker_name": "[Actor Name]", "message_content": "[Actor Name] said to you: '{{intent.details}}'"}}`
+                            *   `estimated_delay_seconds`: 0.5 (This ensures the speech is processed as an interrupt almost immediately after the speaker finishes their short 'talk' action).
                 *   **If target is an ephemeral NPC (indicated by `intent.target_id` starting with 'npc_concept_' OR if `intent.details` clearly refers to an NPC described in the Actor's `last_observation` which was set by the Narrator):**
                     *   `valid_action: true`.
                     *   `duration`: Short (e.g., 15-60s).
@@ -184,11 +196,30 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
                         *   `outcome_description`: `"[Actor Name] moved to [New Location Name] (ID: [new_target_location_id_from_intent.details])."`
             *   `look_around`: The actor observes their surroundings.
                 *   `valid_action`: `true`.
-                *   `duration`: Short (e.g., 3-5 seconds).
+                *   `duration`: Very Short (e.g., 0.1 to 0.5 seconds).
                 *   **CRITICAL `results` for `look_around`:** `{{"simulacra_profiles.[sim_id].last_observation": "You take a moment to observe your surroundings."}}` # This is a generic placeholder. The Narrator will provide the detailed observation and discoveries. Do NOT add other results here for look_around.
                 *   `outcome_description`: `"[Actor Name] looked around the [Current Location Name]."` # Factual outcome for Narrator. Do NOT describe what was seen here.
                 *   `scheduled_future_event`: `null`.
-        *   **Self Interaction (e.g., `wait`, `think`):** Simple, short duration.
+        *   **Self Interaction (e.g., `wait`, `think`):**
+            *   `wait`:
+                *   **If `intent.details` clearly indicates waiting for another Simulacra's response in an ongoing conversation (e.g., "Waiting for [Other Agent] to reply", "Listening for what they say next", "Waiting for them to speak"):**
+                    *   `valid_action: true`.
+                    *   `duration`: Very short, representing a brief pause to cede the conversational floor (e.g., 0.1 - 0.5 seconds). The agent will become 'idle' almost immediately and await an interrupt from the other agent's speech.
+                    *   `results: {{}}`.
+                    *   `outcome_description: "[Actor Name] paused, waiting for a response."`
+                    *   `scheduled_future_event: null`.
+                *   **Else (for timed waits or general pauses not tied to immediate conversation):**
+                    *   `valid_action: true`.
+                    *   `duration`: As implied by `intent.details` if a specific time is mentioned (e.g., "wait for 5 minutes"), otherwise a generic short duration (e.g., 3-10 seconds) if details are vague like "wait for a bit" or "wait patiently".
+                    *   `results: {{}}`.
+                    *   `outcome_description: "[Actor Name] waited."` (or more specific if details allow, e.g., "[Actor Name] waited for 5 minutes.")
+                    *   `scheduled_future_event: null`.
+            *   `think`:
+                *   `valid_action: true`.
+                *   `duration`: Short, representing a moment of thought (e.g., 1-2 seconds, depending on the complexity implied by `intent.details` if any; simple thoughts should be quicker).
+                *   `results: {{}}`.
+                *   `outcome_description: "[Actor Name] took a moment to think."`
+                *   `scheduled_future_event: null`.
     *   **Handling `initiate_change` Action Type (from agent's self-reflection or idle planning):**
         *   **Goal:** The actor is signaling a need for a change. Acknowledge this and provide a new observation.
         *   **`valid_action`:** Always `true`.
@@ -255,7 +286,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
         *   If moving to a location listed in `Actor's Current Location State.connected_locations` which has explicit travel time, use that.
         {world_engine_move_duration_instruction} # This instruction block already considers Current World Time for duration if real/realtime
         *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 5-30 seconds).
-    *   For other actions, assign plausible durations (e.g., `talk` a few minutes, `use` object varies, `wait` as specified or short).
+    *   For other actions not detailed above, assign plausible durations (e.g., `use` object varies based on complexity). `talk` durations are for the utterance itself (see specific `talk` guidelines). `wait` and `think` durations are also specified above.
 4.  **Determine Results & Scheduled Future Event:** State changes in dot notation for immediate results. Populate `scheduled_future_event` if applicable. Empty `{{}}` for invalid actions.
     *   For a successful `move`, the key result is `{{ "simulacra_profiles.[sim_id].location": "[target_location_id_from_intent.details]" }}`.
 5.  **Generate Factual Outcome Description:** STRICTLY FACTUAL. **Crucially, if the action is performed by an actor, the `outcome_description` MUST use the `Actor Name` exactly as provided in the input.** Examples:
@@ -327,6 +358,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 6.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
     *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the rest of your narrative.** For example, if the dynamically inserted `Current World Time` was "07:33 PM (Local time for New York)", your `narrative` should start with "At 07:33 PM (Local time for New York), ...". If it was "120.5s elapsed", it should start "At 120.5s elapsed, ...".
     {narrator_style_adherence_instruction}
+                **CRITICAL JSON FORMATTING: When generating the 'narrative' string, if you include any direct speech or text that itself contains double quotes (\"), you MUST escape those internal double quotes with a backslash (e.g., \\\"text in quotes\\\"). Failure to do so will result in invalid JSON.**
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**
     *   **Flow:** Ensure reasonable flow.
