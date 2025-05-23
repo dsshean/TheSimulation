@@ -59,7 +59,7 @@ from .config import (  # For run_simulation; For self-reflection; New constants 
     PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, SEARCH_AGENT_MODEL_NAME,
     SIMULACRA_KEY, SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR,
     SOCIAL_POST_HASHTAGS, SOCIAL_POST_TEXT_LIMIT, STATE_DIR, UPDATE_INTERVAL,
-    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
+    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY, MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK)
 from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (  # MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK removed from config import
     get_nested, load_json_file, load_or_initialize_simulation,
@@ -308,7 +308,8 @@ async def world_engine_task_llm():
                 continue
 
             actor_id = get_nested(request_event, "actor_id")
-            
+            intent_id_from_queue = get_nested(request_event, "intent_id") # Get the intent ID from the event
+
             # Check if agent is in interaction mode
             in_interaction_mode = get_nested(state, SIMULACRA_KEY, actor_id, "interaction_mode", default=False)
             if in_interaction_mode:
@@ -322,6 +323,19 @@ async def world_engine_task_llm():
                 logger.warning(f"[WorldEngineLLM] Received invalid action request event: {request_event}")
                 event_bus.task_done()
                 continue
+            # --- Check for Stale Intent ---
+            current_pending_intent_id_in_state = get_nested(state, f"{SIMULACRA_KEY}.{actor_id}.current_pending_intent_id")
+            actor_name_for_log_stale = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
+            actor_status = get_nested(state, SIMULACRA_KEY, actor_id, "status")
+           
+            # Modified check: Process if intent matches OR if agent is in "thinking" status AND we have a valid intent
+            if intent_id_from_queue == current_pending_intent_id_in_state or (actor_status == "thinking" and intent_id_from_queue):
+                # Intent is valid, continue processing
+                pass
+            else:
+                logger.warning(f"[WorldEngineLLM] Stale intent {str(intent_id_from_queue)[:8]} for {actor_name_for_log_stale} ({actor_id}) detected. Agent's current pending intent is {str(current_pending_intent_id_in_state)[:8]}. Discarding stale intent.")
+                event_bus.task_done()
+                continue # Skip processing this stale intent
 
             # --- BEGIN MOVED CLASSIFICATION LOGIC ---
             target_id_for_classification = intent.get("target_id")
@@ -449,6 +463,18 @@ Resolve this intent based on your instructions and the provided context.
 
             if validated_data and validated_data.valid_action:
                 completion_time = current_sim_time + validated_data.duration
+                
+                # Add interruption detection for speak actions
+                if action_type == "speak" and target_id:
+                    # Check if target agent is busy (being interrupted)
+                    target_status = get_nested(state, SIMULACRA_KEY, target_id, "status")
+                    
+                    if target_status == "busy":
+                        # Mark this as an interruption in the narrative
+                        target_name = get_nested(state, SIMULACRA_KEY, target_id, "persona_details", "Name", default=target_id)
+                        validated_data.outcome_description = f"Interrupting {target_name}, {actor_name} {validated_data.outcome_description.lower() if validated_data.outcome_description[0].isupper() else validated_data.outcome_description}"
+                        logger.info(f"[WorldEngineLLM] Detected conversation interruption: {actor_name} interrupted {target_name}")
+
                 # --- BEGIN ADDITION: Handle scheduled_future_event ---
                 if validated_data.scheduled_future_event:
                     sfe = validated_data.scheduled_future_event
@@ -491,6 +517,8 @@ Resolve this intent based on your instructions and the provided context.
                     validated_data.results[f"{SIMULACRA_KEY}.{actor_id}.location_details"] = new_location_details_text
                     logger.info(f"[WorldEngineLLM] Queuing update for {actor_id}'s location_details to: '{new_location_details_text}'")
                 # --- End Phase 3 Change ---
+                # Clear the pending intent ID as it has now been processed by the World Engine (moved here for all valid actions)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_pending_intent_id", None, logger)
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", validated_data.results, logger)
@@ -504,6 +532,8 @@ Resolve this intent based on your instructions and the provided context.
                 final_outcome_desc = validated_data.outcome_description if validated_data else outcome_description
                 logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_outcome_desc}")
                 # --- Log World Engine Resolution Event (Failure) ---
+                # Clear pending intent ID for invalid actions too
+                _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_pending_intent_id", None, logger)
                 _log_event(
                     sim_time=current_sim_time,
                     agent_id="WorldEngine",
@@ -530,14 +560,10 @@ Resolve this intent based on your instructions and the provided context.
         except Exception as e:
             logger.exception(f"[WorldEngineLLM] Error processing event for actor {actor_id}: {e}")
             if actor_id and actor_id in get_nested(state, SIMULACRA_KEY, default={}):
-                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
-                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", {}, logger)
-                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", f"Action failed unexpectedly: {e}", logger)
-            if request_event and event_bus._unfinished_tasks > 0: 
-                try: event_bus.task_done()
-                except ValueError: pass 
-            await asyncio.sleep(1) 
-        finally: 
+                _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", {}, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", f"Action failed unexpectedly: {e}", logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_pending_intent_id", None, logger)
             if request_event and event_bus._unfinished_tasks > 0:
                 try: event_bus.task_done()
                 except ValueError: logger.warning("[WorldEngineLLM] task_done() called too many times in finally.")
@@ -647,6 +673,8 @@ async def simulacra_agent_task_llm(agent_id: str):
         sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
         if "last_interjection_sim_time" not in sim_state_init:
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_interjection_sim_time", 0.0, logger)
+        if "current_pending_intent_id" not in sim_state_init: # Initialize the new field
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_pending_intent_id", None, logger)
         if "current_interrupt_probability" not in sim_state_init: # Initialize if not present
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
         # next_simple_timer_interjection_sim_time is no longer managed by this task
@@ -734,11 +762,20 @@ async def simulacra_agent_task_llm(agent_id: str):
                         else:
                             raise TypeError(f"Unexpected type from parse_json_output_last: {type(response_text_clean_str)}. Expected dict or None.")
                         validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
+
+                        intent_id_for_this_action = uuid.uuid4().hex
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_pending_intent_id", intent_id_for_this_action, logger)
+                        logger.debug(f"[{agent_name}] Stored new pending intent ID (initial): {intent_id_for_this_action[:8]}")
+
                         if live_display_object:
                             live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
                             live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
                             live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
-                        await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                        await event_bus.put({
+                            "type": "intent_declared", "actor_id": agent_id,
+                            "intent": validated_intent.model_dump(exclude={'internal_monologue'}),
+                            "intent_id": intent_id_for_this_action
+                        })
                         
                         # --- Log Simulacra Intent Event ---
                         _log_event(
@@ -837,11 +874,20 @@ async def simulacra_agent_task_llm(agent_id: str):
                             else:
                                 raise TypeError(f"Unexpected type from parse_json_output_last: {type(response_text_clean_str)}. Expected dict or None.")
                             validated_intent = SimulacraIntentResponse.model_validate(parsed_data)
+
+                            intent_id_for_this_action = uuid.uuid4().hex
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_pending_intent_id", intent_id_for_this_action, logger)
+                            logger.debug(f"[{agent_name}] Stored new pending intent ID (idle loop): {intent_id_for_this_action[:8]}")
+
                             if live_display_object:
                                 live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
                                 live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
                                 live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
-                            await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                            await event_bus.put({
+                                "type": "intent_declared", "actor_id": agent_id,
+                                "intent": validated_intent.model_dump(exclude={'internal_monologue'}),
+                                "intent_id": intent_id_for_this_action
+                            })
                             
                             # --- Log Simulacra Intent Event ---
                             _log_event(
@@ -905,8 +951,16 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
                                         # Probability remains as it was, task continues
                                     else:
+                                        intent_id_for_reflection_action = uuid.uuid4().hex
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_pending_intent_id", intent_id_for_reflection_action, logger)
+                                        logger.debug(f"[{agent_name}] Stored new pending intent ID (reflection): {intent_id_for_reflection_action[:8]}")
+
                                         logger.info(f"[{agent_name}] Reflection: Chose to '{validated_reflection_intent.action_type}'. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
-                                        await event_bus.put({ "type": "intent_declared", "actor_id": agent_id, "intent": validated_reflection_intent.model_dump(exclude={'internal_monologue'}) })
+                                        await event_bus.put({
+                                            "type": "intent_declared", "actor_id": agent_id,
+                                            "intent": validated_reflection_intent.model_dump(exclude={'internal_monologue'}),
+                                            "intent_id": intent_id_for_reflection_action
+                                        })
                                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger) # Clear as action is changing
                                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                                 except Exception as e_reflect:
@@ -1085,8 +1139,7 @@ async def run_simulation(
                     state=state,
                     narration_queue=narration_queue,
                     world_mood=world_mood_global,
-                    simulation_time_getter=get_current_sim_time
-                ), 
+                    simulation_time_getter=get_current_sim_time                ), 
                 name="SocketServer"
             ))
             tasks.append(asyncio.create_task(time_manager_task(
@@ -1463,7 +1516,7 @@ Generate this image.
                 )
             )
 
-            image_generated = False
+            image_generated = False # Mark success
             saved_image_path_for_social_post: Optional[str] = None # Store path of successfully saved image
 
             for generated_image in response.generated_images:
@@ -1508,7 +1561,7 @@ Generate this image.
                     original_file_size = os.path.getsize(saved_image_path_for_social_post)
 
                     if original_file_size > BLUESKY_MAX_IMAGE_SIZE_BYTES:
-                        logger.warning(f"[NarrativeImageGenerator] Image {saved_image_path_for_social_post} ({original_file_size / (1024*1024):.2f}MB) exceeds Bluesky limit ({BLUESKY_MAX_IMAGE_SIZE_BYTES / (1024*1024):.2f}MB). Attempting to compress/resize.")
+                        logger.warning(f"[NarrativeImageGenerator] Image {saved_image_path_for_social_post} ({original_file_size / (1024*1024):.2f}MB) exceeds Bluesky limit ({BLUESKY_MAX_IMAGE_SIZE_BYTES / (1024*1024):.2f}MB). Attempting to compress.")
                         try:
                             img_pil = Image.open(saved_image_path_for_social_post)
                             # Convert to RGB if it's RGBA (PNGs can have alpha) to save as JPEG
@@ -1521,7 +1574,7 @@ Generate this image.
                             # Attempt to save with decreasing quality
                             while quality >= 50:
                                 temp_image_buffer.seek(0) # Reset buffer
-                                temp_image_buffer.truncate() # Clear buffer
+                                temp_image_buffer.truncate(0) # Clear buffer
                                 img_pil.save(temp_image_buffer, format="JPEG", quality=quality, optimize=True)
                                 if temp_image_buffer.tell() <= BLUESKY_MAX_IMAGE_SIZE_BYTES:
                                     logger.info(f"[NarrativeImageGenerator] Compressed image to {temp_image_buffer.tell() / 1024:.2f}KB with JPEG quality {quality}.")

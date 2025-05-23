@@ -4,8 +4,21 @@
     "sim_b797o8",
     "sim_sustdj"
   ],
-  "world_time": 0.0,
-  "narrative_log": [],
+  "world_time": 94.42200000002049,
+  "narrative_log": [
+    "[T10.0] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), Daniel, still slightly groggy, turns towards Ava in the Long Island City apartment. He rubs his eyes before clearing his throat and speaking to her, a gentle smile forming on his face.",
+    "[T10.6] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), Ava lies in bed in her Long Island City apartment, a sliver of sunlight peeking through the blinds. As Daniel speaks, her stomach rumbles, reminding her that she skipped breakfast and it's getting late into the morning.",
+    "[T27.1] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), Daniel pulls out his phone while still standing in the bedroom of the Long Island City apartment, illuminated by the cloudy morning light filtering through the window. He quickly opens the weather app, hoping to gauge if a hike is feasible later.",
+    "[T24.7] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), Ava, still in bed in her Long Island City apartment, responds to Daniel's greeting. She notices, however, that he's already engrossed in his phone, his brow furrowed slightly as he stares at the screen, seemingly distracted by something on the display.",
+    "[T34.7] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), while Daniel continues to scroll through his phone in the cloudy morning light, Ava pushes the covers aside and swings her legs over the edge of the bed in their Long Island City apartment. She stands up, the cool air a slight contrast to the warmth of the bed, and stretches, ready to face the day and, more immediately, find some breakfast.",
+    "[T40.6] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), Daniel, having finally checked the weather and seeing the disappointing cloud cover, looks up from his phone as Ava gets out of bed in their Long Island City apartment. He responds to her initial greeting, adding a question about her plans for the day, a slight note of uncertainty in his voice given the thwarted hiking plans.",
+    "[T60.5] At 11:24 AM on Friday, May 23, 2025 (Local time for New York, New York), as Daniel speaks, Ava, now on her feet, heads out of the bedroom and into the kitchen of their Long Island City apartment, the cloudy morning light barely illuminating the space. Her stomach rumbles again as she anticipates the prospect of finally getting some breakfast.",
+    "[T56.2] At 11:25 AM on Friday, May 23, 2025 (Local time for New York, New York), now that Ava has left the bedroom and headed toward the kitchen, Daniel puts his phone down on the nightstand. He then gets out of bed, the chill of the cloudy morning air prompting him to quickly search for his slippers.",
+    "[T66.5] Ava Sharma's action failed: At 11:25 AM on Friday, May 23, 2025 (Local time for New York, New York), Ava Sharma is already in the Kitchen (Kitchen_01).",
+    "[T78.4] At 11:25 AM on Friday, May 23, 2025 (Local time for New York, New York), Ava enters the kitchen of the Long Island City apartment, the neutral tones of the cabinets and countertop reflecting the grey light filtering in from the cloudy morning outside. She's immediately followed by Daniel, who appears to be somewhat more awake now, adjusting his glasses as he enters the kitchen.",
+    "[T83.8] At 11:25 AM on Friday, May 23, 2025 (Local time for New York, New York), with Daniel now in the kitchen, Ava heads directly to the refrigerator in their Long Island City apartment. The hum of the appliance fills the otherwise quiet space as she opens the door, peering inside to assess their breakfast options under the pale, cloudy morning light.",
+    "[T87.7] At 11:25 AM on Friday, May 23, 2025 (Local time for New York, New York), Daniel follows Ava into the kitchen of their Long Island City apartment and, seeing her already peering into the open refrigerator, asks if she needs help finding anything, curious to know what she's considering for breakfast on this cloudy morning."
+  ],
   "world_template_details": {
     "description": "A new world is beginning.",
     "rules": {
@@ -26,13 +39,13 @@
   "simulacra_profiles": {
     "sim_b797o8": {
       "current_location": "Home_01",
-      "location_details": "Your home and bedroom.",
-      "last_observation": "You are at Home_01.",
+      "location_details": "You have arrived in Kitchen_01.",
+      "last_observation": "Daniel Rodriguez said to you: 'Hey, need a hand finding anything? What are you thinking for breakfast?'",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 0.0,
+      "current_action_end_time": 88.82299999999465,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -75,18 +88,20 @@
         "Dreams": "To work on a space exploration project, to build a sustainable tech company, and to travel the world",
         "Past_Traumas": null
       },
-      "location": "Home_01",
-      "current_interrupt_probability": null
+      "location": "Kitchen_01",
+      "current_pending_intent_id": null,
+      "current_interrupt_probability": null,
+      "current_action_description": "Interrupted by Daniel Rodriguez saying something."
     },
     "sim_sustdj": {
       "current_location": "Home_01",
-      "location_details": "Your home and bedroom.",
-      "last_observation": "You are at Home_01.",
+      "location_details": "You have arrived in Kitchen.",
+      "last_observation": "At 11:25 AM on Friday, May 23, 2025 (Local time for New York, New York), Daniel follows Ava into the kitchen of their Long Island City apartment and, seeing her already peering into the open refrigerator, asks if she needs help finding anything, curious to know what she's considering for breakfast on this cloudy morning.",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 0.0,
+      "current_action_end_time": 87.65700000000652,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -129,8 +144,10 @@
         "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
         "Past_Traumas": null
       },
-      "location": "Home_01",
-      "current_interrupt_probability": null
+      "location": "Kitchen_01",
+      "current_pending_intent_id": null,
+      "current_interrupt_probability": null,
+      "current_action_description": "Action: talk - Details: Hey, need a hand finding anything? What are you thinking for breakfast?"
     }
   },
   "objects": [],
@@ -142,7 +159,17 @@
         "description": "A modern one-bedroom apartment in Long Island City, Queens, offering a convenient commute to Manhattan and stunning skyline views. The space is clean and organized, reflecting her analytical nature, with touches of warmth from travel souvenirs and potted plants.",
         "ephemeral_objects": [],
         "ephemeral_npcs": [],
-        "connected_locations": []
+        "connected_locations": [],
+        "objects_present": []
+      },
+      "Kitchen_01": {
+        "id": "Kitchen_01",
+        "name": "Kitchen",
+        "description": "The kitchen area.",
+        "ephemeral_objects": [],
+        "ephemeral_npcs": [],
+        "connected_locations": [],
+        "objects_present": []
       }
     },
     "world_feeds": {
@@ -156,5 +183,43 @@
       "last_update_sim_time": 0.0
     }
   },
-  "pending_simulation_events": []
+  "pending_simulation_events": [],
+  "world_feeds": {
+    "last_update_sim_time": 10.610000000015134,
+    "weather": {
+      "condition": "cloudy",
+      "temperature_celsius": 12,
+      "forecast_short": "Light rain during the day, clear with periodic clouds at night.",
+      "timestamp": 10.610000000015134,
+      "source_category": "weather"
+    },
+    "news_updates": [
+      {
+        "headline": "NYC: Randall's Island Attack, Pride Scaled Back",
+        "summary": "A person of interest is in custody after a mother was attacked on Randall's Island, and NYC Pride is scaling back events due to lost sponsorships.",
+        "timestamp": 10.610000000015134,
+        "source_category": "local_news"
+      },
+      {
+        "headline": "NYC Security Boosted, EBT Skimming Targeted",
+        "summary": "New York City is increasing security at Jewish institutions after a fatal shooting and the Secret Service is targeting EBT skimmers in a large-scale operation.",
+        "timestamp": 10.610000000015134,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "Global Tensions Rise Amidst Prisoner Swaps, Nuclear Talks, and Trade Wars",
+        "summary": "International conflicts, political disputes, and social issues are escalating worldwide, with prisoner exchanges, nuclear negotiations, and trade wars dominating the headlines.",
+        "timestamp": 10.610000000015134,
+        "source_category": "world_news"
+      }
+    ],
+    "pop_culture_updates": [
+      {
+        "headline": "Global Turmoil: Trade Wars, War in Gaza, and Political Battles Dominate Headlines",
+        "summary": "International news is dominated by Trump's tariff threats, a major prisoner swap between Ukraine and Russia, the ongoing war in Gaza, and legal and political battles in the US.",
+        "timestamp": 10.610000000015134,
+        "source_category": "pop_culture"
+      }
+    ]
+  }
 }

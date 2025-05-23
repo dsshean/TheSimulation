@@ -1,0 +1,2 @@
+{"sim_time_s": 0.0, "agent_id": "sim_sustdj", "event_type": "intent", "data": {"action_type": "talk", "target_id": "sim_b797o8", "details": "Good morning, Ava!"}}
+{"sim_time_s": 0.0, "agent_id": "sim_b797o8", "event_type": "intent", "data": {"action_type": "look_around", "target_id": null, "details": "Look around the apartment to get a better sense of my surroundings and identify immediate exits and objects, specifically the laptop and to check the weather."}}

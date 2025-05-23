@@ -146,13 +146,13 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
             *   `talk`:
                 *   **If target is a Simulacra:**
                     *   Check if Actor and Target Simulacra are in the same `Actor's Current Location ID`.
-                                *   **Note: Even if the `Target Entity State.status` is 'busy' (e.g., with their own 'talk' action, 'wait', or other short action) or 'thinking', this `talk` action can still be `valid_action: true`. The target might be interrupted or process the speech slightly later. Your `outcome_description` can reflect that the target was occupied, e.g., \"[Actor Name] spoke to [Target Name], who seemed preoccupied, saying: '{{intent.details}}'\"**
+                                *   **Note: Even if the `Target Entity State.status` is 'busy' (e.g., with their own 'talk' action, 'wait', or other short action) or 'thinking', this `talk` action can still be `valid_action: true`. The target might be interrupted or process the speech slightly later. Your `outcome_description` can reflect that the target was occupied, e.g., \"[Actor Name] spoke to [Target Name], who seemed preoccupied.\"**
                     *   If not, `valid_action: false`, `duration: 0.0`, `results: {{}}`, `outcome_description: "[Actor Name] tried to talk to [Target Simulacra Name], but they are not in the same location."`
                     *   If yes:
                         *   `valid_action: true`.
                         *   `duration`: Estimate realistically the time it takes for the Actor to *say* the words in `intent.details`. A very brief utterance (1-5 words) might take 1-3 seconds. A typical sentence or two (e.g., "Hey, how are you? Want to grab lunch?") might take 3-7 seconds. This is ONLY the time the speaker is busy speaking.
                         *   `results`: `{{}}` (The speaker's action of talking doesn't directly change other state immediately, beyond them being busy for the short `duration`).
-                        *   `outcome_description`: `"[Actor Name] said to [Target Simulacra Name]: '{{intent.details}}'"` (Factual statement of what the actor did).
+                        *   `outcome_description`: `"[Actor Name] spoke to [Target Simulacra Name]."` (Factual statement of the action. The speech content is handled by the `scheduled_future_event`).
                         *   `scheduled_future_event`:
                             *   `event_type`: "simulacra_speech_received_as_interrupt"
                             *   `target_agent_id`: The `intent.target_id` (the Simulacra being spoken to).
@@ -187,9 +187,9 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
                             *   `"simulacra_profiles.[sim_id].location": "[new_target_location_id_from_intent.details]"`
                             *   `"simulacra_profiles.[sim_id].location_details": "You have entered [New Location Name]."` (Agent's personal understanding)
                             *   `"simulacra_profiles.[sim_id].last_observation": "You move into [New Location Name]."`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].id": "[new_target_location_id_from_intent.details]"`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].name": "[Generate a plausible short name, e.g., 'A Dark Corridor' if ID was 'Dark_Corridor_01']"`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].description": "[Generate a brief, generic placeholder description, e.g., 'This appears to be a dark corridor.']"` (This is for the Narrator's next `look_around`)
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].id": "[new_target_location_id_from_intent.details]"` # The ID of the new location
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].name": "[Generate a plausible short name for the new location, based on the Narrator's description of the *connection* that led here. This connection description is found in the Actor's Current Location State.connected_locations list, where the to_location_id_hint matches this new location ID.]"`
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].description": "[Generate a brief description of the new location *itself*. This description MUST be strongly based on and consistent with the Narrator's description of the *connection* that led here. For example, if the connection was described as 'a grand archway leading to a sunlit courtyard', the new location's description could be 'This appears to be the sunlit courtyard, entered through a grand archway.' or 'The courtyard is bright and open...'. This is for the Narrator's next `look_around`.]"`
                             *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_objects": []`
                             *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_npcs": []`
                             *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].connected_locations": []`
@@ -361,6 +361,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
                 **CRITICAL JSON FORMATTING: When generating the 'narrative' string, if you include any direct speech or text that itself contains double quotes (\"), you MUST escape those internal double quotes with a backslash (e.g., \\\"text in quotes\\\"). Failure to do so will result in invalid JSON.**
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**
+    *   **Regarding Speech (CRITICAL):** If the `Factual Outcome Description` indicates speaking, your narrative MUST describe the *act, manner, and scene* of the speaking event (e.g., "Daniel cleared his throat and spoke to Ava," "Ava replied with a smile"). You MUST NOT include the actual words spoken by the actor from `Original Intent.details` in your narrative. The system handles delivering the speech content separately. You MAY, however, include *new* speech if you are introducing an ephemeral NPC who is speaking as part of your narrative.
     *   **Flow:** Ensure reasonable flow.
     *   **If the `Original Intent.action_type` was `look_around` (CRITICAL - Pay attention to location context):**
         *   **Examine `Actor's Current Location State.description` (provided implicitly via the actor's state, which you don't directly see but influences the context).** This description is your primary source for understanding the current location.

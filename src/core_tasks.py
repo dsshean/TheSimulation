@@ -87,6 +87,7 @@ async def time_manager_task(
                                 f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
                                 # Make them act very soon by setting their action end time to now + tiny delay
                                 f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": new_sim_time + 0.01,
+                                f"{SIMULACRA_KEY}.{target_agent_id}.current_pending_intent_id": None,
                                 f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {}, # Clear any pending results from a potentially interrupted action
                                 f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
                                 f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None, # Reset interrupt probability
@@ -94,6 +95,7 @@ async def time_manager_task(
                             for key_path, value in updates_for_interrupt.items():
                                 _update_state_value(current_state, key_path, value, logger_instance)
 
+                            logger_instance.info(f"[TimeManager] Cleared pending intent ID for {target_agent_id} due to speech interrupt from {speaker_name}.")
                             logger_instance.info(
                                 f"[TimeManager] Agent {target_agent_id} processed speech interrupt. New observation set. Status set to idle."
                             )

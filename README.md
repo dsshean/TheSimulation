@@ -3,6 +3,11 @@
 Exploring Simulation Theory through Large Language Models
 
 Update as of:
+5/23/2025
+
+- Fixed requirements - needs the first release of google-adk. Migration planned for v1.0.
+- There were a lot of shortcuts taken to make the system work and its not the most elegant code just functional. Since the project is fully functional pending minior sync and validation issues updates will include to follow proper patterns.
+
 5/22/2025
 
 - All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
