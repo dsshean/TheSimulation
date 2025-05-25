@@ -2,9 +2,74 @@
 
 from google.adk.agents import LlmAgent
 from google.adk.tools import load_memory, google_search
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models import LlmResponse, LlmRequest
+from typing import Optional
+import logging
 
 # Import constants from the config module
 from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME, MEMORY_LOG_CONTEXT_LENGTH
+from .models import SimulacraIntentResponse, WorldEngineResponse, NarratorOutput # Import Pydantic models
+
+def clean_response_schema(
+    callback_context: CallbackContext, llm_request: LlmRequest, llm_response: LlmResponse
+) -> Optional[LlmResponse]:
+    """Clean response schema to prevent Pydantic validation errors."""
+    agent_name = callback_context.agent_name
+    logger = logging.getLogger("TheSimulation")
+    logger.debug(f"[Callback] Processing response for agent: {agent_name}")
+    
+    # Only process WorldEngineLLMAgent responses
+    if agent_name != "WorldEngineLLMAgent":
+        return None  # Continue normal processing
+    
+    # Access the raw response if available
+    if hasattr(llm_response, 'raw') and llm_response.raw:
+        raw = llm_response.raw
+        
+        # Check if response has a response_schema field
+        if hasattr(raw, 'response_schema') and raw.response_schema:
+            logger.debug(f"[Callback] Found response schema to clean")
+            schema = raw.response_schema
+            
+            # Clean additionalProperties throughout the schema
+            if isinstance(schema, dict):
+                # Remove root level additionalProperties
+                if 'additionalProperties' in schema:
+                    logger.debug("[Callback] Removing root additionalProperties")
+                    del schema['additionalProperties']
+                
+                # Clean properties.results if it exists
+                if 'properties' in schema and 'results' in schema['properties']:
+                    results_schema = schema['properties']['results']
+                    if 'additionalProperties' in results_schema:
+                        logger.debug("[Callback] Cleaning results.additionalProperties")
+                        # Replace complex additionalProperties with simple true value
+                        results_schema['additionalProperties'] = True
+                
+                # Clean scheduled_future_event if it exists
+                if ('properties' in schema and 
+                    'scheduled_future_event' in schema['properties']):
+                    sfe_schema = schema['properties']['scheduled_future_event']
+                    
+                    # Clean additionalProperties on scheduled_future_event
+                    if 'additionalProperties' in sfe_schema:
+                        logger.debug("[Callback] Cleaning scheduled_future_event.additionalProperties")
+                        del sfe_schema['additionalProperties']
+                    
+                    # Clean details.additionalProperties if it exists
+                    if ('properties' in sfe_schema and 
+                        'details' in sfe_schema['properties'] and
+                        'additionalProperties' in sfe_schema['properties']['details']):
+                        logger.debug("[Callback] Cleaning scheduled_future_event.details.additionalProperties")
+                        sfe_schema['properties']['details']['additionalProperties'] = True
+                
+                # Update the response schema
+                raw.response_schema = schema
+                logger.debug("[Callback] Response schema cleaned successfully")
+    
+    # Continue with normal processing
+    return None
 
 def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) -> LlmAgent:
     """Creates the LLM agent representing the character."""
@@ -15,10 +80,10 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) 
 - Your Location ID & Description.
 - Your Status: (Should be 'idle' when you plan your next turn, or 'reflecting' if you are being prompted during a long task).
 - Current Time.
-- Last Observation/Event.
+- Last Observation/Event (what just happened to you or what you just did).
 - Recent History (Last ~{MEMORY_LOG_CONTEXT_LENGTH} events).
-- Objects in Room (IDs and Names).
-- Other Agents in Room.
+- Perceived Environment (Details about your current location, including other simulacra, objects, and NPCs you can perceive right now).
+- Audible Environment (Sounds you can currently hear, like ambient noise or specific events).
 - Current World Feeds (Weather, News Headlines - if available and relevant to your thoughts).
 
 CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
@@ -64,17 +129,21 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 5.  **Formulate Intent:** Choose the best action. Use `target_id` only for `use` and `talk`. Make `details` specific.
 
 **Output:**
-- Output ONLY a JSON object: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`
+- Your entire response MUST be a single JSON object conforming to the following schema:
+  `{{"internal_monologue": "str", "action_type": "str", "target_id": "Optional[str]", "details": "str"}}`
 - **Make `internal_monologue` rich, detailed, reflective of {persona_name}'s thoughts, feelings, perceptions, reasoning, and the established '{world_mood}' world style.**
 - Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit otherwise.
-- **Ensure the final output is ONLY the JSON object.**
+- **Ensure your entire output is ONLY this JSON object and nothing else.**
 """
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
         # tools=[load_memory],
         instruction=instruction,
-        description=f"LLM Simulacra agent for {persona_name} in a '{world_mood}' world."
+        output_key="simulacra_intent_response", # Added output_key
+        # output_schema=SimulacraIntentResponse, # Specify the output schema
+        description=f"LLM Simulacra agent for {persona_name} in a '{world_mood}' world.",
+        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True
     )
 
 def create_world_engine_llm_agent(
@@ -112,7 +181,7 @@ def create_world_engine_llm_agent(
     # --- End of Conditional Prompt Section for World Engine ---
 
     instruction = f"""You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
-**Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details (unless directly caused by the action), or emotional interpretation.** This description will be used by a separate Narrator agent.
+**Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details, or emotional interpretation.** This description will be used by a separate Narrator agent.
 **Input (Provided via trigger message):**
 - Actor Name & ID:{persona_name} ({sim_id})
 - Current Location
@@ -120,13 +189,13 @@ def create_world_engine_llm_agent(
 - Actor's Current Location State (Details of the specific location where the actor currently is, including its name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
 - World Context (Overall world settings: world_type, sub_genre, description, overall_location (city/state/country))
 - Intent: {{"action_type": "...", "target_id": "...", "details": "..."}}
-- Target Entity State (if applicable)
-- World Feeds (Weather, recent major news - for environmental context)
+- Target Entity State (if applicable).
+- World Feeds (Weather - for environmental context).
 World Rules (e.g., allow_teleportation)
 
 **Your Task:**
 {world_engine_critical_knowledge_instruction}
-YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR RESULTS.
+YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDING FOR YOUR RESULTS.
 **IMPORTANT: You are a stateless resolver. For most actions, evaluate each intent based *only* on the information provided in THIS request. Do not use memory of previous interactions or prior states of the actor unless they are explicitly part of the current input. The exception is `resolve_interrupted_move`, where `intent.details` provides necessary history.**
 
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
@@ -200,26 +269,26 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
                 *   **CRITICAL `results` for `look_around`:** `{{"simulacra_profiles.[sim_id].last_observation": "You take a moment to observe your surroundings."}}` # This is a generic placeholder. The Narrator will provide the detailed observation and discoveries. Do NOT add other results here for look_around.
                 *   `outcome_description`: `"[Actor Name] looked around the [Current Location Name]."` # Factual outcome for Narrator. Do NOT describe what was seen here.
                 *   `scheduled_future_event`: `null`.
-        *   **Self Interaction (e.g., `wait`, `think`):**
-            *   `wait`:
-                *   **If `intent.details` clearly indicates waiting for another Simulacra's response in an ongoing conversation (e.g., "Waiting for [Other Agent] to reply", "Listening for what they say next", "Waiting for them to speak"):**
+            *   **Self Interaction (e.g., `wait`, `think`):**
+                *   `wait`:
+                    *   **If `intent.details` clearly indicates waiting for another Simulacra's response in an ongoing conversation (e.g., "Waiting for [Other Agent] to reply", "Listening for what they say next", "Waiting for them to speak"):**
+                        *   `valid_action: true`.
+                        *   `duration`: Very short, representing a brief pause to cede the conversational floor (e.g., 0.1 - 0.5 seconds). The agent will become 'idle' almost immediately and await an interrupt from the other agent's speech.
+                        *   `results: {{}}`.
+                        *   `outcome_description: "[Actor Name] paused, waiting for a response."`
+                        *   `scheduled_future_event: null`.
+                    *   **Else (for timed waits or general pauses not tied to immediate conversation):**
+                        *   `valid_action: true`.
+                        *   `duration`: As implied by `intent.details` if a specific time is mentioned (e.g., "wait for 5 minutes"), otherwise a generic short duration (e.g., 3-10 seconds) if details are vague like "wait for a bit" or "wait patiently".
+                        *   `results: {{}}`.
+                        *   `outcome_description: "[Actor Name] waited."` (or more specific if details allow, e.g., "[Actor Name] waited for 5 minutes.")
+                        *   `scheduled_future_event: null`.
+                *   `think`:
                     *   `valid_action: true`.
-                    *   `duration`: Very short, representing a brief pause to cede the conversational floor (e.g., 0.1 - 0.5 seconds). The agent will become 'idle' almost immediately and await an interrupt from the other agent's speech.
+                    *   `duration`: Short, representing a moment of thought (e.g., 1-2 seconds, depending on the complexity implied by `intent.details` if any; simple thoughts should be quicker).
                     *   `results: {{}}`.
-                    *   `outcome_description: "[Actor Name] paused, waiting for a response."`
+                    *   `outcome_description: "[Actor Name] took a moment to think."`
                     *   `scheduled_future_event: null`.
-                *   **Else (for timed waits or general pauses not tied to immediate conversation):**
-                    *   `valid_action: true`.
-                    *   `duration`: As implied by `intent.details` if a specific time is mentioned (e.g., "wait for 5 minutes"), otherwise a generic short duration (e.g., 3-10 seconds) if details are vague like "wait for a bit" or "wait patiently".
-                    *   `results: {{}}`.
-                    *   `outcome_description: "[Actor Name] waited."` (or more specific if details allow, e.g., "[Actor Name] waited for 5 minutes.")
-                    *   `scheduled_future_event: null`.
-            *   `think`:
-                *   `valid_action: true`.
-                *   `duration`: Short, representing a moment of thought (e.g., 1-2 seconds, depending on the complexity implied by `intent.details` if any; simple thoughts should be quicker).
-                *   `results: {{}}`.
-                *   `outcome_description: "[Actor Name] took a moment to think."`
-                *   `scheduled_future_event: null`.
     *   **Handling `initiate_change` Action Type (from agent's self-reflection or idle planning):**
         *   **Goal:** The actor is signaling a need for a change. Acknowledge this and provide a new observation.
         *   **`valid_action`:** Always `true`.
@@ -297,13 +366,17 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 - Example (Success with future event): `{{"valid_action": true, "duration": 120.0, "results": {{}}, "outcome_description": "Daniel Rodriguez placed an order for sushi.", "scheduled_future_event": {{"event_type": "food_delivery_arrival", "target_agent_id": "sim_daniel_id", "location_id": "daniel_home_kitchen", "details": {{"item": "sushi"}}, "estimated_delay_seconds": 2700}}}}`
 - Example (Success, no future event): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "outcome_description": "The desk lamp turned on.", "scheduled_future_event": null}}`
 - Example (Failure): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "The vault door handle did not move; it is locked.", "scheduled_future_event": null}}`
-- **CRITICAL: Your entire response MUST be ONLY the JSON object. No other text is permitted.**
+- **CRITICAL: Your entire response MUST be ONLY a single JSON object conforming to the schema: `{{"valid_action": bool, "duration": float, "results": dict, "outcome_description": "str", "scheduled_future_event": Optional[dict]}}`. No other text is permitted.**
 """
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
         instruction=instruction,
-        description="LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome_description."
+        output_key="world_engine_resolution", # Added output_key
+        # output_schema=WorldEngineResponse, # Specify the output schema
+        description="LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome_description.",
+        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
+        # before_model_callback=clean_response_schema
     )
 
 def create_narration_llm_agent(
@@ -358,7 +431,18 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 6.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
     *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the rest of your narrative.** For example, if the dynamically inserted `Current World Time` was "07:33 PM (Local time for New York)", your `narrative` should start with "At 07:33 PM (Local time for New York), ...". If it was "120.5s elapsed", it should start "At 120.5s elapsed, ...".
     {narrator_style_adherence_instruction}
-                **CRITICAL JSON FORMATTING: When generating the 'narrative' string, if you include any direct speech or text that itself contains double quotes (\"), you MUST escape those internal double quotes with a backslash (e.g., \\\"text in quotes\\\"). Failure to do so will result in invalid JSON.**
+                **⚠️ CRITICAL JSON FORMATTING REQUIREMENT ⚠️**
+                
+                When writing dialogue or text containing quotes in your narrative:
+                
+                1. ALWAYS use escaped double quotes (\\") for ANY speech or quoted text
+                2. NEVER use unescaped quotes (" or ") within the narrative string
+                3. Example correct format: "He said, \\"Hello there\\" with a smile."
+                4. Example INCORRECT format: "He said, "Hello there" with a smile."
+                
+                FAILURE TO PROPERLY ESCAPE QUOTES WILL CAUSE SYSTEM ERRORS.
+                
+                Double-check your output before submitting to ensure all quotes are properly escaped.
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**
     *   **Flow:** Ensure reasonable flow.
@@ -417,7 +501,7 @@ Output ONLY a valid JSON object matching this exact structure:
 *   If no objects or NPCs are discovered/relevant (e.g., for actions other than `look_around`, or if `look_around` reveals an empty space), `discovered_objects` and `discovered_npcs` can be empty arrays `[]`.
 *   Example for `look_around` in a bedroom:
     `{{ // Example includes discovered_connections
-      "narrative": "Glances around sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door (door_to_hallway_01)** is set in the east wall, likely leading to a hallway.",
+      "narrative": "At 08:15 AM (Local time for Springfield), glances around sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door (door_to_hallway_01)** is set in the east wall, likely leading to a hallway.",
       "discovered_objects": [
         {{"id": "closet_bedroom_01", "name": "Oak Closet", "description": "A large oak closet.", "is_interactive": true, "properties": {{"is_container": true, "is_openable": true, "is_open": false}}}},
         {{"id": "bed_bedroom_01", "name": "Unmade Bed", "description": "Her unmade bed.", "is_interactive": true, "properties": {{}}}},
@@ -430,13 +514,16 @@ Output ONLY a valid JSON object matching this exact structure:
         {{"id": "npc_cat_01", "name": "Fluffy Cat", "description": "A fluffy cat curled up on the nightstand."}}
       ]
     }}`
-*   Your entire response MUST be this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure.
+*   Your entire response MUST be ONLY this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure. The schema is: `{{"narrative": "str", "discovered_objects": list, "discovered_connections": list, "discovered_npcs": list}}`.
 """
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
         instruction=instruction,
-        description=f"LLM Narrator: Generates '{world_mood}' narrative based on factual outcomes."
+        output_key="narrator_output_package", # Added output_key
+        # output_schema=NarratorOutput, # Specify the output schema
+        description=f"LLM Narrator: Generates '{world_mood}' narrative based on factual outcomes.",
+        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True
     )
 
 def create_search_llm_agent() -> LlmAgent:
@@ -447,6 +534,9 @@ def create_search_llm_agent() -> LlmAgent:
         name=agent_name,
         model=SEARCH_AGENT_MODEL_NAME,
         tools=[google_search],
+        # For a tool-using agent like this, an output_schema might be less critical
+        # if the primary output is the tool's result.
+        # However, if it can also respond directly, a simple schema could be defined.
         instruction=instruction,
         description="Dedicated LLM Agent for performing Google Searches."
     )

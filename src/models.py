@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, FilePath, validator, ValidationInfo
-from typing import List, Optional, Dict, Any # Removed FilePath as it's not used
+from pydantic import BaseModel, Field, model_validator, ConfigDict
+from typing import List, Optional, Dict, Any, ClassVar, Union, Literal
 from uuid import UUID
 from datetime import datetime
 import logging
@@ -43,9 +43,8 @@ class PersonaDetails(BaseModel):
     Age: Optional[int] = None
     Gender: Optional[str] = None
     Occupation: Optional[str] = None
-    # Add other fields from the 'persona_details' section of life_summary.json
-    class Config:
-        extra = 'allow' # Allow extra fields not explicitly defined
+    
+    model_config = ConfigDict(extra="allow") # Changed from "allow"
 
 class SimulacraState(BaseModel):
     simulacra_id: str
@@ -57,9 +56,8 @@ class SimulacraState(BaseModel):
     memories: List[Any] = Field(default_factory=list)
     goals: List[Any] = Field(default_factory=list)
     current_status: Optional[str] = None
-    # Allow other fields that might exist in the JSON
-    class Config:
-        extra = 'allow'
+    
+    model_config = ConfigDict(extra="allow") # Changed from "allow"
 
 # --- Overall Simulation State ---
 
@@ -70,28 +68,34 @@ class SimulationState(BaseModel):
     current_simulation_time: Optional[datetime] = None
 
 # --- Added from simulation_async.py ---
+class ScheduledFutureEvent(BaseModel):
+    event_type: str
+    target_agent_id: Optional[str] = None
+    location_id: str
+    details: Dict[str, Any] = Field(default_factory=dict)
+    estimated_delay_seconds: float
+
+    model_config = ConfigDict(extra="allow")
+
 class WorldEngineResponse(BaseModel):
     valid_action: bool
     duration: float = Field(ge=0.0)
-    results: Dict[str, Any] = Field(default_factory=dict)
+    results: Dict[str, Any] = Field(default_factory=dict)  # Allow any values
     outcome_description: str
-    scheduled_future_event: Optional[Dict[str, Any]] = None
+    scheduled_future_event: Optional[ScheduledFutureEvent] = None
 
-    @validator('duration') # Pydantic v1 style validator
-    @classmethod
-    def duration_must_be_zero_if_invalid(cls, v: float, values: Dict[str, Any]): # Changed info to values for Pydantic v1
-        if 'valid_action' in values and not values['valid_action'] and v != 0.0:
-            # logger.warning(f"Invalid action returned non-zero duration ({v}). Forcing to 0.0.") # Logger not available here easily
-            return 0.0
-        return v
+    model_config = ConfigDict(extra="allow")
 
-    @validator('results') # Pydantic v1 style validator
-    @classmethod
-    def results_must_be_empty_if_invalid(cls, v: Dict, values: Dict[str, Any]): # Changed info to values for Pydantic v1
-        if 'valid_action' in values and not values['valid_action'] and v:
-            # logger.warning(f"Invalid action returned non-empty results ({v}). Forcing to empty dict.") # Logger not available here easily
-            return {}
-        return v
+    # @model_validator(mode='after')
+    # def check_duration_and_results_if_invalid(self) -> 'WorldEngineResponse':
+    #     if not self.valid_action:
+    #         if self.duration != 0.0:
+    #             logger.debug(f"WorldEngineResponse: Invalid action returned non-zero duration ({self.duration}). Forcing to 0.0.")
+    #             self.duration = 0.0
+    #         if self.results:
+    #             logger.debug(f"WorldEngineResponse: Invalid action returned non-empty results ({self.results}). Forcing to empty dict.")
+    #             self.results = {}
+    #     return self
 
 class SimulacraIntentResponse(BaseModel):
     internal_monologue: str

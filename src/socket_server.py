@@ -260,13 +260,41 @@ async def process_message(
                 try:
                     # Apply multiple fixes to handle different quoting issues
                     fixed_json = raw_json
-                    # Fix 1: Replace patterns of "" within string values with \"
-                    fixed_json = re.sub(r'(": *")([^"]*?)""([^"]*?)""([^"]*?)(")', r'\1\2\"\3\"\4\5', fixed_json)
-                    # Fix 2: More aggressive - replaces all double double-quotes with escaped quotes
-                    fixed_json = re.sub(r'""', r'\\"', fixed_json)
                     
-                    # Return the fixed JSON to the client
-                    return {"success": True, "fixed_json": fixed_json}
+                    # Fix 1: Replace unescaped quotes within json string values
+                    def fix_quotes_in_json(json_str):
+                        # Pattern to find quotes inside string values
+                        pattern = r'(": *")([^"\\]*?)(")((?:[^"\\])*?)(")'
+                        
+                        # Keep applying the replacement until no more changes
+                        prev_json = None
+                        while prev_json != json_str:
+                            prev_json = json_str
+                            json_str = re.sub(pattern, r'\1\2\\\3\4\5', json_str)
+                        return json_str
+                    
+                    # Apply the fix
+                    fixed_json = fix_quotes_in_json(fixed_json)
+                    
+                    # Additional fixes for other common issues
+                    # Fix 2: Replace double quotes used as apostrophes
+                    fixed_json = re.sub(r'(?<=\w)"(?=\w)', r"'", fixed_json)
+                    
+                    # Fix 3: Handle missing commas between objects
+                    fixed_json = re.sub(r'}\s*{', r'},{', fixed_json)
+                    
+                    # Validate the fixed JSON
+                    try:
+                        json.loads(fixed_json)
+                        valid_json = True
+                    except json.JSONDecodeError:
+                        valid_json = False
+                        
+                    return {
+                        "success": valid_json, 
+                        "fixed_json": fixed_json,
+                        "message": "JSON successfully fixed" if valid_json else "Warning: JSON may still have issues"
+                    }
                 except Exception as e:
                     logger.error(f"[SocketServer] Error fixing JSON: {e}")
                     return {"success": False, "message": f"Error fixing JSON: {str(e)}"}
@@ -303,13 +331,23 @@ async def process_message(
             return {
                 "success": True,
                 "data": {
-                    "time": current_sim_time,
-                    "world_mood": world_mood,
-                    "agent_ids": active_sim_ids,
-                    "current_locations": {
-                        agent_id: get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown")
+                    "agent_ids": active_sim_ids  # This is the primary format client looks for
+                },
+                "state": {
+                    "simulacra_profiles": {
+                        agent_id: {
+                            "id": agent_id,
+                            "location": get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown"),
+                            "status": get_nested(state, SIMULACRA_KEY, agent_id, "status", default="unknown")
+                        }
                         for agent_id in active_sim_ids
                     }
+                },
+                "time": current_sim_time,
+                "world_mood": world_mood,
+                "agents": active_sim_ids,  # Redundant but ensures compatibility with client's fallbacks
+                "simulacra_profiles": {
+                    agent_id: {"id": agent_id} for agent_id in active_sim_ids
                 }
             }
         
@@ -356,73 +394,80 @@ async def process_message(
             event_type = message.get("event_type", "text_message")
             content = message.get("content", "")
             
-            if agent_id and agent_id in get_nested(state, SIMULACRA_KEY, default={}) and content:
-                # Format the event based on the communication channel
-                formatted_event = ""
-                
-                if event_type == "text_message":
-                    formatted_event = f"You receive a text message: \"{content}\""
-                elif event_type == "phone_call":
-                    formatted_event = f"You receive a phone call. The caller says: \"{content}\""
-                elif event_type == "voice":
-                    formatted_event = f"A voice speaks to you: \"{content}\""
-                elif event_type == "doorbell":
-                    formatted_event = f"The doorbell rings. {content}"
-                elif event_type == "knock":
-                    formatted_event = f"There's a knock at the door. {content}"
-                elif event_type == "noise":
-                    formatted_event = f"You hear a noise. {content}"
-                elif event_type == "custom":
-                    formatted_event = content
-                else:
-                    formatted_event = f"Something happens: {content}"
-
-                logger.info(f"[SocketServer] Sending '{event_type}' event to {agent_id}: {formatted_event[:50]}...")
-                
-                # This uses the standard agent event injection mechanism
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
-                
-                # After formatting the event:
-                formatted_event = f"You receive a text message: \"{content}\"" # or other event types
-    
-                # Instead of trying to use the Rich console directly, send it through the narration system:
-                current_sim_time = simulation_time_getter()
-                
-                # Create a special narration event that will display in the main simulation console
-                display_narration_event = {
-                    "type": "action_complete",  # This is what the narration system expects
-                    "actor_id": "INTERACTION_MODE",  # Special actor ID for display formatting
-                    "action": {
-                        "action_type": "interact",
-                        "details": f"Interaction with {agent_id}"
-                    },
-                    "results": {},
-                    "outcome_description": f"[Interactive Mode] {agent_id} experiences: {formatted_event}",
-                    "completion_time": current_sim_time,
-                    "current_action_description": "Interactive event",
-                    "actor_current_location_id": get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown"),
-                    "world_mood": world_mood
-                }
-                
-                # Add to the narration queue - this will be displayed by the main narration loop
-                await narration_queue.put(display_narration_event)
-                
-                # Still update the agent and add to narrative log as before
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
-                
-                final_narrative_entry = f"[T{current_sim_time:.1f}] [InteractionMode] {agent_id} experiences: {formatted_event}"
-                state.setdefault("narrative_log", []).append(final_narrative_entry)
-                
-                return {
-                    "success": True,
-                    "message": "Interaction event sent to agent",
-                    "timestamp": current_sim_time
-                }
+            # Add validation
+            if not agent_id:
+                return {"success": False, "message": "Missing agent_id parameter"}
+            
+            if not content:
+                return {"success": False, "message": "Missing content parameter"}
+            
+            # Check if agent exists
+            if agent_id not in get_nested(state, SIMULACRA_KEY, default={}):
+                return {"success": False, "message": f"Agent {agent_id} not found in simulation"}
+            
+            # Format the event based on the communication channel
+            formatted_event = ""
+            
+            if event_type == "text_message":
+                formatted_event = f"You receive a text message: \"{content}\""
+            elif event_type == "phone_call":
+                formatted_event = f"You receive a phone call. The caller says: \"{content}\""
+            elif event_type == "voice":
+                formatted_event = f"A voice speaks to you: \"{content}\""
+            elif event_type == "doorbell":
+                formatted_event = f"The doorbell rings. {content}"
+            elif event_type == "knock":
+                formatted_event = f"There's a knock at the door. {content}"
+            elif event_type == "noise":
+                formatted_event = f"You hear a noise. {content}"
+            elif event_type == "custom":
+                formatted_event = content
             else:
-                return {"success": False, "message": "Failed to send interaction event"}
-        
+                formatted_event = f"Something happens: {content}"
+
+            logger.info(f"[SocketServer] Sending '{event_type}' event to {agent_id}: {formatted_event[:50]}...")
+            
+            # This uses the standard agent event injection mechanism
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
+            
+            # After formatting the event:
+            formatted_event = f"You receive a text message: \"{content}\"" # or other event types
+    
+            # Instead of trying to use the Rich console directly, send it through the narration system:
+            current_sim_time = simulation_time_getter()
+            
+            # Create a special narration event that will display in the main simulation console
+            display_narration_event = {
+                "type": "action_complete",  # This is what the narration system expects
+                "actor_id": "INTERACTION_MODE",  # Special actor ID for display formatting
+                "action": {
+                    "action_type": "interact",
+                    "details": f"Interaction with {agent_id}"
+                },
+                "results": {},
+                "outcome_description": f"[Interactive Mode] {agent_id} experiences: {formatted_event}",
+                "completion_time": current_sim_time,
+                "current_action_description": "Interactive event",
+                "actor_current_location_id": get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown"),
+                "world_mood": world_mood
+            }
+            
+            # Add to the narration queue - this will be displayed by the main narration loop
+            await narration_queue.put(display_narration_event)
+            
+            # Still update the agent and add to narrative log as before
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
+            
+            final_narrative_entry = f"[T{current_sim_time:.1f}] [InteractionMode] {agent_id} experiences: {formatted_event}"
+            state.setdefault("narrative_log", []).append(final_narrative_entry)
+            
+            return {
+                "success": True,
+                "message": "Interaction event sent to agent",
+                "timestamp": current_sim_time
+            }
         elif command == "get_agent_responses":
             # Get all narrative entries since a timestamp
             since_timestamp = message.get("since_timestamp", 0.0)
@@ -443,9 +488,41 @@ async def process_message(
                             "content": content
                         })
             
+            # Process responses to extract agent actions/speech
+            processed_responses = []
+            for resp in responses:
+                content = resp.get("content", "")
+                timestamp = resp.get("timestamp", 0.0)
+                
+                # Add parsed information to help client display the response
+                response_type = "narrative"
+                extracted_text = content
+                
+                # Try to extract direct speech or actions
+                if agent_id and agent_id in content:
+                    if "says" in content and agent_id in content.split("says")[0]:
+                        response_type = "speech"
+                        parts = content.split("says", 1)
+                        extracted_text = parts[1].strip() if len(parts) > 1 else content
+                    elif "decides to" in content:
+                        response_type = "action" 
+                        parts = content.split("decides to", 1)
+                        extracted_text = parts[1].strip() if len(parts) > 1 else content
+                    elif ":" in content and content.index(":") > content.index(agent_id):
+                        response_type = "speech"
+                        parts = content.split(":", 1)
+                        extracted_text = parts[1].strip() if len(parts) > 1 else content
+                
+                processed_responses.append({
+                    "timestamp": timestamp,
+                    "content": content,
+                    "type": response_type,
+                    "extracted_text": extracted_text
+                })
+
             return {
                 "success": True,
-                "responses": responses,
+                "responses": processed_responses,
                 "current_time": simulation_time_getter()
             }
         

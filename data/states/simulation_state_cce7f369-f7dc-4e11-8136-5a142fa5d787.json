@@ -75,8 +75,7 @@
         "Dreams": "To work on a space exploration project, to build a sustainable tech company, and to travel the world",
         "Past_Traumas": null
       },
-      "location": "Home_01",
-      "current_interrupt_probability": null
+      "location": "Home_01"
     },
     "sim_sustdj": {
       "current_location": "Home_01",
@@ -129,8 +128,7 @@
         "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
         "Past_Traumas": null
       },
-      "location": "Home_01",
-      "current_interrupt_probability": null
+      "location": "Home_01"
     }
   },
   "objects": [],

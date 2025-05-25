@@ -212,13 +212,50 @@ def interactive_session(client: SimulationClient):
         console.print("[red]Failed to get simulation state[/]")
         return
     
-    # Fix #1: Look for nested data (double nested)
+    # Enhanced agent ID extraction with more patterns
     agent_ids = []
+    
+    # Try multiple paths to find agent_ids in the response
     if response.get("data", {}).get("data", {}).get("agent_ids"):
         agent_ids = response["data"]["data"]["agent_ids"]
-    # Fix #2: Or check if data is directly in response.data
     elif response.get("data", {}).get("agent_ids"):
         agent_ids = response["data"]["agent_ids"]
+    elif response.get("state", {}).get("simulacra_profiles"):
+        # Extract from simulacra_profiles if available
+        agent_ids = list(response["state"]["simulacra_profiles"].keys())
+    elif response.get("simulacra_profiles"):
+        # Direct simulacra_profiles at root
+        agent_ids = list(response["simulacra_profiles"].keys())
+    elif response.get("data", {}).get("simulacra"):
+        # Another possible format
+        agent_ids = list(response["data"]["simulacra"].keys())
+    elif response.get("agents"):
+        # Direct agents list
+        agent_ids = response["agents"]
+    
+    # Try to extract from any list-like field that might contain agent IDs
+    if not agent_ids:
+        for key, value in response.items():
+            if isinstance(value, list) and value and isinstance(value[0], str) and value[0].startswith("sim_"):
+                agent_ids = value
+                console.print(f"[yellow]Found potential agent IDs in field '{key}'[/]")
+                break
+            elif isinstance(value, dict):
+                for subkey, subvalue in value.items():
+                    if isinstance(subvalue, list) and subvalue and isinstance(subvalue[0], str) and subvalue[0].startswith("sim_"):
+                        agent_ids = subvalue
+                        console.print(f"[yellow]Found potential agent IDs in field '{key}.{subkey}'[/]")
+                        break
+    
+    # Last resort: scan for any fields that might contain agent IDs (strings starting with "sim_")
+    if not agent_ids:
+        console.print("[yellow]Scanning response for agent IDs...[/]")
+        response_str = json.dumps(response)
+        import re
+        potential_ids = re.findall(r'"(sim_[a-zA-Z0-9_]+)"', response_str)
+        if potential_ids:
+            agent_ids = list(set(potential_ids))  # Remove duplicates
+            console.print(f"[yellow]Found {len(agent_ids)} potential agent IDs by regex search[/]")
     
     if not agent_ids:
         console.print("[red]No active simulacra found[/]")

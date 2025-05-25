@@ -54,7 +54,7 @@ NEW_SIMULATION_STATE_TEMPLATE = {
     "mood": "The real world and general slice of life."
   },
   "simulacra_profiles": {},
-  "objects": [], # Will be populated from world_config's initial_objects
+  "objects": [], # Static objects populated from world_config's initial_objects
   WORLD_STATE_KEY: { # Using constant for current_world_state
       LOCATION_DETAILS_KEY: {}, # e.g., {"Home_01": {"id": "Home_01", "name": "Home", "description": "...", ...}}
       WORLD_FEEDS_KEY: { # Using constant for world_feeds
@@ -164,7 +164,8 @@ def create_blank_simulation_state(
     # Ensure Home_01 has a basic entry if not in initial_location_definitions
     if DEFAULT_HOME_LOCATION_NAME not in state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY]:
         state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY][DEFAULT_HOME_LOCATION_NAME] = {
-            "id": DEFAULT_HOME_LOCATION_NAME, "name": "Home", "description": DEFAULT_HOME_DESCRIPTION,
+            "id": DEFAULT_HOME_LOCATION_NAME, "name": "Home", 
+            "description": DEFAULT_HOME_DESCRIPTION, "ambient_sound_description": "The quiet hum of household appliances.",
             "ephemeral_objects": [], "ephemeral_npcs": [], "connected_locations": []
         }
         logger.info(f"Initialized default '{DEFAULT_HOME_LOCATION_NAME}' in state as it was missing from world_config.")
@@ -335,6 +336,9 @@ def sync_world_config_to_state(state: dict, world_config: dict) -> bool:
     # Fallback: Ensure Home_01 exists if it's somehow still missing after sync
     if DEFAULT_HOME_LOCATION_NAME not in get_nested(state, *state_loc_details_path_tuple, default={}):
         home_loc_data = { "id": DEFAULT_HOME_LOCATION_NAME, "name": "Home", "description": DEFAULT_HOME_DESCRIPTION, "ephemeral_objects": [], "ephemeral_npcs": [], "connected_locations": [] }
+        # Add default ambient sound for Home_01 if it's being created here
+        if "ambient_sound_description" not in home_loc_data: # Check if it wasn't already set by a more specific config
+            home_loc_data["ambient_sound_description"] = "The gentle hum of domestic life."
         state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY][DEFAULT_HOME_LOCATION_NAME] = home_loc_data
         modified = True
         logger.info(f"Ensured default '{DEFAULT_HOME_LOCATION_NAME}' exists in state's location_details during sync.")
@@ -601,6 +605,12 @@ def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
             # Fix 1: Replace patterns of "" within string values with \"
             # This handles cases like: "key": "value with ""quotes"" inside"
             fixed_json = re.sub(r'(": *")([^"]*?)""([^"]*?)""([^"]*?)(")', r'\1\2\"\3\"\4\5', fixed_json)
+            
+            # NEW FIX: Handle unescaped quotes inside JSON strings
+            # This handles the specific case we're seeing in narrative text like: "narrative": "Text with "quotes" inside"
+            # Look for the pattern: ": "...[unescaped quote]...[unescaped quote]..."
+            # Using negative lookbehind (?<!\\) to ensure we only replace quotes that aren't already escaped
+            fixed_json = re.sub(r'(": *"[^"]*?)(?<!\\)"([^"]*?)(?<!\\)"([^"]*?")', r'\1\\"\\2\\"\\3', fixed_json)
             
             # Fix 2: More aggressive - replaces all double double-quotes with escaped quotes
             # This might over-correct but is worth trying
