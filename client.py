@@ -283,40 +283,34 @@ def interactive_session(client: SimulationClient):
                             if "[InteractionMode]" in content:
                                 continue
                             
-                            # Only process if it might contain agent's response
+                            # Only process if it contains agent's actual response/action
                             if selected_agent in content:
-                                # Try different parsing strategies to find the agent's response
+                                # Enhanced parsing for different response types
                                 if "decides to" in content:
                                     parts = content.split("decides to", 1)
                                     action_part = parts[1].strip() if len(parts) > 1 else content
-                                    console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{action_part}[/]")
+                                    console.print(f"[bold green]🤖 {selected_agent}:[/] [italic cyan]{action_part}[/]")
                                 
                                 elif "says" in content and selected_agent in content.split("says")[0]:
                                     parts = content.split("says", 1)
-                                    speech_part = parts[1].strip() if len(parts) > 1 else content
-                                    console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{speech_part}[/]")
+                                    speech_part = parts[1].strip(' "\'') if len(parts) > 1 else content
+                                    console.print(f"[bold green]💬 {selected_agent}:[/] [italic yellow]\"{speech_part}\"[/]")
                                 
-                                elif ":" in content and content.index(":") > content.index(selected_agent):
-                                    parts = content.split(":", 1)
-                                    speech_part = parts[1].strip() if len(parts) > 1 else content
-                                    console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{speech_part}[/]")
-                                    
-                                elif "responds" in content and selected_agent in content.split("responds")[0]:
+                                elif "responds" in content:
                                     parts = content.split("responds", 1)
-                                    second_part = parts[1].strip() if len(parts) > 1 else content
+                                    response_part = parts[1].strip() if len(parts) > 1 else content
                                     
-                                    # Further split by quotes or just use the text
-                                    if '"' in second_part:
-                                        quote_parts = second_part.split('"')
-                                        speech_part = quote_parts[1] if len(quote_parts) > 1 else second_part
+                                    # Extract quoted speech if present
+                                    if '"' in response_part:
+                                        quote_parts = response_part.split('"')
+                                        speech_part = quote_parts[1] if len(quote_parts) > 1 else response_part
+                                        console.print(f"[bold green]💬 {selected_agent}:[/] [italic yellow]\"{speech_part}\"[/]")
                                     else:
-                                        speech_part = second_part
-                                        
-                                    console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{speech_part}[/]")
+                                        console.print(f"[bold green]🤖 {selected_agent}:[/] [italic cyan]{response_part}[/]")
                                 
                                 else:
-                                    # Last resort: just show the raw content
-                                    console.print(f"[dim]{content}[/]")
+                                    # Show other agent actions/thoughts
+                                    console.print(f"[dim]📝 {content}[/]")
                         
                         # Update timestamp to latest response time
                         last_check_time = poll_response.get("current_time", last_check_time)

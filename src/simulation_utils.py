@@ -11,12 +11,16 @@ try:
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # For Python 3.9+
 except ImportError:
     ZoneInfo, ZoneInfoNotFoundError = None, None # Fallback for older Python
+from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
 from geopy.geocoders import Nominatim
-from google.adk.runners import Runner  # For type hinting
+# from google.adk.runners import Runner  # For type hinting
 from google.genai import types as genai_types  # For type hinting
 from rich import box
+from google.adk.tools import agent_tool # For AgentTool type hint
+from google.adk.agents.invocation_context import InvocationContext # For type hint
+from google.adk.tools import ToolContext # Added for AgentTool.run_async
 from rich.columns import Columns  # Added for two-column layout
 from rich.panel import Panel  # For generate_table
 from rich.table import Table  # For generate_table
@@ -223,47 +227,76 @@ async def _fetch_and_summarize_real_feed(
     category_for_logging: str,
     search_query: str,
     summarization_prompt_template: str, # Should contain {search_results} placeholder
-    output_format_note: str,
-    global_search_agent_runner: Optional[Runner],
-    search_agent_session_id: Optional[str],
-    user_id_for_search: str,
+    output_format_note: str, # This is part of the summarization prompt now
+    search_agent_tool: Optional[agent_tool.AgentTool], # Changed from runner/session
+    adk_context_for_tool_run: Optional[InvocationContext], # Context for running the tool
     llm_for_summarization: genai.GenerativeModel,
     logger_instance: logging.Logger
 ) -> Optional[Dict[str, Any]]:
     """Helper to perform search and then summarize the results for world feeds."""
     raw_search_results_text = ""
     search_tool_used_successfully = False
-
-    if not (global_search_agent_runner and search_agent_session_id):
-        logger_instance.warning(f"[{category_for_logging}] Search components unavailable. Cannot fetch real feed.")
+    
+    if not (search_agent_tool and adk_context_for_tool_run):
+        logger_instance.warning(f"[{category_for_logging}] Search agent tool or ADK context unavailable. Cannot fetch real feed.")
         return None
 
     logger_instance.info(f"[{category_for_logging}] Attempting REAL search with query: '{search_query}'")
-    search_trigger_content = genai_types.Content(role='user', parts=[genai_types.Part(text=search_query)])
     
-    async for event in global_search_agent_runner.run_async(user_id=user_id_for_search, session_id=search_agent_session_id, new_message=search_trigger_content): # type: ignore
-        logger_instance.debug(f"[{category_for_logging}_SearchEvent] Event ID: {getattr(event, 'id', 'N/A')}, Author: {getattr(event, 'author', 'N/A')}")
-        if event.is_final_response() and event.content and event.content.parts:
-            part = event.content.parts[0]
-            if hasattr(part, 'function_response') and part.function_response and hasattr(part.function_response, 'response'):
-                tool_response_data = dict(part.function_response.response)
-                raw_search_results_text = json.dumps(tool_response_data.get("results", tool_response_data))
-                search_tool_used_successfully = True
-                logger_instance.info(f"[{category_for_logging}_SearchEvent] Tool response: {raw_search_results_text[:200]}...")
-            elif part.text:
-                raw_search_results_text = part.text
-                if not ("tool_code" in raw_search_results_text and "google_search" in raw_search_results_text): # Avoid agent returning its own tool code
-                    search_tool_used_successfully = True
-                    logger_instance.info(f"[{category_for_logging}_SearchEvent] Text response: {raw_search_results_text[:200]}...")
-                else:
-                    logger_instance.warning(f"[{category_for_logging}_SearchEvent] Agent returned tool_code: {raw_search_results_text[:200]}...")
-            break 
-    
+    try:
+        # The SearchLLMAgent is expected to take the query as text input.
+        # AgentTool.run_async returns the final content of the wrapped agent.
+        # We assume SearchLLMAgent's final output is the summarized search result text.
+        # If SearchLLMAgent had an output_schema, this would be a parsed object.
+
+        # 1. Create ToolContext from the InvocationContext passed to this function
+        tool_ctx = ToolContext(invocation_context=adk_context_for_tool_run)
+        
+        # 2. Prepare the arguments dictionary for the tool.
+        #    For an LlmAgent without a specific input_schema (like your SearchLLMAgent),
+        #    AgentTool expects the query string under the 'request' key.
+        tool_args_dict = {'request': search_query}
+
+        # 3. Call run_async with keyword arguments
+        tool_output = await search_agent_tool.run_async(
+            args=tool_args_dict,
+            tool_context=tool_ctx
+        )
+        if isinstance(tool_output, str):
+            raw_search_results_text = tool_output
+            search_tool_used_successfully = True
+        elif isinstance(tool_output, dict) and "answer" in tool_output: # If SearchLLMAgent returns structured
+            raw_search_results_text = tool_output.get("answer", "")
+            if not raw_search_results_text and "search_results" in tool_output: # Fallback to raw results
+                raw_search_results_text = json.dumps(tool_output["search_results"])
+            search_tool_used_successfully = True
+        else:
+            logger_instance.warning(f"[{category_for_logging}] Search agent tool returned unexpected output type: {type(tool_output)}")
+
+    except Exception as e_tool_run:
+        logger_instance.error(f"[{category_for_logging}] Error running search agent tool: {e_tool_run}", exc_info=True)
+        return None
+
     if search_tool_used_successfully and raw_search_results_text.strip():
         logger_instance.info(f"[{category_for_logging}] REAL search returned: {raw_search_results_text.strip()[:400]}")
         summarization_prompt = summarization_prompt_template.format(search_results=raw_search_results_text.strip()[:1000]) + f"\n{output_format_note}"
-        response_obj = await llm_for_summarization.generate_content_async(summarization_prompt)
-        return response_obj # Return the LLM response object
+        # The response_obj here is from the summarization LLM, not the search tool directly.
+        # The search tool's output (raw_search_results_text) is fed into this summarization.
+        summarization_response = await llm_for_summarization.generate_content_async(summarization_prompt)
+        
+        # Parse the summarization LLM's response
+        if summarization_response and summarization_response.text:
+            try:
+                # Attempt to parse the JSON from the summarization LLM
+                parsed_summary = json.loads(re.sub(r'^```json\s*|\s*```$', '', summarization_response.text.strip(), flags=re.MULTILINE))
+                return parsed_summary # Return the parsed dictionary
+            except json.JSONDecodeError:
+                logger_instance.error(f"[{category_for_logging}] Failed to decode JSON from summarization LLM: {summarization_response.text.strip()}")
+                # Fallback: return the raw text if JSON parsing fails, wrapped in a dict
+                return {"summary_text": summarization_response.text.strip(), "error": "Summarization JSON decode failed"}
+        else:
+            logger_instance.warning(f"[{category_for_logging}] Summarization LLM returned no text.")
+            return None
     
     logger_instance.warning(f"[{category_for_logging}] REAL search did not yield usable results. Raw: {raw_search_results_text[:200]}")
     return None
@@ -274,17 +307,17 @@ async def generate_simulated_world_feed_content(
     simulation_time: float,
     location_context: str,
     world_mood: str,
-    global_search_agent_runner: Optional[Runner],
-    search_agent_session_id: Optional[str],
-    user_id_for_search: str,
-    logger_instance: logging.Logger
+    logger_instance: logging.Logger,
+    # Parameters for real feeds using AgentTool
+    search_agent_tool_for_real_feeds: Optional[agent_tool.AgentTool] = None,
+    adk_context_for_tool_run: Optional[InvocationContext] = None # Context from the calling ADK agent
 ) -> Dict[str, Any]:
     """Generates world feed content, conditionally using real search."""
     try:
         model = genai.GenerativeModel(MODEL_NAME)
         llm_for_summarization = genai.GenerativeModel(MODEL_NAME)
         prompt_text = f"Current simulation time: {simulation_time:.0f} seconds. Location context: {location_context}. World Mood: {world_mood}.\n"
-        output_format_note = "Respond ONLY with a JSON object matching the specified format."
+        output_format_note = " Respond ONLY with a JSON object matching the specified format." # Added space
         response_obj = None
 
         world_type = get_nested(current_sim_state, WORLD_TEMPLATE_DETAILS_KEY, 'world_type', default="fictional")
@@ -297,14 +330,14 @@ async def generate_simulated_world_feed_content(
             if use_real_feeds:
                 search_query = f"What is the current weather in {location_context}?"
                 summarization_template = "Based on this weather information: '{search_results}'\nExtract the current weather condition, temperature in Celsius (as an integer), and a short forecast. Format: {{{{ \"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\" }}}}\nIf temperature is in Fahrenheit, convert it to Celsius. If exact data is missing, make a plausible estimation."
-                response_obj = await _fetch_and_summarize_real_feed(
+                parsed_summary_data = await _fetch_and_summarize_real_feed(
                     category_for_logging="WorldInfoGatherer_Weather", search_query=search_query,
                     summarization_prompt_template=summarization_template, output_format_note=output_format_note,
-                    global_search_agent_runner=global_search_agent_runner, search_agent_session_id=search_agent_session_id,
-                    user_id_for_search=user_id_for_search, llm_for_summarization=llm_for_summarization,
+                    search_agent_tool=search_agent_tool_for_real_feeds, adk_context_for_tool_run=adk_context_for_tool_run,
+                    llm_for_summarization=llm_for_summarization,
                     logger_instance=logger_instance
                 )
-                if not response_obj: # Fallback if real search failed or components missing
+                if not parsed_summary_data: # Fallback if real search failed or components missing
                     logger_instance.warning(f"[WorldInfoGatherer] REAL weather search for '{location_context}' did not yield usable results or components missing. Falling back to simulation.")
                     prompt_text += f"Generate a plausible, brief weather report for {location_context}. Format: {{{{ \"condition\": \"str\", \"temperature_celsius\": int, \"forecast_short\": \"str\" }}}}\n{output_format_note}"
             else: 
@@ -330,14 +363,14 @@ async def generate_simulated_world_feed_content(
                     search_query = f"What are the top latest {pop_culture_region} pop culture trends and entertainment news headlines (e.g., movies, music, viral trends)?"
 
                 summarization_template = f"Based on these search results for {category}: '{{search_results}}'\nProvide a single, very concise headline and a one-sentence summary. Format: {{{{ \"headline\": \"str\", \"summary\": \"str\" }}}}"
-                response_obj = await _fetch_and_summarize_real_feed(
+                parsed_summary_data = await _fetch_and_summarize_real_feed(
                     category_for_logging=f"WorldInfoGatherer_{category}", search_query=search_query,
                     summarization_prompt_template=summarization_template, output_format_note=output_format_note,
-                    global_search_agent_runner=global_search_agent_runner, search_agent_session_id=search_agent_session_id,
-                    user_id_for_search=user_id_for_search, llm_for_summarization=llm_for_summarization,
+                    search_agent_tool=search_agent_tool_for_real_feeds, adk_context_for_tool_run=adk_context_for_tool_run,
+                    llm_for_summarization=llm_for_summarization,
                     logger_instance=logger_instance
                 )
-                if not response_obj: # Fallback
+                if not parsed_summary_data: # Fallback
                     logger_instance.warning(f"[WorldInfoGatherer] REAL search for '{category}' did not yield usable results or components missing. Falling back to simulation.")
                     prompt_text += f"Generate a plausible, concise {category.replace('_', ' ')} headline and summary. Format: {{{{ \"headline\": \"str\", \"summary\": \"str\" }}}}\n{output_format_note}"
             else: 
@@ -346,11 +379,16 @@ async def generate_simulated_world_feed_content(
         else: 
             return {"error": "Unknown category"}
 
-        if not (response_obj and response_obj.text):
+        # If parsed_summary_data exists from real search, use it directly
+        if 'parsed_summary_data' in locals() and parsed_summary_data:
+            parsed_summary_data["timestamp"] = simulation_time
+            parsed_summary_data["source_category"] = category
+            return parsed_summary_data
+        
+        # Otherwise, generate content using LLM (fallback or non-realtime path)
+        if not response_obj: # Ensure response_obj is only set if not using parsed_summary_data
             response_obj = await model.generate_content_async(prompt_text)
-
-        response_text = response_obj.text.strip() if response_obj and response_obj.text else "{}"
-        response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text, flags=re.MULTILINE)
+        response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_obj.text.strip() if response_obj and response_obj.text else "{}", flags=re.MULTILINE)
         
         try:
             data = json.loads(response_text_clean)
@@ -428,3 +466,220 @@ def get_time_string_for_prompt(
     elif sim_elapsed_time_seconds is not None:
         return f"{sim_elapsed_time_seconds:.1f}s elapsed"
     return "Time unknown (elapsed not provided for non-realtime or state missing)"
+
+def get_random_style_combination(
+    include_general=True,
+    num_general=1,
+    include_lighting=True,
+    num_lighting=1,
+    include_color=True,
+    num_color=1,
+    include_technique=True,
+    num_technique=1,
+    include_composition=True, # New category for composition
+    num_composition=1,
+    include_atmosphere=True,  # New category for atmosphere/mood
+    num_atmosphere=1
+):
+    """
+    Generates a random combination of photographic styles.
+
+    Args:
+        # ... (existing args) ...
+        include_general (bool): Whether to include general photographic styles.
+        num_general (int): Number of general styles to sample (if included).
+        include_lighting (bool): Whether to include lighting/mood styles.
+        num_lighting (int): Number of lighting/mood styles to sample (if included).
+        include_color (bool): Whether to include color/tone styles.
+        num_color (int): Number of color/tone styles to sample (if included).
+        include_technique (bool): Whether to include camera technique styles.
+        num_technique (int): Number of camera technique styles to sample (if included).
+        include_composition (bool): Whether to include compositional styles.
+        num_composition (int): Number of compositional styles to sample.
+        include_atmosphere (bool): Whether to include atmospheric/emotional styles.
+        num_atmosphere (int): Number of atmospheric styles to sample.
+
+    Returns:
+        str: A comma-separated string of randomly selected styles.
+             Returns an empty string if no categories are included or no styles are sampled.
+    """
+
+    # Define the lists of styles by category
+    general_styles = [
+        "Documentary Photography", "Street Photography", "Fine Art Photography",
+        "Environmental Portraiture", "Minimalist Photography", "Abstract Photography", "Photojournalism",
+        "Conceptual Photography", "Urban Photography", "Landscape Photography",
+        "Still Life Photography", "Fashion Photography", "Architectural Photography"
+    ]
+
+    lighting_styles = [
+        "Cinematic Lighting", "Soft Natural Light", "High Key", "Low Key",
+        "Golden Hour Photography", "Blue Hour Photography", "Dramatic Lighting",
+        "Rim Lighting", "Backlit", "Chiaroscuro", "Studio Lighting", "Available Light"
+    ]
+
+    color_styles = [
+        "Monochromatic (Black and White)", "Vibrant and Saturated", "Muted Tones",
+        "Sepia Tone", "High Contrast Color", "Pastel Colors", "Duotone", "Cross-processed look",
+        "Natural Color Palette", "Warm Tones", "Cool Tones"
+    ]
+
+    # Note: Bokeh/Shallow Depth are often implied by your prompt's requirement
+    # for a blurred background. Deep Depth is the opposite.
+    # Include these if you want to explicitly reinforce or add variety.
+    technique_styles = [
+        "Bokeh-rich", "Shallow Depth of Field", "Deep Depth of Field", "Long Exposure", "Motion Blur",
+        "Panning Shot", "High-Speed Photography", "Tilt-Shift Effect", "Lens Flare (subtle)",
+        "Wide-Angle Perspective", "Telephoto Compression", "Macro Detail", "Clean and Sharp"
+    ]
+
+    compositional_styles = [
+        "Rule of Thirds", "Leading Lines", "Symmetrical Composition", "Asymmetrical Balance",
+        "Frame within a Frame", "Dynamic Symmetry", "Golden Ratio", "Negative Space Emphasis",
+        "Pattern and Repetition", "Centered Subject", "Off-center Subject"
+    ]
+
+    atmospheric_styles = [
+        "Ethereal Mood", "Dreamlike Atmosphere", "Gritty Realism", "Nostalgic Feel",
+        "Serene and Calm", "Dynamic and Energetic", "Mysterious Ambiance", "Whimsical Charm",
+        "Dramatic and Intense", "Melancholic Tone", "Uplifting and Bright", "Crisp Morning Air",
+        "Humid Haze", "Foggy Overlay"
+    ]
+
+    selected_styles = []
+    style_categories_used = 0 # To track how many categories contributed
+
+    # Sample from each category based on the parameters
+    if include_general and num_general > 0:
+        # Ensure we don't try to sample more than available styles
+        k = min(num_general, len(general_styles))
+        selected_styles.extend(random.sample(general_styles, k))
+
+    if include_lighting and num_lighting > 0:
+        k = min(num_lighting, len(lighting_styles))
+        selected_styles.extend(random.sample(lighting_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_color and num_color > 0:
+        k = min(num_color, len(color_styles))
+        selected_styles.extend(random.sample(color_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_technique and include_technique > 0:
+        k = min(num_technique, len(technique_styles))
+        selected_styles.extend(random.sample(technique_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_composition and num_composition > 0:
+        k = min(num_composition, len(compositional_styles))
+        selected_styles.extend(random.sample(compositional_styles, k))
+        if k > 0: style_categories_used +=1
+
+    if include_atmosphere and num_atmosphere > 0:
+        k = min(num_atmosphere, len(atmospheric_styles))
+        selected_styles.extend(random.sample(atmospheric_styles, k))
+        if k > 0: style_categories_used +=1
+
+    # Shuffle the final list to mix the order of styles
+    random.shuffle(selected_styles)
+    
+    # Log the selected styles for debugging/monitoring
+    # Ensure logger is defined in the scope where this function is defined,
+    # or pass it as an argument if necessary.
+    # For now, assuming 'logger' is accessible (e.g., module-level logger).
+    if selected_styles:
+        logger.info(f"Selected {len(selected_styles)} styles from {style_categories_used} categories: {', '.join(selected_styles)}")
+
+    # Join the selected styles into a comma-separated string
+    return ", ".join(selected_styles)
+
+def get_random_style_combination(
+    include_general=True,
+    num_general=1,
+    include_lighting=True,
+    num_lighting=1,
+    include_color=True,
+    num_color=1,
+    include_technique=True,
+    num_technique=1,
+    include_composition=True, # New category for composition
+    num_composition=1,
+    include_atmosphere=True,  # New category for atmosphere/mood
+    num_atmosphere=1
+):
+    """
+    Generates a random combination of photographic styles.
+    """
+
+    # Define the lists of styles by category
+    general_styles = [
+        "Documentary Photography", "Street Photography", "Fine Art Photography",
+        "Environmental Portraiture", "Minimalist Photography", "Abstract Photography", "Photojournalism",
+        "Conceptual Photography", "Urban Photography", "Landscape Photography",
+        "Still Life Photography", "Fashion Photography", "Architectural Photography"
+    ]
+
+    lighting_styles = [
+        "Cinematic Lighting", "Soft Natural Light", "High Key", "Low Key",
+        "Golden Hour Photography", "Blue Hour Photography", "Dramatic Lighting",
+        "Rim Lighting", "Backlit", "Chiaroscuro", "Studio Lighting", "Available Light"
+    ]
+
+    color_styles = [
+        "Monochromatic (Black and White)", "Vibrant and Saturated", "Muted Tones",
+        "Sepia Tone", "High Contrast Color", "Pastel Colors", "Duotone", "Cross-processed look",
+        "Natural Color Palette", "Warm Tones", "Cool Tones"
+    ]
+
+    technique_styles = [
+        "Bokeh-rich", "Shallow Depth of Field", "Deep Depth of Field", "Long Exposure", "Motion Blur",
+        "Panning Shot", "High-Speed Photography", "Tilt-Shift Effect", "Lens Flare (subtle)",
+        "Wide-Angle Perspective", "Telephoto Compression", "Macro Detail", "Clean and Sharp"
+    ]
+
+    compositional_styles = [
+        "Rule of Thirds", "Leading Lines", "Symmetrical Composition", "Asymmetrical Balance",
+        "Frame within a Frame", "Dynamic Symmetry", "Golden Ratio", "Negative Space Emphasis",
+        "Pattern and Repetition", "Centered Subject", "Off-center Subject"
+    ]
+
+    atmospheric_styles = [
+        "Ethereal Mood", "Dreamlike Atmosphere", "Gritty Realism", "Nostalgic Feel",
+        "Serene and Calm", "Dynamic and Energetic", "Mysterious Ambiance", "Whimsical Charm",
+        "Dramatic and Intense", "Melancholic Tone", "Uplifting and Bright", "Crisp Morning Air",
+        "Humid Haze", "Foggy Overlay"
+    ]
+
+    selected_styles = []
+    style_categories_used = 0 
+
+    if include_general and num_general > 0:
+        k = min(num_general, len(general_styles))
+        selected_styles.extend(random.sample(general_styles, k))
+    if include_lighting and num_lighting > 0:
+        k = min(num_lighting, len(lighting_styles))
+        selected_styles.extend(random.sample(lighting_styles, k))
+        if k > 0: style_categories_used +=1
+    if include_color and num_color > 0:
+        k = min(num_color, len(color_styles))
+        selected_styles.extend(random.sample(color_styles, k))
+        if k > 0: style_categories_used +=1
+    if include_technique and num_technique > 0: # Corrected variable name
+        k = min(num_technique, len(technique_styles))
+        selected_styles.extend(random.sample(technique_styles, k))
+        if k > 0: style_categories_used +=1
+    if include_composition and num_composition > 0:
+        k = min(num_composition, len(compositional_styles))
+        selected_styles.extend(random.sample(compositional_styles, k))
+        if k > 0: style_categories_used +=1
+    if include_atmosphere and num_atmosphere > 0:
+        k = min(num_atmosphere, len(atmospheric_styles))
+        selected_styles.extend(random.sample(atmospheric_styles, k))
+        if k > 0: style_categories_used +=1
+
+    random.shuffle(selected_styles)
+    
+    if selected_styles:
+        logger.info(f"Selected {len(selected_styles)} styles from {style_categories_used} categories: {', '.join(selected_styles)}")
+
+    return ", ".join(selected_styles)

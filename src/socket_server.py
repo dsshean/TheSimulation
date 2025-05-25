@@ -1,13 +1,15 @@
+import asyncio
 import json
 import logging
-import asyncio
-import socket
 import re
-from typing import Dict, Any, Optional, Union
+import socket
+from typing import Any, Dict, Optional, Union
 
-from .simulation_utils import _update_state_value
+from rich.panel import Panel
+
+from .config import ACTIVE_SIMULACRA_IDS_KEY, SIMULACRA_KEY
 from .loop_utils import get_nested
-from .config import SIMULACRA_KEY, ACTIVE_SIMULACRA_IDS_KEY
+from .simulation_utils import _update_state_value
 
 # Configuration constants
 SOCKET_SERVER_HOST = "127.0.0.1"  # localhost
@@ -16,9 +18,28 @@ SOCKET_BUFFER_SIZE = 4096
 
 logger = logging.getLogger(__name__)
 
+def display_interaction_event(agent_id: str, formatted_event: str, current_sim_time: float):
+    """Display interaction events in the main simulation console"""
+    try:
+        # Import simulation_async module to access live display
+        from . import simulation_async
+        
+        if hasattr(simulation_async, 'live_display_object') and simulation_async.live_display_object:
+            from rich.panel import Panel
+            simulation_async.live_display_object.console.print(Panel(
+                f"[bold magenta]{agent_id}:[/] {formatted_event}",
+                title=f"Interactive Event @ {current_sim_time:.1f}s",
+                border_style="magenta", 
+                expand=False
+            ))
+        else:
+            # Fallback to logger
+            logger.info(f"[Interactive] {agent_id}: {formatted_event}")
+    except Exception as e:
+        logger.error(f"Error displaying interaction event: {e}")
+
 async def socket_server_task(
     state: Dict[str, Any],
-    narration_queue: asyncio.Queue,
     world_mood: str,
     simulation_time_getter: callable,  # Function that returns current sim time
 ):
@@ -49,7 +70,6 @@ async def socket_server_task(
                         client_socket, 
                         client_address, 
                         state, 
-                        narration_queue, 
                         world_mood,
                         simulation_time_getter
                     ))
@@ -75,7 +95,6 @@ async def handle_client(
     client_socket,
     address, 
     state: Dict[str, Any],
-    narration_queue: asyncio.Queue,
     world_mood: str,
     simulation_time_getter: callable
 ):
@@ -102,7 +121,6 @@ async def handle_client(
                     result = await process_message(
                         message.decode('utf-8'),
                         state,
-                        narration_queue,
                         world_mood,
                         simulation_time_getter
                     )
@@ -130,7 +148,6 @@ async def handle_client(
 async def process_message(
     message_str: str,
     state: Dict[str, Any],
-    narration_queue: asyncio.Queue,
     world_mood: str,
     simulation_time_getter: callable
 ) -> Union[Dict[str, Any], bool]:
@@ -159,30 +176,20 @@ async def process_message(
                     state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
                 
                 # 3. Display in console if available
-                from rich.panel import Panel  # Import within function
-                from rich.console import Console
-                console = Console()
                 try:
-                    # Try to use the live display if it exists
-                    live_display = None
-                    if 'live_display_object' in globals():
-                        live_display = globals()['live_display_object']
+                    # Import simulation_async to access live display
+                    from . import simulation_async
                     
-                    if live_display:
-                        live_display.console.print(Panel(
+                    if hasattr(simulation_async, 'live_display_object') and simulation_async.live_display_object:
+                        simulation_async.live_display_object.console.print(Panel(
                             narrative_text, 
                             title=f"External Narrative @ {current_sim_time:.1f}s",
                             border_style="cyan", 
                             expand=False
                         ))
                     else:
-                        # Fallback to direct console print
-                        console.print(Panel(
-                            narrative_text, 
-                            title=f"External Narrative @ {current_sim_time:.1f}s",
-                            border_style="cyan", 
-                            expand=False
-                        ))
+                        # Fallback to regular logger
+                        logger.info(f"[SocketServer] External Narrative: {narrative_text}")
                 except Exception as e:
                     logger.error(f"[SocketServer] Error displaying narrative: {e}")
                 
@@ -205,22 +212,8 @@ async def process_message(
                             logger
                         )
                 
-                # Also queue a narration event for consistency
-                narration_event = {
-                    "type": "action_complete",
-                    "actor_id": "EXTERNAL_NARRATOR",
-                    "action": {"action_type": "narrate", "details": "External narrative"},
-                    "results": {},
-                    "outcome_description": narrative_text,
-                    "completion_time": current_sim_time,
-                    "current_action_description": "External narrative injection",
-                    "actor_current_location_id": "global",
-                    "world_mood": world_mood
-                }
-                await narration_queue.put(narration_event)
-                
-                # Log the event
-                logger.info(f"[SocketServer] Successfully injected narrative and updated {len(active_sim_ids)} agents")
+                # Just log the event directly
+                logger.info(f"[SocketServer] Successfully injected narrative: {narrative_text}")
                 
                 return {
                     "success": True, 
@@ -260,7 +253,7 @@ async def process_message(
                 try:
                     # Apply multiple fixes to handle different quoting issues
                     fixed_json = raw_json
-                    # Fix 1: Replace patterns of "" within string values with \"
+                    # Fix 1: Replace patterns of "" within string values with \
                     fixed_json = re.sub(r'(": *")([^"]*?)""([^"]*?)""([^"]*?)(")', r'\1\2\"\3\"\4\5', fixed_json)
                     # Fix 2: More aggressive - replaces all double double-quotes with escaped quotes
                     fixed_json = re.sub(r'""', r'\\"', fixed_json)
@@ -383,37 +376,8 @@ async def process_message(
                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)
                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
                 
-                # After formatting the event:
-                formatted_event = f"You receive a text message: \"{content}\"" # or other event types
-    
-                # Instead of trying to use the Rich console directly, send it through the narration system:
-                current_sim_time = simulation_time_getter()
-                
-                # Create a special narration event that will display in the main simulation console
-                display_narration_event = {
-                    "type": "action_complete",  # This is what the narration system expects
-                    "actor_id": "INTERACTION_MODE",  # Special actor ID for display formatting
-                    "action": {
-                        "action_type": "interact",
-                        "details": f"Interaction with {agent_id}"
-                    },
-                    "results": {},
-                    "outcome_description": f"[Interactive Mode] {agent_id} experiences: {formatted_event}",
-                    "completion_time": current_sim_time,
-                    "current_action_description": "Interactive event",
-                    "actor_current_location_id": get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown"),
-                    "world_mood": world_mood
-                }
-                
-                # Add to the narration queue - this will be displayed by the main narration loop
-                await narration_queue.put(display_narration_event)
-                
-                # Still update the agent and add to narrative log as before
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
-                
-                final_narrative_entry = f"[T{current_sim_time:.1f}] [InteractionMode] {agent_id} experiences: {formatted_event}"
-                state.setdefault("narrative_log", []).append(final_narrative_entry)
+                # After sending the event to the agent:
+                display_interaction_event(agent_id, formatted_event, current_sim_time)
                 
                 return {
                     "success": True,
