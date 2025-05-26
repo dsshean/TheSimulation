@@ -3,6 +3,9 @@
 Exploring Simulation Theory through Large Language Models
 
 Update as of:
+5/26/2025
+* Codebase migrated to ADK v 1.0 - due to new features in ADK - Contents get accumulated throughout each agent call, so seperation of individual Simulacras not working.  The code works but the attribution to events will be garbled if more than 1 sim is present.  Furthermore content/context will continue to grow leading to large token consumption.  Alternative fix in the works.
+  
 5/22/2025
 
 - All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
