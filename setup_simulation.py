@@ -22,7 +22,7 @@ from src.state_loader import parse_location_string # Import the canonical versio
 # Configure logging to capture info from the generator
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    handlers=[logging.FileHandler("setup_simulation.log"),
+                    handlers=[logging.FileHandler("setup_simulation.log", encoding='utf-8'),
                               logging.StreamHandler()]) # Log to file and console stream
 logger = logging.getLogger(__name__)
 

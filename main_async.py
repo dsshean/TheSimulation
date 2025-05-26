@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from typing import Any, Dict, List, Optional, Tuple
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,12 +13,13 @@ from rich.console import Console
 
 console = Console()
 
-from src.simulation_async import (APP_NAME, run_simulation)
+from src.simulation_async import APP_NAME, run_simulation
 
 # Assuming logger_config.py is in the same directory or accessible via PYTHONPATH
 # and contains the setup_unique_logger function.
 try:
-    from src.logger_config import setup_unique_logger, setup_event_logger # MODIFIED: Added setup_event_logger
+    from src.logger_config import (  # MODIFIED: Added setup_event_logger
+        setup_event_logger, setup_unique_logger)
 except ImportError:
     print("ERROR: logger_config.py not found. Please ensure it exists and is in your PYTHONPATH.")
     print("Using basic fallback logging to console only.")

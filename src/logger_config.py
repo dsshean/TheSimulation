@@ -44,7 +44,7 @@ def setup_unique_logger(
     # If it has handlers, we assume it's already configured (e.g., by a previous call to this function).
     if not root_logger.handlers:
         # File Handler
-        file_handler = logging.FileHandler(log_filename, mode=file_mode)
+        file_handler = logging.FileHandler(log_filename, mode=file_mode, encoding='utf-8')
         file_handler.setLevel(file_level)
         file_formatter = logging.Formatter(file_formatter_str)
         file_handler.setFormatter(file_formatter)

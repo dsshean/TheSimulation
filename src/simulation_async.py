@@ -1148,10 +1148,10 @@ async def run_simulation(
 
     adk_session_service = InMemorySessionService()
     adk_session_id = f"sim_session_{world_instance_uuid}"
-    adk_session = adk_session_service.create_session(
+    adk_session = await adk_session_service.create_session(
         app_name=APP_NAME, user_id=USER_ID, session_id=adk_session_id, state=state
     )
-    logger.info(f"ADK Session created: {adk_session_id}.")
+    # logger.info(f"ADK Session created: {adk_session.id if adk_session else 'None'}.") # Log actual session ID if available
     # Create shared agents once
     # Assuming the first simulacra's details can be used for generic agent naming/mood context if needed,
     # or prompts are fully generic. The current prompts take actor details in the trigger.
@@ -1206,7 +1206,18 @@ async def run_simulation(
     logger.info(f"Main ADK Runner initialized.")
 
     search_agent_session_id_val = f"world_feed_search_session_{world_instance_uuid}"
-    adk_session_service.create_session(app_name=APP_NAME + "_Search", user_id=USER_ID, session_id=search_agent_session_id_val)
+    # adk_session_service.create_session(app_name=APP_NAME + "_Search", user_id=USER_ID, session_id=search_agent_session_id_val)
+    # Ensure the search agent session creation is awaited
+    search_adk_session = await adk_session_service.create_session(
+        app_name=APP_NAME + "_Search", 
+        user_id=USER_ID, # This user_id is used by the world feed fetcher in simulation_utils.py
+        session_id=search_agent_session_id_val,
+        state={} # Initial empty state for the search session
+    )
+    if search_adk_session:
+        logger.info(f"ADK Search Agent Session created: {search_adk_session.id}")
+    else:
+        logger.error(f"Failed to create ADK Search Agent Session: {search_agent_session_id_val}. World feeds may not function correctly.")
     search_agent_runner_instance = Runner(
         agent=search_llm_agent_instance, app_name=APP_NAME + "_Search",
         session_service=adk_session_service
