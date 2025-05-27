@@ -11,6 +11,24 @@ import logging
 from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME, MEMORY_LOG_CONTEXT_LENGTH
 from .models import SimulacraIntentResponse, WorldEngineResponse, NarratorOutput # Import Pydantic models
 
+async def always_clear_llm_contents_callback(
+    callback_context: CallbackContext,
+    llm_request: LlmRequest
+) -> None: # Or '-> Optional[LlmResponse]' if you follow the full type hint
+    """
+    A 'before_model_callback' that always clears llm_request.contents.
+    This ensures no user messages or historical content (if any were assembled)
+    are sent to the LLM in the 'contents' field.
+    """
+    print(f"Before callback, llm_request.contents: {llm_request.contents}") # For debugging
+    if llm_request.contents: # If the list is not empty
+        if len(llm_request.contents) > 1: # Only if there's more than one item
+            llm_request.contents = [llm_request.contents[-1]] # Keep only the last item, as a list
+        # If len(llm_request.contents) == 1, it remains unchanged (e.g., [item1]).
+        # If the list was empty, the outer 'if' is false, and it remains an empty list.
+    print(f"After callback, llm_request.contents: {llm_request.contents}") # For debugging
+    # No return value (or returning None) means:
+
 def clean_response_schema(
     callback_context: CallbackContext, llm_request: LlmRequest, llm_response: LlmResponse
 ) -> Optional[LlmResponse]:
@@ -533,7 +551,8 @@ Output ONLY a valid JSON object matching this exact structure:
         output_key="narrator_output_package", # Added output_key
         # output_schema=NarratorOutput, # Specify the output schema
         description=f"LLM Narrator: Generates '{world_mood}' narrative based on factual outcomes.",
-        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True
+        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
+        # before_agent_callback=always_clear_llm_contents_callback,
     )
 
 def create_search_llm_agent() -> LlmAgent:

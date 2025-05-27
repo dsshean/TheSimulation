@@ -149,42 +149,46 @@ async def _call_adk_agent_and_parse(
     
     runner.agent = agent_instance
 
-    llm_response_data = None
-    raw_text_from_llm = ""
+        llm_response_data = None
+        raw_text_from_llm = ""
 
-    async for event_llm in runner.run_async(user_id=user_id, session_id=session_id, new_message=trigger_content):
-        if event_llm.error_message:
-            logger_instance.error(f"[{agent_name_for_logging}] LLM Error: {event_llm.error_message}")
-            if modified_instruction and original_instruction: # Restore original instruction on error
-                agent_instance.instruction = original_instruction
-            return None
-        
-        if event_llm.is_final_response() and event_llm.content:
-            if isinstance(event_llm.content, expected_pydantic_model):
-                llm_response_data = event_llm.content
-                logger_instance.debug(f"[{agent_name_for_logging}] ADK successfully parsed {expected_pydantic_model.__name__} schema.")
-            elif event_llm.content.parts:
-                raw_text_from_llm = event_llm.content.parts[0].text.strip()
-                logger_instance.debug(f"[{agent_name_for_logging}] LLM Final Raw Content: {raw_text_from_llm[:200]}...")
-                parsed_dict_from_llm = parse_json_output_last(raw_text_from_llm)
-                if parsed_dict_from_llm:
-                    try:
-                        llm_response_data = expected_pydantic_model.model_validate(parsed_dict_from_llm)
-                    except ValidationError as ve:
-                        logger_instance.error(f"[{agent_name_for_logging}] Pydantic validation failed for manual parse: {ve}. Raw: {raw_text_from_llm}")
-                        llm_response_data = None # Ensure it's None
-                else:
-                    logger_instance.error(f"[{agent_name_for_logging}] Failed to parse JSON (manual fallback). Raw: {raw_text_from_llm}")
-                    # Special handling for NarratorOutput if parsing fails, use raw text for narrative
-                    if expected_pydantic_model == NarratorOutput:
-                        llm_response_data = NarratorOutput(narrative=raw_text_from_llm)
+        async for event_llm in runner.run_async(user_id=user_id, session_id=session_id, new_message=trigger_content):
+            if event_llm.error_message:
+                logger_instance.error(f"[{agent_name_for_logging}] LLM Error: {event_llm.error_message}")
+                return None # Early exit on error
+            
+            if event_llm.is_final_response() and event_llm.content:
+                if isinstance(event_llm.content, expected_pydantic_model):
+                    llm_response_data = event_llm.content
+                    logger_instance.debug(f"[{agent_name_for_logging}] ADK successfully parsed {expected_pydantic_model.__name__} schema.")
+                elif event_llm.content.parts:
+                    raw_text_from_llm = event_llm.content.parts[0].text.strip()
+                    logger_instance.debug(f"[{agent_name_for_logging}] LLM Final Raw Content: {raw_text_from_llm[:200]}...")
+                    
+                    # Assuming parse_json_output_last is defined
+                    parsed_dict_from_llm = parse_json_output_last(raw_text_from_llm)
+                    if parsed_dict_from_llm:
+                        try:
+                            llm_response_data = expected_pydantic_model.model_validate(parsed_dict_from_llm)
+                        except ValidationError as ve:
+                            logger_instance.error(f"[{agent_name_for_logging}] Pydantic validation failed for manual parse: {ve}. Raw: {raw_text_from_llm}")
+                            llm_response_data = None
                     else:
-                        llm_response_data = None # Ensure it's None
-            break 
-
-    if modified_instruction and original_instruction: # Restore original instruction if it was modified
-        agent_instance.instruction = original_instruction
+                        logger_instance.error(f"[{agent_name_for_logging}] Failed to parse JSON (manual fallback). Raw: {raw_text_from_llm}")
+                        # Assuming NarratorOutput is defined
+                        if expected_pydantic_model == NarratorOutput:
+                            llm_response_data = NarratorOutput(narrative=raw_text_from_llm)
+                        else:
+                            llm_response_data = None
+                break # Exit loop after processing final response
+    finally:
+        # Restore original instruction if it was modified
+        if modified_instruction and original_instruction:
+            agent_instance.instruction = original_instruction
         
+        # Restore original include_contents setting
+        agent_instance.include_contents = original_include_contents
+
     return llm_response_data
 
 # --- ADK-Dependent Tasks (Remain in this file for global context access) ---
