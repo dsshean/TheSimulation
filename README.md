@@ -5,8 +5,10 @@ Exploring Simulation Theory through Large Language Models
 Update as of:
 5/27/2025
 
-- Code migrated to ADK V1.0
-- Agent Isolation to address uncontrolled Contents growth.
+- Release V1
+
+* Code migrated to ADK V1.0
+* Agent Isolation to address uncontrolled Contents growth.
 
 5/22/2025
 
