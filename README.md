@@ -3,6 +3,11 @@
 Exploring Simulation Theory through Large Language Models
 
 Update as of:
+5/27/2025
+
+- Code migrated to ADK V1.0
+- Agent Isolation to address uncontrolled Contents growth.
+
 5/22/2025
 
 - All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
@@ -32,6 +37,7 @@ Update as of:
 
 ## Table of Contents
 
+- [Simulacra States of Insanity: Understanding Erratic Behavior](#simulacra-states-of-insanity-understanding-erratic-behavior)
 - [Project Overview](#project-overview)
 - [Practical Applications](#practical-applications)
 - [Conceptual Framework](#conceptual-framework)
@@ -375,3 +381,34 @@ While the core loop is functional, several areas need development:
     - Simulated Communication Systems: Implement tools for agents to send/receive emails or messages, enabling more complex inter-agent or agent-to-outside-world communication. (To Be Determined)
     - Broader API Access: Connect to a wider range of external APIs (e.g., more detailed weather services, stock market data, translation tools, scientific knowledge bases) to enrich the simulation's data sources and agent capabilities. (To Be Determined)
     - These integrations will likely leverage robust communication patterns (A2A and MCP).
+
+## Simulacra States of Insanity: Understanding Erratic Behavior
+
+Working with LLM-driven autonomous agents like the Simulacra can sometimes lead to unexpected and seemingly "insane" behaviors. This is often a result of the agent's perception, its LLM's interpretation, and the simulation's state. Here are a few common pitfalls and reasons why Simulacra might start acting nonsensically:
+
+1.  **Sensory Deprivation or Undefined Environments:**
+
+    - **The Void Effect:** If a Simulacrum is placed in a location that is "undescribed" or has no defined features (e.g., teleported to a new, empty location ID without an accompanying description), the LLM struggles to ground itself. With no sensory input or environmental cues to react to, its internal monologue and subsequent actions can become abstract, repetitive, or nonsensical as it tries to make sense of a featureless void. The agent might repeatedly "look around" to no avail or generate confused, introspective thoughts that don't lead to coherent actions.
+
+2.  **Cascading Failures from Malformed Outputs:**
+
+    - **The Contagion of Confusion:** The simulation relies on structured JSON communication between its components (Simulacra, World Engine, Narrator). If a Simulacrum's LLM, due to prompt misinterpretation or an internal LLM quirk, fails to adhere to its expected JSON output schema (e.g., outputting the Narrator's JSON instead of its own `SimulacraIntentResponse`), this can trigger a cascade:
+      - **Initial Error:** The system might try to handle the malformed output, perhaps by forcing the agent into a generic "think" action and logging the error.
+      - **Corrupted Context:** The agent's `last_observation` or internal state for its next turn might now contain this error message or the raw, confusing output. This pollutes its context.
+      - **Agent Confusion:** On its next turn, the agent's LLM, when presented with this corrupted context, may struggle to generate a coherent, in-character response. It might default to more "think" actions, or its internal monologue and chosen actions might become increasingly erratic and off-topic.
+      - **Narrator Degradation:** If agents are stuck in a loop of confused "think" actions, the World Engine provides very little factual outcome for the Narrator. The Narrator, trying to create an engaging story from sparse input, might then produce increasingly bizarre or rambling narratives.
+      - **Feedback Loop:** These nonsensical narrations become the `last_observation` for the agents, further polluting their context and making it very difficult for them to recover their coherence. The agents essentially "feed" off each other's confusion, amplified by the Narrator.
+
+3.  **Prompt Ambiguity or Overly Complex Scenarios:**
+
+    - If the prompts guiding the LLMs (Simulacra, World Engine, Narrator) are ambiguous, or if the simulation presents a scenario that is too far outside the LLM's training or the defined rules of the world, the LLMs can produce less predictable or lower-quality outputs. This can manifest as agents making illogical decisions or the narrative taking strange turns.
+
+4.  **Repetitive States and Lack of Novelty:**
+    - If agents find themselves in a loop where their actions don't significantly change their environment or perceived state, and there's a lack of new external stimuli (like dynamic interruptions or new information from the `world_info_gatherer_task`), they might exhaust their immediate goals or conversational topics. This can lead to repetitive actions or a gradual decline into less meaningful interactions.
+
+**Mitigation Strategies:**
+
+- **Prompt Engineering:** Refining prompts to be extremely clear about roles, expected output formats (especially JSON schemas), and how to handle uncertainty or unexpected situations in an in-character way.
+- **Strict Input Validation and Graceful Error Handling:** Malformed LLM outputs are caught, logged, and handled in a way that minimizes the corruption of an agent's subsequent context. For instance, instead of directly feeding an error message into an agent's "thoughts," provide a more abstract, in-world observation of their confusion.
+- **Rich and Dynamic Environments:** Providing agents with sufficiently detailed environments and a steady stream of potential (even minor) new stimuli can help keep them grounded and provide new avenues for action and thought.
+- **Memory and Goal Management:** More sophisticated long-term memory and goal-tracking mechanisms can help agents maintain coherence over longer periods and avoid getting stuck in repetitive loops.

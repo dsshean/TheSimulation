@@ -20,13 +20,13 @@ async def always_clear_llm_contents_callback(
     This ensures no user messages or historical content (if any were assembled)
     are sent to the LLM in the 'contents' field.
     """
-    print(f"Before callback, llm_request.contents: {llm_request.contents}") # For debugging
+    # print(f"Before callback, llm_request.contents: {llm_request.contents}") # For debugging
     if llm_request.contents: # If the list is not empty
         if len(llm_request.contents) > 1: # Only if there's more than one item
             llm_request.contents = [llm_request.contents[-1]] # Keep only the last item, as a list
         # If len(llm_request.contents) == 1, it remains unchanged (e.g., [item1]).
         # If the list was empty, the outer 'if' is false, and it remains an empty list.
-    print(f"After callback, llm_request.contents: {llm_request.contents}") # For debugging
+    # print(f"After callback, llm_request.contents: {llm_request.contents}") # For debugging
     # No return value (or returning None) means:
 
 def clean_response_schema(
@@ -169,7 +169,8 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
         output_key="simulacra_intent_response", # Added output_key
         # output_schema=SimulacraIntentResponse, # Specify the output schema
         description=f"LLM Simulacra agent for {persona_name} in a '{world_mood}' world.",
-        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True
+        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
+        before_model_callback=always_clear_llm_contents_callback
     )
 
 def create_world_engine_llm_agent(
@@ -209,7 +210,7 @@ def create_world_engine_llm_agent(
     instruction = f"""You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
 **Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details, or emotional interpretation.** This description will be used by a separate Narrator agent.
 **Input (Provided via trigger message):**
-- Actor Name & ID:{persona_name} ({sim_id})
+- Actor Name & ID
 - Current Location
 - World Context:
 - Actor's Current Location State (Details of the specific location where the actor currently is, including its name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
@@ -402,7 +403,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
         # output_schema=WorldEngineResponse, # Specify the output schema
         description="LLM World Engine: Resolves action mechanics, calculates duration/results, generates factual outcome_description.",
         disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
-        # before_model_callback=clean_response_schema
+        before_model_callback=always_clear_llm_contents_callback
     )
 
 def create_narration_llm_agent(
@@ -552,7 +553,7 @@ Output ONLY a valid JSON object matching this exact structure:
         # output_schema=NarratorOutput, # Specify the output schema
         description=f"LLM Narrator: Generates '{world_mood}' narrative based on factual outcomes.",
         disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
-        # before_agent_callback=always_clear_llm_contents_callback,
+        before_model_callback=always_clear_llm_contents_callback,
     )
 
 def create_search_llm_agent() -> LlmAgent:
@@ -567,5 +568,6 @@ def create_search_llm_agent() -> LlmAgent:
         # if the primary output is the tool's result.
         # However, if it can also respond directly, a simple schema could be defined.
         instruction=instruction,
+        before_model_callback=always_clear_llm_contents_callback,
         description="Dedicated LLM Agent for performing Google Searches."
     )

@@ -7,8 +7,8 @@ import os
 import random  # Keep for interjection logic in simulacra_agent_task_llm
 import re
 import sys
-from datetime import datetime, timezone
-# from io import BytesIO # No longer used directly here
+import uuid # Added for temporary session IDs
+
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai  # For direct API config
@@ -18,14 +18,12 @@ from google.adk.agents import LlmAgent
 from google.adk.memory import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService, Session
-from google.adk.tools import google_search  # <<< Import the google_search tool
 from google.genai import types as genai_types
 # from PIL import Image # No longer used directly here
 from pydantic import ValidationError # BaseModel, Field, etc. are no longer needed here
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.table import Table
 
 from .socket_server import socket_server_task
@@ -77,14 +75,20 @@ state: Dict[str, Any] = {} # Global state dictionary
 event_logger_global: Optional[logging.Logger] = None # Global variable for the event logger
 
 adk_session_service: Optional[InMemorySessionService] = None
-adk_session_id: Optional[str] = None # Main session for World Engine, Narrator, Simulacra
-adk_session: Optional[Session] = None
-adk_runner: Optional[Runner] = None # Main runner
 adk_memory_service: Optional[InMemoryMemoryService] = None
 
 world_engine_agent: Optional[LlmAgent] = None
+world_engine_runner: Optional[Runner] = None
+world_engine_session_id: Optional[str] = None
+
 narration_agent_instance: Optional[LlmAgent] = None # Renamed
+narration_runner: Optional[Runner] = None
+narration_session_id: Optional[str] = None
+
 simulacra_agents_map: Dict[str, LlmAgent] = {} # Renamed
+simulacra_runners_map: Dict[str, Runner] = {}
+simulacra_session_ids_map: Dict[str, str] = {}
+
 search_llm_agent_instance: Optional[LlmAgent] = None # Renamed
 search_agent_runner_instance: Optional[Runner] = None # Renamed
 search_agent_session_id_val: Optional[str] = None # Renamed
@@ -125,7 +129,7 @@ def _prepare_dynamic_instruction_context(
 async def _call_adk_agent_and_parse(
     runner: Runner,
     agent_instance: LlmAgent,
-    session_id: str,
+    agent_dedicated_session_id: str, # The agent's own persistent session ID
     user_id: str,
     trigger_content: genai_types.Content,
     expected_pydantic_model: type,
@@ -136,26 +140,33 @@ async def _call_adk_agent_and_parse(
 ) -> Optional[Any]:
     """
     Calls an ADK agent, processes its response, and parses it into the expected Pydantic model.
+    Ensures only the trigger_content is sent to the LLM.
     Handles dynamic instruction updates if provided.
     """
     modified_instruction = False
-    if original_instruction and instruction_replacements:
-        current_instruction = original_instruction
-        for placeholder, value in instruction_replacements.items():
-            current_instruction = current_instruction.replace(placeholder, value)
-        if agent_instance.instruction != current_instruction:
-            agent_instance.instruction = current_instruction
-            modified_instruction = True
-    
-    runner.agent = agent_instance
+    original_include_contents = agent_instance.include_contents # Save original value
+    # The `always_clear_llm_contents_callback` in agents.py handles clearing history before model call.
+    # So, we can use the agent's dedicated session ID directly.
+
+    try:
+        if original_instruction and instruction_replacements:
+            current_instruction = original_instruction
+            for placeholder, value in instruction_replacements.items():
+                current_instruction = current_instruction.replace(placeholder, value)
+            if agent_instance.instruction != current_instruction:
+                agent_instance.instruction = current_instruction
+                modified_instruction = True
+
+        # No need to set runner.agent = agent_instance, as the passed `runner`
+        # is already the dedicated runner for `agent_instance`.
 
         llm_response_data = None
         raw_text_from_llm = ""
 
-        async for event_llm in runner.run_async(user_id=user_id, session_id=session_id, new_message=trigger_content):
+        async for event_llm in runner.run_async(user_id=user_id, session_id=agent_dedicated_session_id, new_message=trigger_content):
             if event_llm.error_message:
-                logger_instance.error(f"[{agent_name_for_logging}] LLM Error: {event_llm.error_message}")
-                return None # Early exit on error
+                logger_instance.error(f"[{agent_name_for_logging}] LLM Error in session {agent_dedicated_session_id}: {event_llm.error_message}")
+                return None 
             
             if event_llm.is_final_response() and event_llm.content:
                 if isinstance(event_llm.content, expected_pydantic_model):
@@ -196,11 +207,10 @@ async def _call_adk_agent_and_parse(
 async def narration_task():
     """Listens for completed actions on the narration queue and generates stylized narrative."""
     logger.info("[NarrationTask] Task started.")
-
-    if not adk_runner or not narration_agent_instance or not adk_session:
-        logger.error("[NarrationTask] Global ADK components (runner, agent, session) not initialized. Task cannot proceed.")
+    # Use dedicated runner and session for narration
+    if not narration_runner or not narration_agent_instance or not narration_session_id:
+        logger.error("[NarrationTask] Narration ADK components (runner, agent, session_id) not initialized. Task cannot proceed.")
         return
-    session_id_to_use = adk_session.id
     # Store original instruction to handle dynamic parts
     original_narration_instruction = narration_agent_instance.instruction
 
@@ -251,7 +261,7 @@ Generate the narrative paragraph based on these details and your instructions (r
             trigger_content_narrator = genai_types.UserContent(parts=[genai_types.Part(text=trigger_text_narrator)])
 
             validated_narrator_output = await _call_adk_agent_and_parse(
-                adk_runner, narration_agent_instance, session_id_to_use, USER_ID,
+                narration_runner, narration_agent_instance, narration_session_id, USER_ID,
                 trigger_content_narrator, NarratorOutput, f"NarrationTask_{actor_name}", logger,
                 original_instruction=original_narration_instruction, instruction_replacements=instruction_replacements_narrator
             )
@@ -345,11 +355,10 @@ Generate the narrative paragraph based on these details and your instructions (r
 async def world_engine_task_llm():
     """Listens for action requests, calls LLM to resolve, stores results, and triggers narration."""
     logger.info("[WorldEngineLLM] Task started.")
-
-    if not adk_runner or not world_engine_agent or not adk_session:
-        logger.error("[WorldEngineLLM] Global ADK components (runner, agent, session) not initialized. Task cannot proceed.")
+    # Use dedicated runner and session for world engine
+    if not world_engine_runner or not world_engine_agent or not world_engine_session_id:
+        logger.error("[WorldEngineLLM] World Engine ADK components (runner, agent, session_id) not initialized. Task cannot proceed.")
         return
-    session_id_to_use = adk_session.id
     # Store original instruction to handle dynamic parts
     original_world_engine_instruction = world_engine_agent.instruction
 
@@ -434,7 +443,7 @@ Resolve this intent based on your instructions and the provided context.
             trigger_content_we = genai_types.UserContent(parts=[genai_types.Part(text=trigger_text_we)])
 
             validated_data = await _call_adk_agent_and_parse(
-                adk_runner, world_engine_agent, session_id_to_use, USER_ID,
+                world_engine_runner, world_engine_agent, world_engine_session_id, USER_ID,
                 trigger_content_we, WorldEngineResponse, f"WorldEngineLLM_{actor_id}", logger,
                 original_instruction=original_world_engine_instruction, instruction_replacements=instruction_replacements_we
             )
@@ -646,14 +655,13 @@ async def simulacra_agent_task_llm(agent_id: str):
     agent_name = get_nested(state, SIMULACRA_KEY, agent_id, "persona_details", "Name", default=agent_id)
     logger.info(f"[{agent_name}] LLM Agent task started.")
 
-    if not adk_runner or not adk_session:
-        logger.error(f"[{agent_name}] Global ADK Runner or Session not initialized. Task cannot proceed.")
-        return
-
-    session_id_to_use = adk_session.id
+    # Get dedicated runner and session for this simulacrum
+    sim_runner = simulacra_runners_map.get(agent_id)
+    sim_session_id = simulacra_session_ids_map.get(agent_id)
     sim_agent = simulacra_agents_map.get(agent_id)
-    if not sim_agent:
-        logger.error(f"[{agent_name}] Could not find agent instance in simulacra_agents_map. Task cannot proceed.")
+
+    if not sim_runner or not sim_session_id or not sim_agent:
+        logger.error(f"[{agent_name}] ADK components (runner, session_id, or agent) not found for this simulacrum. Task cannot proceed.")
         return
 
     # Store the original instruction here, at the beginning of the function
@@ -684,7 +692,7 @@ async def simulacra_agent_task_llm(agent_id: str):
             initial_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=initial_trigger_text)])
             
             validated_intent = await _call_adk_agent_and_parse(
-                adk_runner, sim_agent, session_id_to_use, USER_ID,
+                sim_runner, sim_agent, sim_session_id, USER_ID,
                 initial_trigger_content, SimulacraIntentResponse, f"Simulacra_{agent_name}_Initial", logger,
                 original_instruction=original_simulacra_agent_instruction, instruction_replacements=instruction_replacements_sim
             )
@@ -726,7 +734,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                 trigger_content_loop = genai_types.UserContent(parts=[genai_types.Part(text=prompt_text)])
 
                 validated_intent = await _call_adk_agent_and_parse(
-                    adk_runner, sim_agent, session_id_to_use, USER_ID,
+                    sim_runner, sim_agent, sim_session_id, USER_ID,
                     trigger_content_loop, SimulacraIntentResponse, f"Simulacra_{agent_name}_Subsequent", logger,
                     original_instruction=original_simulacra_agent_instruction, instruction_replacements=instruction_replacements_sim_loop
                 )
@@ -773,7 +781,7 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                         reflection_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=reflection_prompt_text)])
                         # For reflection, instruction replacements are not typically needed as the prompt is self-contained.
                         validated_reflection_intent = await _call_adk_agent_and_parse(
-                            adk_runner, sim_agent, session_id_to_use, USER_ID,
+                            sim_runner, sim_agent, sim_session_id, USER_ID,
                             reflection_trigger_content, SimulacraIntentResponse, f"Simulacra_{agent_name}_Reflection", logger
                             # No original_instruction/replacements needed here as reflection prompt is specific
                         )
@@ -806,8 +814,11 @@ async def run_simulation(
     mood_override_arg: Optional[str] = None,
     event_logger_instance: Optional[logging.Logger] = None # Added event_logger_instance parameter
     ):
-    global adk_session_service, adk_session_id, adk_session, adk_runner, adk_memory_service
-    global world_engine_agent, simulacra_agents_map, state, live_display_object, narration_agent_instance
+    global adk_session_service, adk_memory_service
+    global world_engine_agent, world_engine_runner, world_engine_session_id
+    global narration_agent_instance, narration_runner, narration_session_id
+    global simulacra_agents_map, simulacra_runners_map, simulacra_session_ids_map
+    global state, live_display_object
     global world_mood_global, search_llm_agent_instance, search_agent_runner_instance, search_agent_session_id_val, perception_manager_global
     global event_logger_global # Ensure we can assign to the global
 
@@ -820,6 +831,7 @@ async def run_simulation(
         logger.info(f"Global random seed initialized to: {RANDOM_SEED}")
 
     adk_memory_service = InMemoryMemoryService()
+    adk_session_service = InMemorySessionService()
     logger.info("ADK InMemoryMemoryService initialized.")
 
     if not API_KEY:
@@ -882,12 +894,7 @@ async def run_simulation(
     logger.info(f"Initialization complete. Instance {world_instance_uuid} ready with {len(final_active_sim_ids)} simulacra.")
     console.print(f"Running simulation with: {', '.join(final_active_sim_ids)}")
 
-    adk_session_service = InMemorySessionService()
-    adk_session_id = f"sim_session_{world_instance_uuid}"
-    adk_session = adk_session_service.create_session(
-        app_name=APP_NAME, user_id=USER_ID, session_id=adk_session_id, state=state
-    )
-    # logger.info(f"ADK Session created: {adk_session.id if adk_session else 'None'}.") # Log actual session ID if available
+
     # Create shared agents once
     # Assuming the first simulacra's details can be used for generic agent naming/mood context if needed,
     # or prompts are fully generic. The current prompts take actor details in the trigger.
@@ -900,22 +907,56 @@ async def run_simulation(
     current_world_type = world_template_details_for_agents.get("world_type", "unknown")
     current_sub_genre = world_template_details_for_agents.get("sub_genre", "unknown")
 
+    # --- Initialize World Engine Agent, Runner, and Session ---
     world_engine_agent = create_world_engine_llm_agent(
         sim_id=first_sim_id, persona_name=first_persona_name,
         world_type=current_world_type, sub_genre=current_sub_genre
     )
+    world_engine_runner = Runner(agent=world_engine_agent, app_name=APP_NAME + "_WorldEngine", session_service=adk_session_service)
+    world_engine_session_id = f"world_engine_session_{world_instance_uuid}"
+    await adk_session_service.create_session(app_name=world_engine_runner.app_name, user_id=USER_ID, session_id=world_engine_session_id, state={})
+    logger.info(f"World Engine Runner and Session ({world_engine_session_id}) initialized.")
+
+    # --- Initialize Narration Agent, Runner, and Session ---
     narration_agent_instance = create_narration_llm_agent(
         sim_id=first_sim_id, persona_name=first_persona_name,
         world_mood=world_mood_global, world_type=current_world_type, sub_genre=current_sub_genre
     )
+    narration_runner = Runner(agent=narration_agent_instance, app_name=APP_NAME + "_Narrator", session_service=adk_session_service)
+    narration_session_id = f"narration_session_{world_instance_uuid}"
+    await adk_session_service.create_session(app_name=narration_runner.app_name, user_id=USER_ID, session_id=narration_session_id, state={})
+    logger.info(f"Narration Runner and Session ({narration_session_id}) initialized.")
+
+    # --- Initialize Search Agent, Runner, and Session (already mostly dedicated) ---
     search_llm_agent_instance = create_search_llm_agent()
+    search_agent_runner_instance = Runner(
+        agent=search_llm_agent_instance, app_name=APP_NAME + "_Search",
+        session_service=adk_session_service
+    )
+    search_agent_session_id_val = f"world_feed_search_session_{world_instance_uuid}"
+    search_adk_session = await adk_session_service.create_session(
+        app_name=search_agent_runner_instance.app_name, user_id=USER_ID,
+        session_id=search_agent_session_id_val, state={}
+    )
+    if search_adk_session:
+        logger.info(f"ADK Search Agent Session created: {search_adk_session.id}")
+    else:
+        logger.error(f"Failed to create ADK Search Agent Session: {search_agent_session_id_val}. World feeds may not function correctly.")
+    logger.info(f"Dedicated Search Agent Runner initialized.")
 
     simulacra_agents_map.clear()
+    simulacra_runners_map.clear()
+    simulacra_session_ids_map.clear()
     for sim_id_val in final_active_sim_ids:
         sim_profile_data = get_nested(state, SIMULACRA_KEY, sim_id_val, default={})
         persona_name = get_nested(sim_profile_data, "persona_details", "Name", default=sim_id_val)
         sim_agent_instance = create_simulacra_llm_agent(sim_id_val, persona_name, world_mood=world_mood_global)
         simulacra_agents_map[sim_id_val] = sim_agent_instance
+        sim_runner_instance = Runner(agent=sim_agent_instance, app_name=f"{APP_NAME}_Sim_{sim_id_val}", session_service=adk_session_service)
+        simulacra_runners_map[sim_id_val] = sim_runner_instance
+        sim_session_id = f"sim_agent_session_{sim_id_val}_{world_instance_uuid}"
+        await adk_session_service.create_session(app_name=sim_runner_instance.app_name, user_id=USER_ID, session_id=sim_session_id, state={})
+        simulacra_session_ids_map[sim_id_val] = sim_session_id
     logger.info(f"Created {len(simulacra_agents_map)} simulacra agents.")
 
     # Register system agents to prevent "unknown agent" errors
@@ -934,31 +975,6 @@ async def run_simulation(
 
     logger.info(f"Added system agents to agent map: WorldEngineLLMAgent, NarrationLLMAgent, SearchAgent")
     logger.info(f"Registered {len(simulacra_agents_map)} total agents (including prefixed variants)")
-
-    adk_runner = Runner(
-        agent=world_engine_agent, app_name=APP_NAME,
-        session_service=adk_session_service, memory_service=adk_memory_service
-    )
-    logger.info(f"Main ADK Runner initialized.")
-
-    search_agent_session_id_val = f"world_feed_search_session_{world_instance_uuid}"
-    # adk_session_service.create_session(app_name=APP_NAME + "_Search", user_id=USER_ID, session_id=search_agent_session_id_val)
-    # Ensure the search agent session creation is awaited
-    search_adk_session = adk_session_service.create_session(
-        app_name=APP_NAME + "_Search", 
-        user_id=USER_ID, # This user_id is used by the world feed fetcher in simulation_utils.py
-        session_id=search_agent_session_id_val,
-        state={} # Initial empty state for the search session
-    )
-    if search_adk_session:
-        logger.info(f"ADK Search Agent Session created: {search_adk_session.id}")
-    else:
-        logger.error(f"Failed to create ADK Search Agent Session: {search_agent_session_id_val}. World feeds may not function correctly.")
-    search_agent_runner_instance = Runner(
-        agent=search_llm_agent_instance, app_name=APP_NAME + "_Search",
-        session_service=adk_session_service
-    )
-    logger.info(f"Dedicated Search Agent Runner initialized.")
 
     tasks = []
     final_state_path = os.path.join(STATE_DIR, f"simulation_state_{world_instance_uuid}.json")
