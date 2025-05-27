@@ -1,4 +1,4 @@
-google-adk==1.0.0
+google-adk==0.1.0
 google-generativeai
 python-dotenv
 rich

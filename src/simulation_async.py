@@ -1148,7 +1148,7 @@ async def run_simulation(
 
     adk_session_service = InMemorySessionService()
     adk_session_id = f"sim_session_{world_instance_uuid}"
-    adk_session = await adk_session_service.create_session(
+    adk_session = adk_session_service.create_session(
         app_name=APP_NAME, user_id=USER_ID, session_id=adk_session_id, state=state
     )
     # logger.info(f"ADK Session created: {adk_session.id if adk_session else 'None'}.") # Log actual session ID if available
@@ -1208,7 +1208,7 @@ async def run_simulation(
     search_agent_session_id_val = f"world_feed_search_session_{world_instance_uuid}"
     # adk_session_service.create_session(app_name=APP_NAME + "_Search", user_id=USER_ID, session_id=search_agent_session_id_val)
     # Ensure the search agent session creation is awaited
-    search_adk_session = await adk_session_service.create_session(
+    search_adk_session = adk_session_service.create_session(
         app_name=APP_NAME + "_Search", 
         user_id=USER_ID, # This user_id is used by the world feed fetcher in simulation_utils.py
         session_id=search_agent_session_id_val,
