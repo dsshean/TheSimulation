@@ -5,9 +5,10 @@ import os
 import glob
 from io import BytesIO
 import argparse # Import argparse for command-line arguments
-from typing import Optional # Added import for Optional type hint
+from typing import Optional, List, Dict, Any # Added import for Optional, List, Dict, Any type hints
 from PIL import Image # For image compression
 from dotenv import load_dotenv
+from rich.console import Console # Added for console output in script
 from atproto import Client, models as atproto_models # Aliased import
 
 # --- Configuration ---
@@ -23,6 +24,8 @@ SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#TheSimulation #AI #Di
 # --- Bluesky API Client (initialized later if needed) ---
 bluesky_client = None
 
+console = Console() # Initialize Rich console for script output
+
 def find_latest_file_in_dir(directory: str, pattern: str) -> Optional[str]:
     """Finds the most recently modified file matching the pattern in a given directory."""
     if not os.path.isdir(directory):
@@ -35,6 +38,7 @@ def find_latest_file_in_dir(directory: str, pattern: str) -> Optional[str]:
     return latest_file
 
 def load_world_simulation_uuid_from_config_filename(jsonl_filepath: str) -> bool:
+    # This function remains largely the same, but uses console for output
     """
     Determines the World Simulation UUID by finding the latest world_config_*.json
     file in the project's 'data' directory and extracting the UUID from its filename.
@@ -42,17 +46,17 @@ def load_world_simulation_uuid_from_config_filename(jsonl_filepath: str) -> bool
     global WORLD_SIMULATION_UUID
     try:
         # Navigate from JSONL path to project's 'data' directory
-        # Assumes JSONL is in project_root/logs/events/
+        # Assumes JSONL is in project_root/logs/events/ or a similar structure
         events_dir = os.path.dirname(jsonl_filepath)
         logs_dir = os.path.dirname(events_dir)
         project_root_dir = os.path.dirname(logs_dir)
         data_dir = os.path.join(project_root_dir, "data")
 
         if not os.path.isdir(data_dir):
-            print(f"Error: 'data' directory not found at expected path: {data_dir}")
+            console.print(f"[red]Error:[/red] 'data' directory not found at expected path: {data_dir}")
             return False
 
-        latest_config_file_path = find_latest_file_in_dir(data_dir, "world_config_*.json")
+        latest_config_file_path = find_latest_file_in_dir(data_dir, "world_config_*.json") # Use the helper
 
         if not latest_config_file_path:
             print(f"Error: No 'world_config_*.json' files found in {data_dir}.")
@@ -63,16 +67,16 @@ def load_world_simulation_uuid_from_config_filename(jsonl_filepath: str) -> bool
         match = re.match(r"world_config_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.json", filename)
         if match:
             WORLD_SIMULATION_UUID = match.group(1)
-            print(f"Loaded World Simulation UUID: {WORLD_SIMULATION_UUID} from config file: {filename}")
+            console.print(f"[green]Loaded World Simulation UUID:[/green] {WORLD_SIMULATION_UUID} from config file: {filename}")
             
             # Optional: Verify UUID inside the file
             try:
                 with open(latest_config_file_path, 'r', encoding='utf-8') as f_cfg:
                     config_content = json.load(f_cfg)
                     if config_content.get("world_instance_uuid") != WORLD_SIMULATION_UUID:
-                        print(f"Warning: UUID in filename ({WORLD_SIMULATION_UUID}) does not match 'world_instance_uuid' in file ({config_content.get('world_instance_uuid')}). Using filename UUID.")
+                        console.print(f"[yellow]Warning:[/yellow] UUID in filename ({WORLD_SIMULATION_UUID}) does not match 'world_instance_uuid' in file ({config_content.get('world_instance_uuid')}). Using filename UUID.")
             except Exception as e_verify:
-                print(f"Warning: Could not verify UUID inside {filename}: {e_verify}")
+                console.print(f"[yellow]Warning:[/yellow] Could not verify UUID inside {filename}: {e_verify}")
             return True
         else:
             print(f"Error: Could not extract UUID from filename: {filename}")
@@ -92,18 +96,18 @@ def _initialize_bluesky_client():
         bsky_password = os.environ.get("BLUESKY_APP_PASSWORD")
 
         if not bsky_handle or not bsky_password:
-            print("Error: BLUESKY_HANDLE or BLUESKY_APP_PASSWORD not found in .env file.")
-            print("Actual posting to Bluesky will be skipped.")
+            console.print("[red]Error:[/red] BLUESKY_HANDLE or BLUESKY_APP_PASSWORD not found in .env file.")
+            console.print("[yellow]Actual posting to Bluesky will be skipped.[/yellow]")
             return False
         
         try:
             client = Client()
             client.login(bsky_handle, bsky_password)
             bluesky_client = client
-            print(f"Successfully logged into Bluesky as {bsky_handle}.")
+            console.print(f"[green]Successfully logged into Bluesky as {bsky_handle}.[/green]")
             return True
         except Exception as e:
-            print(f"Error logging into Bluesky: {e}")
+            console.print(f"[red]Error logging into Bluesky:[/red] {e}")
             print("Actual posting to Bluesky will be skipped.")
             bluesky_client = None 
             return False
@@ -126,7 +130,7 @@ def _send_to_bluesky_api(text_content, image_path=None, alt_text=None):
                 full_image_path = os.path.join(IMAGE_BASE_DIR, image_path)
 
             if not os.path.exists(full_image_path):
-                print(f"Image file not found: {full_image_path}. Posting text only.")
+                console.print(f"[yellow]Image file not found:[/yellow] {full_image_path}. Posting text only.")
             else:
                 image_bytes_for_upload = None
                 original_file_size = os.path.getsize(full_image_path)
@@ -145,12 +149,12 @@ def _send_to_bluesky_api(text_content, image_path=None, alt_text=None):
                             temp_image_buffer.truncate()
                             img_pil.save(temp_image_buffer, format="JPEG", quality=quality, optimize=True)
                             if temp_image_buffer.tell() <= BLUESKY_MAX_IMAGE_SIZE_BYTES:
-                                print(f"Compressed image to {temp_image_buffer.tell() / 1024:.2f}KB (JPEG quality {quality}).")
+                                console.print(f"[green]Compressed image to[/green] {temp_image_buffer.tell() / 1024:.2f}KB (JPEG quality {quality}).")
                                 image_bytes_for_upload = temp_image_buffer.getvalue()
                                 break
                             quality -= 10
                         if not image_bytes_for_upload:
-                            print(f"Could not compress image sufficiently. Final attempt size: {temp_image_buffer.tell() / 1024:.2f}KB.")
+                            console.print(f"[red]Could not compress image sufficiently.[/red] Final attempt size: {temp_image_buffer.tell() / 1024:.2f}KB.")
                     except Exception as e_compress:
                         print(f"Error during image compression: {e_compress}")
                 else:
@@ -158,12 +162,12 @@ def _send_to_bluesky_api(text_content, image_path=None, alt_text=None):
                         image_bytes_for_upload = f_img.read()
 
                 if image_bytes_for_upload:
-                    print(f"Uploading image: {full_image_path} ({len(image_bytes_for_upload)/1024:.2f} KB)...")
+                    console.print(f"[blue]Uploading image:[/blue] {full_image_path} ({len(image_bytes_for_upload)/1024:.2f} KB)...")
                     safe_alt_text = (alt_text or "")[:1000] # Bluesky alt text limit
                     
                     upload_response = bluesky_client.com.atproto.repo.upload_blob(image_bytes_for_upload)
                     
-                    if not upload_response or not hasattr(upload_response, 'blob'):
+                    if not upload_response or not hasattr(upload_response, 'blob') or not upload_response.blob:
                         print("Failed to upload image blob. Posting text only.")
                     else:
                         image_to_embed = atproto_models.AppBskyEmbedImages.Image(
@@ -171,7 +175,7 @@ def _send_to_bluesky_api(text_content, image_path=None, alt_text=None):
                         )
                         embed_to_post = atproto_models.AppBskyEmbedImages.Main(images=[image_to_embed])
                         print("Image uploaded successfully.")
-                else:
+                elif image_path: # Only print this if an image path was provided but preparation failed
                     print("Image preparation failed. Posting text only.")
 
         print("Creating post on Bluesky...")
@@ -189,25 +193,77 @@ def _send_to_bluesky_api(text_content, image_path=None, alt_text=None):
             )
         )
         print("Post successfully created on Bluesky.")
-
     except Exception as e:
         print(f"Error during Bluesky API call: {e}")
 
+def _load_events_from_file(filepath: str) -> List[Dict[str, Any]]:
+    """Loads and parses JSONL events from a file."""
+    raw_events = []
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    raw_events.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    console.print(f"[yellow]Skipping malformed JSON line:[/yellow] {line.strip()} - Error: {e}")
+                    continue
+    except FileNotFoundError:
+        console.print(f"[red]Error:[/red] File not found at {filepath}")
+        return []
+    except Exception as e:
+        console.print(f"[red]Error:[/red] An unexpected error occurred while reading {filepath}: {e}")
+        return []
+
+    if not raw_events:
+        console.print("[yellow]No events found in file.[/yellow]")
+
+    return raw_events
+
+def _extract_image_info_from_events(events: List[Dict[str, Any]]) -> Dict[float, Dict[str, Any]]:
+    """Extracts image generation events and maps them by simulation time."""
+    image_info_map = {}
+    filename_time_regex = re.compile(r"_T(\d+(?:\.\d+)?)_")
+
+    for event in events:
+        if event.get("agent_id") == "ImageGenerator" and event.get("event_type") == "image_generation":
+            data = event.get("data", {})
+            filename = data.get("image_filename")
+            prompt = data.get("prompt_snippet") # This is the refined prompt, good for alt text
+            sim_time = event.get("sim_time_s") # Use the sim_time from the event itself
+
+            if filename and prompt and sim_time is not None:
+                 # Use the sim_time from the event data directly, it's more reliable
+                 # than parsing the filename again.
+                 image_info_map[sim_time] = {
+                     "path": filename,
+                     "alt": prompt, # Use the refined prompt as alt text
+                     "used": False
+                 }
+                 # Optional: Still check filename time for consistency/debugging
+                 match = filename_time_regex.search(filename)
+                 if match:
+                     try:
+                         file_sim_time = float(match.group(1))
+                         if abs(file_sim_time - sim_time) > 0.5: # Check if they are significantly different
+                             console.print(f"[yellow]Warning:[/yellow] Sim time in event ({sim_time:.1f}s) differs from filename ({file_sim_time:.1f}s) for image {filename}.")
+                     except ValueError: pass # Ignore parsing errors
+            
+    return image_info_map
 
 def post_to_bluesky(text_content, image_path=None, alt_text=None):
     """
     Shows a confirmation and then calls the actual Bluesky posting function.
     """
     print("--- PROPOSED BLUESKY POST ---")
-    print(f"Content ({len(text_content)} chars): {text_content}")
+    console.print(f"[bold]Content[/] ({len(text_content)} chars):\n{text_content}")
     if image_path:
         full_image_path = image_path
         if IMAGE_BASE_DIR and not os.path.isabs(image_path):
             full_image_path = os.path.join(IMAGE_BASE_DIR, image_path)
         
-        print(f"Attaching Image: {full_image_path}")
+        console.print(f"[bold]Attaching Image:[/bold] {full_image_path}")
         if os.path.exists(full_image_path):
-            print("(Image file exists on disk)")
+            console.print("[dim](Image file exists on disk)[/dim]")
         else:
             print(f"(Image file NOT FOUND at: {full_image_path})")
         print(f"Alt Text: {alt_text}")
@@ -218,64 +274,25 @@ def post_to_bluesky(text_content, image_path=None, alt_text=None):
         if _initialize_bluesky_client():
             print("Proceeding with post...")
             _send_to_bluesky_api(text_content, image_path, alt_text)
-        else:
-            print("Skipping post due to Bluesky client initialization failure.")
     else:
         print("Skipping post as per user confirmation.")
     print()
-
 
 def process_events_file(filepath):
     global IMAGE_BASE_DIR
     IMAGE_BASE_DIR = os.path.dirname(filepath) # Images are relative to the JSONL file's location
 
     if not load_world_simulation_uuid_from_config_filename(filepath):
-        print("Failed to load World Simulation UUID. Aborting.")
-        return
-    if not WORLD_SIMULATION_UUID:
-        print("World Simulation UUID is not set after attempting load. Aborting.")
-        return
-
-    raw_events = []
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    raw_events.append(json.loads(line))
-                except json.JSONDecodeError as e:
-                    print(f"Skipping malformed JSON line: {line.strip()} - Error: {e}")
-                    continue
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return
-
-    if not raw_events:
-        print("No events found in file.")
+        console.print("[red]Failed to load World Simulation UUID. Aborting.[/red]")
         return
 
     image_info_map = {}
-    filename_time_regex = re.compile(r"_T(\d+(?:\.\d+)?)_")
 
-    for event in raw_events:
-        if event.get("agent_id") == "ImageGenerator":
-            data = event.get("data", {})
-            filename = data.get("image_filename")
-            prompt = data.get("prompt_snippet") # This is the refined prompt, good for alt text
-            if filename and prompt:
-                match = filename_time_regex.search(filename)
-                if match:
-                    try:
-                        ref_sim_time_str = match.group(1)
-                        ref_sim_time = float(ref_sim_time_str)
-                        image_info_map[ref_sim_time] = {
-                            "path": filename,
-                            "alt": prompt, # Use the refined prompt as alt text
-                            "used": False
-                        }
-                    except ValueError:
-                        print(f"Warning: Could not parse sim_time from filename: {filename}")
-                else:
-                    print(f"Warning: Could not extract sim_time signature (e.g., _T123.45_) from filename: {filename}")
+    raw_events = _load_events_from_file(filepath)
+    if not raw_events:
+        return # Loading failed or file was empty, message handled in _load_events_from_file
+
+    image_info_map = _extract_image_info_from_events(raw_events)
             
     for event in raw_events:
         agent_id = event.get("agent_id")
@@ -396,7 +413,7 @@ def process_events_file(filepath):
     unused_image_count = 0
     for ref_time, img_data in image_info_map.items():
         if not img_data["used"]:
-            unused_image_count +=1
+            unused_image_count += 1
             print(f"Info: Unused image (intended for sim_time ~{ref_time}): {img_data['path']}")
     if unused_image_count > 0:
         print(f"Info: Total {unused_image_count} pre-processed images were not attached to any post.")
@@ -413,17 +430,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     target_jsonl_file_path = args.logfile
-
+    
     if not target_jsonl_file_path:
-        print("No specific log file provided. Looking for the latest event log file...")
+        console.print("[yellow]No specific log file provided. Looking for the latest event log file...[/yellow]")
         # Default behavior: find the latest log file
         events_log_directory = r"c:\Users\dshea\Desktop\TheSimulation\logs\events" # Default directory
         events_file_pattern = "events_latest_*.jsonl"
-        print(f"Looking in: {events_log_directory} with pattern: {events_file_pattern}")
+        console.print(f"[blue]Looking in:[/blue] {events_log_directory} with pattern: {events_file_pattern}")
         target_jsonl_file_path = find_latest_file_in_dir(events_log_directory, events_file_pattern)
 
         if not target_jsonl_file_path:
-            print(f"FATAL ERROR: No event log files matching '{events_file_pattern}' found in {events_log_directory}.")
+            console.print(f"[bold red]FATAL ERROR:[/bold red] No event log files matching '{events_file_pattern}' found in {events_log_directory}.")
             exit(1)
 
     if not os.path.exists(target_jsonl_file_path):

@@ -44,16 +44,16 @@ from .config import (  # For run_simulation; For self-reflection; New constants 
     DEFAULT_HOME_DESCRIPTION, DEFAULT_HOME_LOCATION_NAME, # DYNAMIC_INTERRUPTION constants moved to core_tasks import
     ENABLE_BLUESKY_POSTING, # ENABLE_NARRATIVE_IMAGE_GENERATION moved to core_tasks import
     HOME_LOCATION_KEY,
-    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME,
+    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME, MODEL_NAME, # Removed AGENT_MODEL_NAME alias
     IMAGE_GENERATION_OUTPUT_DIR, INTERJECTION_COOLDOWN_SIM_SECONDS,
     LIFE_SUMMARY_DIR, LOCATION_DETAILS_KEY, LOCATION_KEY,
-    LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, MAX_MEMORY_LOG_ENTRIES,
+    LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, MAX_MEMORY_LOG_ENTRIES, # MODEL_NAME as AGENT_MODEL_NAME removed
     MAX_SIMULATION_TIME, MEMORY_LOG_CONTEXT_LENGTH,
-    MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK, MODEL_NAME,
+    MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK,
     PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, SEARCH_AGENT_MODEL_NAME,
     SIMULACRA_KEY, SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR,
-    SOCIAL_POST_HASHTAGS, SOCIAL_POST_TEXT_LIMIT, STATE_DIR, UPDATE_INTERVAL,
-    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY, MODEL_NAME as CONFIG_MODEL_NAME) # Added CONFIG_MODEL_NAME
+    SOCIAL_POST_HASHTAGS, SOCIAL_POST_TEXT_LIMIT, STATE_DIR, UPDATE_INTERVAL, # CONFIG_MODEL_NAME removed
+    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
 from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (get_nested, load_json_file,
                          load_or_initialize_simulation, parse_json_output_last,
@@ -62,7 +62,7 @@ from .perception_manager import PerceptionManager # Import the moved PerceptionM
 from .models import NarratorOutput  # Pydantic models for tasks in this file
 from .models import SimulacraIntentResponse, WorldEngineResponse
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
-    _update_state_value, generate_table, get_time_string_for_prompt, # Re-added get_time_string_for_prompt
+    _update_state_value, generate_table, get_time_string_for_prompt, get_target_entity_state, # Re-added get_time_string_for_prompt, added get_target_entity_state
     _log_event) # get_random_style_combination is used by core_tasks
 from .state_loader import parse_location_string  # Used in run_simulation
 
@@ -95,17 +95,110 @@ live_display_object: Optional[Live] = None
 def get_current_sim_time():
     return state.get("world_time", 0.0)
 
+# --- Helper for Dynamic Instruction Context ---
+def _prepare_dynamic_instruction_context(
+    current_state_dict: Dict[str, Any],
+    sim_time_seconds: float,
+    include_news_in_instruction: bool = True,
+    news_item_count: int = 1 
+) -> Dict[str, str]:
+    """Prepares common dynamic replacement values for agent instructions."""
+    time_str = get_time_string_for_prompt(current_state_dict, sim_elapsed_time_seconds=sim_time_seconds)
+    weather_str = get_nested(current_state_dict, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+    
+    news_str = "No significant news." # Default if not included or not found
+    if include_news_in_instruction:
+        headlines = [
+            item.get('headline', '') 
+            for item in get_nested(current_state_dict, 'world_feeds', 'news_updates', default=[])[:news_item_count]
+            if item.get('headline', '') # Ensure headline is not empty
+        ]
+        if headlines:
+            news_str = headlines[0] # Use the first headline if available
+            
+    return {
+        "{DYNAMIC_CURRENT_TIME}": time_str,
+        "{DYNAMIC_CURRENT_WEATHER}": weather_str,
+        "{DYNAMIC_CURRENT_NEWS}": news_str
+    }
+# --- Helper Function for ADK Agent Calls ---
+async def _call_adk_agent_and_parse(
+    runner: Runner,
+    agent_instance: LlmAgent,
+    session_id: str,
+    user_id: str,
+    trigger_content: genai_types.Content,
+    expected_pydantic_model: type,
+    agent_name_for_logging: str,
+    logger_instance: logging.Logger,
+    original_instruction: Optional[str] = None,
+    instruction_replacements: Optional[Dict[str, str]] = None
+) -> Optional[Any]:
+    """
+    Calls an ADK agent, processes its response, and parses it into the expected Pydantic model.
+    Handles dynamic instruction updates if provided.
+    """
+    modified_instruction = False
+    if original_instruction and instruction_replacements:
+        current_instruction = original_instruction
+        for placeholder, value in instruction_replacements.items():
+            current_instruction = current_instruction.replace(placeholder, value)
+        if agent_instance.instruction != current_instruction:
+            agent_instance.instruction = current_instruction
+            modified_instruction = True
+    
+    runner.agent = agent_instance
+
+    llm_response_data = None
+    raw_text_from_llm = ""
+
+    async for event_llm in runner.run_async(user_id=user_id, session_id=session_id, new_message=trigger_content):
+        if event_llm.error_message:
+            logger_instance.error(f"[{agent_name_for_logging}] LLM Error: {event_llm.error_message}")
+            if modified_instruction and original_instruction: # Restore original instruction on error
+                agent_instance.instruction = original_instruction
+            return None
+        
+        if event_llm.is_final_response() and event_llm.content:
+            if isinstance(event_llm.content, expected_pydantic_model):
+                llm_response_data = event_llm.content
+                logger_instance.debug(f"[{agent_name_for_logging}] ADK successfully parsed {expected_pydantic_model.__name__} schema.")
+            elif event_llm.content.parts:
+                raw_text_from_llm = event_llm.content.parts[0].text.strip()
+                logger_instance.debug(f"[{agent_name_for_logging}] LLM Final Raw Content: {raw_text_from_llm[:200]}...")
+                parsed_dict_from_llm = parse_json_output_last(raw_text_from_llm)
+                if parsed_dict_from_llm:
+                    try:
+                        llm_response_data = expected_pydantic_model.model_validate(parsed_dict_from_llm)
+                    except ValidationError as ve:
+                        logger_instance.error(f"[{agent_name_for_logging}] Pydantic validation failed for manual parse: {ve}. Raw: {raw_text_from_llm}")
+                        llm_response_data = None # Ensure it's None
+                else:
+                    logger_instance.error(f"[{agent_name_for_logging}] Failed to parse JSON (manual fallback). Raw: {raw_text_from_llm}")
+                    # Special handling for NarratorOutput if parsing fails, use raw text for narrative
+                    if expected_pydantic_model == NarratorOutput:
+                        llm_response_data = NarratorOutput(narrative=raw_text_from_llm)
+                    else:
+                        llm_response_data = None # Ensure it's None
+            break 
+
+    if modified_instruction and original_instruction: # Restore original instruction if it was modified
+        agent_instance.instruction = original_instruction
+        
+    return llm_response_data
+
 # --- ADK-Dependent Tasks (Remain in this file for global context access) ---
 
 async def narration_task():
     """Listens for completed actions on the narration queue and generates stylized narrative."""
-    # Accesses global: state, adk_runner, narration_agent_instance, adk_session, narration_queue, world_mood_global, live_display_object, logger
     logger.info("[NarrationTask] Task started.")
 
     if not adk_runner or not narration_agent_instance or not adk_session:
         logger.error("[NarrationTask] Global ADK components (runner, agent, session) not initialized. Task cannot proceed.")
         return
     session_id_to_use = adk_session.id
+    # Store original instruction to handle dynamic parts
+    original_narration_instruction = narration_agent_instance.instruction
 
     while True:
         action_event = None
@@ -135,59 +228,29 @@ async def narration_task():
             history_str = "\n".join(cleaned_recent_narrative)
 
             # Fetch world feeds for the Narrator
-            weather_summary_narrator = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
-            latest_news_headlines_narrator = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:1]] # Just one for brevity
-            news_summary_narrator = latest_news_headlines_narrator[0] if latest_news_headlines_narrator else "No major news."
             logger.info(f"[NarrationTask] Generating narrative for {actor_name}'s action completion. Outcome: '{outcome_desc}'")
             intent_json = json.dumps(intent, indent=2)
             results_json = json.dumps(results, indent=2)
-            time_for_narrator_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=completion_time)
-            # original_narration_agent_instruction = narration_agent_instance.instruction
-            # narration_agent_instance.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_narrator_prompt).replace("{DYNAMIC_CURRENT_WEATHER}", weather_summary_narrator).replace("{DYNAMIC_CURRENT_NEWS}", news_summary_narrator)
-            adk_runner.agent = narration_agent_instance
+            instruction_replacements_narrator = _prepare_dynamic_instruction_context(state, completion_time, include_news_in_instruction=True, news_item_count=1)
 
-            prompt = f"""
+            trigger_text_narrator = f"""
 Actor ID: {actor_id}
 Actor Name: {actor_name}
 Original Intent: {intent_json}
 Factual Outcome Description: {outcome_desc}
 State Changes (Results): {results_json}
-Current World Time: {time_for_narrator_prompt}
-Current Weather: {weather_summary_narrator}
-Latest News Headline: {news_summary_narrator}
 Recent Narrative History (Cleaned):
 {history_str}
 
 Generate the narrative paragraph based on these details and your instructions (remembering the established world style '{world_mood_global}').
 """
-# Use the instance
-            narrative_text = ""
-            trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=prompt)])
+            trigger_content_narrator = genai_types.UserContent(parts=[genai_types.Part(text=trigger_text_narrator)])
 
-            async for event_llm in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
-                if event_llm.error_message:
-                    logger.error(f"NarrationLLM Error: {event_llm.error_message}")
-                    narrative_text = f"[{actor_name}'s action resulted in: {outcome_desc}]"
-                    # Attempt to process this fallback as if it were the narrative paragraph
-                    validated_narrator_output = NarratorOutput(narrative=narrative_text)
-                    # Skip further parsing attempts if there was an LLM error
-                    break 
-                
-                if event_llm.is_final_response() and event_llm.content:
-                    if isinstance(event_llm.content, NarratorOutput): # ADK parsed it!
-                        validated_narrator_output = event_llm.content
-                        logger.debug(f"[NarrationTask] ADK successfully parsed NarratorOutput schema.")
-                        narrative_text = validated_narrator_output.narrative # For logging snippet
-                    elif event_llm.content.parts: # Fallback to manual parsing
-                        narrative_text = event_llm.content.parts[0].text.strip()
-                        logger.debug(f"NarrationLLM Final Raw Content: {narrative_text[:100]}...")
-                        parsed_dict_from_llm = parse_json_output_last(narrative_text)
-                        if parsed_dict_from_llm:
-                            validated_narrator_output = NarratorOutput.model_validate(parsed_dict_from_llm)
-                        else: # If manual parsing also fails
-                            logger.error(f"[NarrationTask] Failed to parse JSON from Narrator (manual fallback). Raw text: {narrative_text}. Using raw text as narrative.")
-                            validated_narrator_output = NarratorOutput(narrative=narrative_text) # Use raw text as narrative
-                    break # Process the final response
+            validated_narrator_output = await _call_adk_agent_and_parse(
+                adk_runner, narration_agent_instance, session_id_to_use, USER_ID,
+                trigger_content_narrator, NarratorOutput, f"NarrationTask_{actor_name}", logger,
+                original_instruction=original_narration_instruction, instruction_replacements=instruction_replacements_narrator
+            )
 
             if 'validated_narrator_output' in locals() and validated_narrator_output:
                 try:
@@ -283,6 +346,8 @@ async def world_engine_task_llm():
         logger.error("[WorldEngineLLM] Global ADK components (runner, agent, session) not initialized. Task cannot proceed.")
         return
     session_id_to_use = adk_session.id
+    # Store original instruction to handle dynamic parts
+    original_world_engine_instruction = world_engine_agent.instruction
 
     while True:
         request_event = None
@@ -341,54 +406,19 @@ async def world_engine_task_llm():
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
             location_state_data["objects_present"] = location_state_data.get("ephemeral_objects", [])
             time_for_world_engine_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time) # type: ignore
-            
-            target_id = get_nested(intent, "target_id")
-            target_state_data = {}
-            if target_id:
-                # Try to find the target in various places
-                # 1. Simulacra
-                target_state_data = get_nested(state, SIMULACRA_KEY, target_id, default=None)
-
-                # 2. Static Objects (list of dicts)
-                if not target_state_data:
-                    static_objects_list = state.get("objects", [])
-                    for obj in static_objects_list:
-                        if isinstance(obj, dict) and obj.get("id") == target_id:
-                            target_state_data = obj
-                            break
-                
-                # 3. Ephemeral Objects in current location
-                if not target_state_data and actor_location_id:
-                    ephemeral_objects_list = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, "ephemeral_objects", default=[])
-                    for eph_obj in ephemeral_objects_list:
-                        if isinstance(eph_obj, dict) and eph_obj.get("id") == target_id:
-                            target_state_data = eph_obj
-                            break
-
-                # 4. Ephemeral NPCs in current location
-                if not target_state_data and actor_location_id:
-                    ephemeral_npcs_list = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, "ephemeral_npcs", default=[])
-                    for eph_npc in ephemeral_npcs_list:
-                        if isinstance(eph_npc, dict) and eph_npc.get("id") == target_id:
-                            target_state_data = eph_npc # NPCs might have a different structure, but treat as dict for now
-                            break
-                if not target_state_data: target_state_data = {} # Ensure it's a dict if not found
-            
-            # Fetch world feeds for the World Engine
-            weather_summary_we = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+            # Use the new helper function to get target_state_data
+            target_id_we = get_nested(intent, "target_id")
+            target_state_data = get_target_entity_state(state, target_id_we, actor_location_id) or {}
 
             intent_json = json.dumps(intent, indent=2)
-            target_state_json = json.dumps(target_state_data, indent=2) if target_state_data else "N/A"
+            target_state_json = json.dumps(target_state_data, indent=2) if target_state_data else "{}" # Ensure valid JSON string
             location_state_json = json.dumps(location_state_data, indent=2)
             world_rules_json = json.dumps(world_rules, indent=2)
-            # News is intentionally omitted from World Engine's direct prompt now
-            prompt = f"""
+            trigger_text_we = f"""
 Actor Name and ID: {actor_name} ({actor_id})
 Current Location: {actor_location_id}
-Current World Time: {time_for_world_engine_prompt}
 Intent: {intent_json}
-Current Weather: {weather_summary_we}
-Target Entity State ({target_id or 'N/A'}): {target_state_json}
+Target Entity State ({target_id_we or 'N/A'}): {target_state_json}
 Location State: {location_state_json}
 World Rules: {world_rules_json}
 
@@ -396,47 +426,23 @@ Resolve this intent based on your instructions and the provided context.
 """
             logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")
 
-            original_narration_agent_instruction = world_engine_agent.instruction
-            # Remove DYNAMIC_CURRENT_NEWS from instruction replacement for World Engine
-            world_engine_agent.instruction = original_narration_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_world_engine_prompt).replace("{DYNAMIC_CURRENT_WEATHER}", weather_summary_we)
-            adk_runner.agent = world_engine_agent
+            instruction_replacements_we = _prepare_dynamic_instruction_context(state, current_sim_time, include_news_in_instruction=False)
+            trigger_content_we = genai_types.UserContent(parts=[genai_types.Part(text=trigger_text_we)])
 
-            response_text = ""
-            trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=prompt)])
+            validated_data = await _call_adk_agent_and_parse(
+                adk_runner, world_engine_agent, session_id_to_use, USER_ID,
+                trigger_content_we, WorldEngineResponse, f"WorldEngineLLM_{actor_id}", logger,
+                original_instruction=original_world_engine_instruction, instruction_replacements=instruction_replacements_we
+            )
 
-            async for event_llm in adk_runner.run_async(
-                user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content
-            ):
-                if event_llm.error_message:
-                    logger.error(f"WorldLLM Error: {event_llm.error_message}")
-                    outcome_description = f"Action failed due to LLM error: {event_llm.error_message}"
-                    break 
-                
-                if event_llm.is_final_response() and event_llm.content:
-                    if isinstance(event_llm.content, WorldEngineResponse): # ADK parsed it!
-                        validated_data = event_llm.content
-                        logger.debug(f"[WorldEngineLLM] ADK successfully parsed WorldEngineResponse schema for {actor_id}.")
-                        parsed_resolution = validated_data.model_dump() # For logging and display
-                    elif event_llm.content.parts: # Fallback to manual parsing
-                        response_text = event_llm.content.parts[0].text
-                        logger.debug(f"WorldLLM Final Raw Content: {response_text[:100]}...")
-                        parsed_resolution_dict = parse_json_output_last(response_text.strip())
-                        if parsed_resolution_dict:
-                            validated_data = WorldEngineResponse.model_validate(parsed_resolution_dict)
-                            parsed_resolution = validated_data.model_dump() # For logging and display
-                        else:
-                            logger.error(f"[WorldEngineLLM] Failed to parse JSON from WorldEngine (manual fallback) for {actor_id}. Response: {response_text}")
-                            outcome_description = "Action failed due to internal error (JSON decode)."
-                    # Common processing after successful parse (ADK or manual)
-                    if validated_data:
-                        logger.debug(f"[WorldEngineLLM] LLM response processed successfully for {actor_id}.")
-                        outcome_description = validated_data.outcome_description
-                        if live_display_object and parsed_resolution:
-                            live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
-                            try: live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
-                            except TypeError: live_display_object.console.print(str(parsed_resolution))
-                        _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=parsed_resolution or {}, logger_instance=logger, event_logger_global=event_logger_global)
-                    break # Process the final response
+            parsed_resolution = validated_data.model_dump() if validated_data else None
+            if validated_data:
+                outcome_description = validated_data.outcome_description
+                if live_display_object and parsed_resolution:
+                    live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
+                    try: live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
+                    except TypeError: live_display_object.console.print(str(parsed_resolution))
+                _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=parsed_resolution or {}, logger_instance=logger, event_logger_global=event_logger_global)
 
             # Handle case where validated_data is still None after loop (e.g. LLM error or no response text)
             if 'validated_data' not in locals() or not validated_data:
@@ -541,6 +547,96 @@ Resolve this intent based on your instructions and the provided context.
                 except Exception as td_e: logger.error(f"[WorldEngineLLM] Error calling task_done() in finally: {td_e}")
 
 
+def _build_simulacra_prompt(
+    agent_id: str,
+    agent_name: str,
+    agent_state_data: Dict[str, Any], 
+    current_sim_time: float,
+    global_state_ref: Dict[str, Any], 
+    perception_manager_instance: PerceptionManager, 
+    status_message_for_prompt: str
+) -> str:
+    """Builds the detailed prompt for the Simulacra agent."""
+    # --- Perception Gathering ---
+    fresh_percepts = perception_manager_instance.get_percepts_for_simulacrum(agent_id)
+    _log_event(
+        sim_time=current_sim_time, agent_id=agent_id, event_type="agent_perception_generated",
+        data=fresh_percepts, logger_instance=logger, event_logger_global=event_logger_global
+    )
+    logger.debug(f"[{agent_name}] Built percepts for prompt: {json.dumps(fresh_percepts, sort_keys=True)[:250]}...")
+
+    # --- Format Percepts for LLM Prompt ---
+    perceptual_summary_for_prompt = "Perception system error or offline."
+    audible_env_str = "  The environment is quiet."
+    if fresh_percepts and not fresh_percepts.get("error"):
+        loc_desc_from_percepts = fresh_percepts.get("location_description", "An unknown place.")
+        
+        visible_sim_text_parts = [
+            f"  - Simulacra: {s.get('name', s.get('id'))} (ID: {s.get('id')}, Status: {s.get('status', 'unknown')})"
+            for s in fresh_percepts.get("visible_simulacra", [])
+        ]
+        visible_sim_str = "\n".join(visible_sim_text_parts) if visible_sim_text_parts else "  No other simulacra perceived."
+
+        visible_static_obj_text_parts = [
+            f"  - Static Object: {o.get('name', o.get('id'))} (ID: {o.get('id')}, Desc: {o.get('description', '')[:30]}...)"
+            for o in fresh_percepts.get("visible_static_objects", [])
+        ]
+        visible_static_obj_str = "\n".join(visible_static_obj_text_parts) if visible_static_obj_text_parts else "  No static objects perceived."
+
+        visible_eph_obj_text_parts = [
+            f"  - Ephemeral Object: {o.get('name', o.get('id'))} (ID: {o.get('id')})"
+            for o in fresh_percepts.get("visible_ephemeral_objects", [])
+        ]
+        visible_eph_obj_str = "\n".join(visible_eph_obj_text_parts) if visible_eph_obj_text_parts else "  No ephemeral objects perceived."
+        
+        visible_eph_npc_text_parts = [
+            f"  - Ephemeral NPC: {n.get('name', n.get('id'))} (ID: {n.get('id')})"
+            for n in fresh_percepts.get("visible_npcs", [])
+        ]
+        visible_eph_npc_str = "\n".join(visible_eph_npc_text_parts) if visible_eph_npc_text_parts else "  No ephemeral NPCs perceived."
+
+        audible_events_text_parts = [
+            f"  - Sound ({s.get('type', 'general')} from {s.get('source_id', 'unknown')}): {s.get('description', 'An indistinct sound.')}"
+            for s in fresh_percepts.get("audible_events", [])
+        ]
+        audible_env_str = "\n".join(audible_events_text_parts) if audible_events_text_parts else "  The environment is quiet."
+
+        perceptual_summary_for_prompt = (
+            f"Official Location Description: \"{loc_desc_from_percepts}\"\n"
+            f"Visible Entities:\n{visible_sim_str}\n{visible_static_obj_str}\n{visible_eph_obj_str}\n{visible_eph_npc_str}"
+        )
+
+    # --- Other Contextual Information ---
+    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME)
+    agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
+    connected_locations = get_nested(global_state_ref, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id, "connected_locations", default=[])
+    raw_recent_narrative = global_state_ref.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
+    cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
+    history_str = "\n".join(cleaned_recent_narrative)
+    weather_summary = get_nested(global_state_ref, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+    latest_news_headlines = [item.get('headline', '') for item in get_nested(global_state_ref, 'world_feeds', 'news_updates', default=[])[:2]]
+    news_summary = " ".join(h for h in latest_news_headlines if h) or "No major news."
+
+    prompt_text_parts = [
+        f"**Current State Info for {agent_name} ({agent_id}):**",
+        f"- Persona: {agent_state_data.get('persona_details', {})}",
+        f"- Current Location ID: {agent_current_location_id or 'Unknown'}",
+        f"- Your Personal Understanding of this Location: \"{agent_personal_location_details}\"",
+        f"- Perceived Environment:\n{perceptual_summary_for_prompt}",
+        f"- Status: {agent_state_data.get('status', 'idle')} ({status_message_for_prompt})",
+        f"- Current Weather: {weather_summary}",
+        f"- Recent News Snippet: {news_summary}",
+        f"- Current Goal: {agent_state_data.get('goal', 'Determine goal.')}",
+        f"- Current Time: {get_time_string_for_prompt(global_state_ref, sim_elapsed_time_seconds=current_sim_time)}",
+        f"- Last Observation/Event: {agent_state_data.get('last_observation', 'None.')}",
+        f"- Audible Environment:\n{audible_env_str}",
+        f"- Recent Narrative History:\n{history_str if history_str else 'None.'}",
+        f"- Exits/Connections from this location: {json.dumps(connected_locations) if connected_locations else 'None observed.'}",
+        "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
+    ]
+    return "\n".join(prompt_text_parts)
+
+
 async def simulacra_agent_task_llm(agent_id: str):
     """Asynchronous task for managing a single Simulacra LLM agent."""
     agent_name = get_nested(state, SIMULACRA_KEY, agent_id, "persona_details", "Name", default=agent_id)
@@ -566,113 +662,41 @@ async def simulacra_agent_task_llm(agent_id: str):
         if "current_interrupt_probability" not in sim_state_init: # Initialize if not present
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
         # next_simple_timer_interjection_sim_time is no longer managed by this task
-
+        
         if get_nested(state, SIMULACRA_KEY, agent_id, "status") == "idle":
             current_sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
-            # --- Phase 3: Location Awareness Enhancement ---
-            agent_current_location_id_init = current_sim_state_init.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME)
-            agent_personal_location_details_init = current_sim_state_init.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
-            world_location_data_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_init, default={})
-            world_location_description_init = world_location_data_init.get("description", "An unknown place.")
             current_world_time_init = state.get("world_time", 0.0)
 
-            def get_entities_in_location_init(entity_type: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
-                entities = []
-                if not location_id: return entities
-                source_dict = state.get(entity_type, {})
-                for entity_id_init_loop, entity_data_init in source_dict.items():
-                    if entity_data_init.get('location') == location_id: # For objects
-                        entities.append({"id": entity_id_init_loop, "name": entity_data_init.get("name", entity_id_init_loop)})
-                    elif entity_type == SIMULACRA_KEY and get_nested(entity_data_init, "location") == location_id: # For simulacra
-                        entities.append({"id": entity_id_init_loop, "name": get_nested(entity_data_init, "persona_details", "Name", default=entity_id_init_loop)})
-                return entities
-
-            ephemeral_objects_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_init, "ephemeral_objects", default=[])
-            objects_in_room_for_prompt_init = []
-            for obj_data in ephemeral_objects_init: 
-                objects_in_room_for_prompt_init.append({"id": obj_data.get("id"), "name": obj_data.get("name")})
-            # Phase 4: Get connected locations for prompt
-            connected_locations_init = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_init, "connected_locations", default=[])
-            agents_in_room_init = [a for a in get_entities_in_location_init(SIMULACRA_KEY, agent_current_location_id_init) if a["id"] != agent_id]
-            
-            raw_recent_narrative_init = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
-            cleaned_recent_narrative_init = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative_init]
-            history_str_init = "\n".join(cleaned_recent_narrative_init)
-            weather_summary = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
-            latest_news_headlines = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:2]]
-            news_summary = " ".join(h for h in latest_news_headlines if h) or "No major news."
-            
-            prompt_text_parts_init = [
-                f"**Current State Info for {agent_name} ({agent_id}):**",
-                f"- Persona: {current_sim_state_init.get('persona_details', {})}",
-                f"- Current Location ID: {agent_current_location_id_init}",
-                f"- Your understanding of this place: \"{agent_personal_location_details_init}\"",
-                f"- Official Location Description: \"{world_location_description_init}\"",
-                f"- Status: {current_sim_state_init.get('status', 'idle')} (You wake up and are ready to act.)",
-                f"- Current Weather: {weather_summary}",
-                f"- Recent News Snippet: {news_summary}",
-                f"- Current Goal: {current_sim_state_init.get('goal', 'Determine goal.')}",
-                f"- Current Time: {get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_world_time_init)}",
-                f"- Last Observation/Event: {current_sim_state_init.get('last_observation', 'None.')}",
-                f"- Recent History:\n{history_str_init if history_str_init else 'None.'}",
-                f"- Objects in area: {json.dumps(objects_in_room_for_prompt_init) if objects_in_room_for_prompt_init else 'None.'}",
-                f"- Other Agents in area: {json.dumps(agents_in_room_init) if agents_in_room_init else 'None.'}",
-                f"- Exits/Connections from this location: {json.dumps(connected_locations_init) if connected_locations_init else 'None observed.'}", # Phase 4
-                f"- Current State: You wake up at home and are ready to act.",
-                 "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
-            # --- End Phase 3 Change ---
-            ]
-            initial_trigger_text = "\n".join(prompt_text_parts_init)
+            initial_trigger_text = _build_simulacra_prompt(
+                agent_id, agent_name, current_sim_state_init, current_world_time_init,
+                state, perception_manager_global, "You wake up and are ready to act."
+            )
             logger.debug(f"[{agent_name}] Sending initial context prompt as agent is idle.")
-            current_sim_time = state.get("world_time", 0.0)
-            time_for_simulacra = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)
-
-            # Fetch weather and news for instruction replacement
-            weather_for_instruction = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
-            news_headlines_for_instruction = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:1]] # Keep it brief for instruction
-            news_for_instruction = news_headlines_for_instruction[0] if news_headlines_for_instruction else "No significant news."
+            
+            instruction_replacements_sim = _prepare_dynamic_instruction_context(
+                state, current_world_time_init, include_news_in_instruction=True, news_item_count=1
+            )
 
             initial_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=initial_trigger_text)])
-            original_simulacra_agent_instruction = sim_agent.instruction
-            sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra).replace("{DYNAMIC_CURRENT_WEATHER}", weather_for_instruction).replace("{DYNAMIC_CURRENT_NEWS}", news_for_instruction)
-            adk_runner.agent = sim_agent
-            async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=initial_trigger_content):
-                if event.error_message:
-                    logger.error(f"[{agent_name}] LLM Error during initial prompt: {event.error_message}")
-                    break
-                
-                if event.is_final_response() and event.content:
-                    validated_intent: Optional[SimulacraIntentResponse] = None
-                    if isinstance(event.content, SimulacraIntentResponse): # ADK parsed it!
-                        validated_intent = event.content
-                        logger.debug(f"[{agent_name}] ADK successfully parsed SimulacraIntentResponse schema (initial).")
-                    elif event.content.parts: # Fallback to manual parsing
-                        response_text = event.content.parts[0].text
-                        response_dict = parse_json_output_last(response_text.strip())
-                        if response_dict:
-                            validated_intent = SimulacraIntentResponse.model_validate(response_dict)
-                        else:
-                            logger.error(f"[{agent_name}] Failed to parse JSON from Simulacra (initial, manual fallback). Response: {response_text}")
-                    
-                    if validated_intent:
-                        if live_display_object:
-                            live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
-                            live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
-                            live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
-                        await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
-                        
-                        # --- Log Simulacra Intent Event ---
-                        _log_event(
-                            sim_time=current_world_time_init,
-                            agent_id=agent_id,
-                            event_type="intent",
-                            data=validated_intent.model_dump(exclude={'internal_monologue'}), # Log the intent data
-                            logger_instance=logger, event_logger_global=event_logger_global
-                        )
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
-                    # else: Error already logged by parsing attempts
-
-                    break 
+            
+            validated_intent = await _call_adk_agent_and_parse(
+                adk_runner, sim_agent, session_id_to_use, USER_ID,
+                initial_trigger_content, SimulacraIntentResponse, f"Simulacra_{agent_name}_Initial", logger,
+                original_instruction=original_simulacra_agent_instruction, instruction_replacements=instruction_replacements_sim
+            )
+            
+            if validated_intent:
+                if live_display_object:
+                    live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
+                    live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
+                    live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
+                await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                _log_event(
+                    sim_time=current_world_time_init, agent_id=agent_id, event_type="intent",
+                    data=validated_intent.model_dump(exclude={'internal_monologue'}), 
+                    logger_instance=logger, event_logger_global=event_logger_global
+                )
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
 
         next_interjection_check_sim_time = state.get("world_time", 0.0) + AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS
         while True:
@@ -682,146 +706,39 @@ async def simulacra_agent_task_llm(agent_id: str):
             current_status_busy_loop = agent_state_busy_loop.get("status")
 
             if current_status_busy_loop == "idle":
-                # --- Generate and Log Percepts ---
-                if perception_manager_global:
-                    fresh_percepts = perception_manager_global.get_percepts_for_simulacrum(agent_id)
-                    _log_event(
-                        sim_time=current_sim_time_busy_loop,
-                        agent_id=agent_id,
-                        event_type="agent_perception_generated", # New event type for logging
-                        data=fresh_percepts,
-                        logger_instance=logger, event_logger_global=event_logger_global
-                    )
-                    logger.debug(f"[{agent_name}] Generated percepts: {json.dumps(fresh_percepts, sort_keys=True)[:250]}...") # Slightly more log
-                else:
-                    logger.warning(f"[{agent_name}] Perception Manager not available. Skipping fresh percept generation.")
-                    fresh_percepts = {"error": "Perception system offline."} # Provide a fallback
-                # --- End Perception Generation ---
-
                 logger.debug(f"[{agent_name}] Status is idle. Proceeding to plan next action.")
-
-                # --- Format Percepts for LLM Prompt ---
-                perceptual_summary_for_prompt = "Perception system error or offline."
-                if fresh_percepts and not fresh_percepts.get("error"):
-                    loc_desc_from_percepts = fresh_percepts.get("location_description", "An unknown place.")
-                    
-                    visible_sim_text_parts = []
-                    for sim_info in fresh_percepts.get("visible_simulacra", []):
-                        visible_sim_text_parts.append(f"  - Simulacra: {sim_info.get('name', sim_info.get('id'))} (ID: {sim_info.get('id')}, Status: {sim_info.get('status', 'unknown')})")
-                    visible_sim_str = "\n".join(visible_sim_text_parts) if visible_sim_text_parts else "  No other simulacra perceived."
-
-                    visible_static_obj_text_parts = []
-                    for static_obj_info in fresh_percepts.get("visible_static_objects", []):
-                        visible_static_obj_text_parts.append(f"  - Static Object: {static_obj_info.get('name', static_obj_info.get('id'))} (ID: {static_obj_info.get('id')}, Desc: {static_obj_info.get('description', '')[:30]}...)")
-                    visible_static_obj_str = "\n".join(visible_static_obj_text_parts) if visible_static_obj_text_parts else "  No static objects perceived."
-
-                    visible_obj_text_parts = []
-                    for obj_info in fresh_percepts.get("visible_ephemeral_objects", []): # Use renamed key
-                        visible_obj_text_parts.append(f"  - Ephemeral Object: {obj_info.get('name', obj_info.get('id'))} (ID: {obj_info.get('id')})")
-                    visible_eph_obj_str = "\n".join(visible_obj_text_parts) if visible_obj_text_parts else "  No ephemeral objects perceived."
-                    
-                    visible_npc_text_parts = []
-                    for npc_info in fresh_percepts.get("visible_npcs", []): # Ephemeral NPCs
-                        visible_npc_text_parts.append(f"  - Ephemeral NPC: {npc_info.get('name', npc_info.get('id'))} (ID: {npc_info.get('id')})")
-                    visible_eph_npc_str = "\n".join(visible_npc_text_parts) if visible_npc_text_parts else "  No ephemeral NPCs perceived."
-
-                    audible_events_text_parts = []
-                    for sound_info in fresh_percepts.get("audible_events", []):
-                        audible_events_text_parts.append(f"  - Sound ({sound_info.get('type', 'general')} from {sound_info.get('source_id', 'unknown')}): {sound_info.get('description', 'An indistinct sound.')}")
-                    audible_env_str = "\n".join(audible_events_text_parts) if audible_events_text_parts else "  The environment is quiet."
-
-                    perceptual_summary_for_prompt = (
-                        f"Official Location Description: \"{loc_desc_from_percepts}\"\n"
-                        f"Visible Entities:\n{visible_sim_str}\n{visible_static_obj_str}\n{visible_eph_obj_str}\n{visible_eph_npc_str}"
-                    )
-                # --- End Format Percepts ---
-
-                # --- Phase 3: Location Awareness Enhancement ---
-                agent_current_location_id_loop = agent_state_busy_loop.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME)
-                agent_personal_location_details_loop = agent_state_busy_loop.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
-                world_location_data_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_loop, default={})
-                world_location_description_loop = world_location_data_loop.get("description", "An unknown place.")
-                def get_entities_in_location(entity_type: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
-                    entities = []
-                    # This function is now largely superseded by PerceptionManager for simulacra/objects/NPCs.
-                    # It might still be useful for other entity types if you add them.
-                    # For now, we'll rely on the PerceptionManager's output.
-                    return entities
                 
-                # Phase 4: Get connected locations for prompt
-                connected_locations_loop = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id_loop, "connected_locations", default=[])
-                raw_recent_narrative = state.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
-                cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
-                history_str = "\n".join(cleaned_recent_narrative)
-                weather_summary_loop = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
-                latest_news_headlines_loop = [item.get('headline', '') for item in get_nested(state, 'world_feeds', 'news_updates', default=[])[:2]]
-                news_summary_loop = " ".join(h for h in latest_news_headlines_loop if h) or "No major news."
-                prompt_text_parts = [
-                     f"**Current State Info for {agent_name} ({agent_id}):**",
-                     f"- Persona: {agent_state_busy_loop.get('persona_details', {})}", # Use agent_state_busy_loop
-                     f"- Current Location ID: {agent_current_location_id_loop or 'Unknown'}",
-                     f"- Your Personal Understanding of this Location: \"{agent_personal_location_details_loop}\"",
-                     f"- Perceived Environment:\n{perceptual_summary_for_prompt}", # Use the formatted percepts
-                     f"- Status: {agent_state_busy_loop.get('status', 'idle')} (You should act now)",
-                     f"- Current Weather: {weather_summary_loop}",
-                     f"- Recent News Snippet: {news_summary_loop}",
-                     f"- Current Goal: {agent_state_busy_loop.get('goal', 'Determine goal.')}",
-                     f"- Current Time: {get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time_busy_loop)}",
-                     f"- Last Observation/Event: {agent_state_busy_loop.get('last_observation', 'None.')}",
-                     f"- Audible Environment:\n{audible_env_str}", # Add audible environment
-                     f"- Recent Narrative History:\n{history_str if history_str else 'None.'}",
-                     f"- Exits/Connections from this location: {json.dumps(connected_locations_loop) if connected_locations_loop else 'None observed.'}", # Phase 4
-                     "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
-                # --- End Phase 3 Change ---
-                ]
-                prompt_text = "\n".join(prompt_text_parts)
+                prompt_text = _build_simulacra_prompt(
+                    agent_id, agent_name, agent_state_busy_loop, current_sim_time_busy_loop,
+                    state, perception_manager_global, "You should act now."
+                )
                 logger.debug(f"[{agent_name}] Sending subsequent prompt.")
                 
                 # Also update instruction for subsequent calls
-                time_for_simulacra_loop = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time_busy_loop)
-                weather_for_instruction_loop = weather_summary_loop # Already fetched for prompt
-                news_for_instruction_loop = news_summary_loop.split('.')[0] if news_summary_loop else "No significant news." # First sentence or default
-                sim_agent.instruction = original_simulacra_agent_instruction.replace("{DYNAMIC_CURRENT_TIME}", time_for_simulacra_loop).replace("{DYNAMIC_CURRENT_WEATHER}", weather_for_instruction_loop).replace("{DYNAMIC_CURRENT_NEWS}", news_for_instruction_loop)
+                instruction_replacements_sim_loop = _prepare_dynamic_instruction_context(
+                    state, current_sim_time_busy_loop, include_news_in_instruction=True, news_item_count=1
+                )
 
-                trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=prompt_text)])
-                adk_runner.agent = sim_agent 
-                async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=trigger_content):
-                    if event.error_message:
-                        logger.error(f"[{agent_name}] LLM Error during subsequent prompt: {event.error_message}")
-                        break
-                    
-                    if event.is_final_response() and event.content:
-                        validated_intent: Optional[SimulacraIntentResponse] = None
-                        if isinstance(event.content, SimulacraIntentResponse): # ADK parsed it!
-                            validated_intent = event.content
-                            logger.debug(f"[{agent_name}] ADK successfully parsed SimulacraIntentResponse schema (subsequent).")
-                        elif event.content.parts: # Fallback to manual parsing
-                            response_text = event.content.parts[0].text
-                            response_dict = parse_json_output_last(response_text.strip())
-                            if response_dict:
-                                validated_intent = SimulacraIntentResponse.model_validate(response_dict)
-                            else:
-                                logger.error(f"[{agent_name}] Failed to parse JSON from Simulacra (subsequent, manual fallback). Response: {response_text}")
-                        
-                        if validated_intent:
-                            if live_display_object:
-                                live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
-                                live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
-                                live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
-                            await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
-                            
-                            # --- Log Simulacra Intent Event ---
-                            _log_event(
-                                sim_time=current_sim_time_busy_loop,
-                                agent_id=agent_id,
-                                event_type="intent",
-                                data=validated_intent.model_dump(exclude={'internal_monologue'}), # Log the intent data
-                                logger_instance=logger, event_logger_global=event_logger_global
-                            )
-                            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
-                        # else: Error already logged by parsing attempts
+                trigger_content_loop = genai_types.UserContent(parts=[genai_types.Part(text=prompt_text)])
 
-                        break 
+                validated_intent = await _call_adk_agent_and_parse(
+                    adk_runner, sim_agent, session_id_to_use, USER_ID,
+                    trigger_content_loop, SimulacraIntentResponse, f"Simulacra_{agent_name}_Subsequent", logger,
+                    original_instruction=original_simulacra_agent_instruction, instruction_replacements=instruction_replacements_sim_loop
+                )
+
+                if validated_intent:
+                    if live_display_object:
+                        live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
+                        live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
+                        live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
+                    await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                    _log_event(
+                        sim_time=current_sim_time_busy_loop, agent_id=agent_id, event_type="intent",
+                        data=validated_intent.model_dump(exclude={'internal_monologue'}),
+                        logger_instance=logger, event_logger_global=event_logger_global
+                    )
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                 continue 
 
             # Busy Action Interjection Logic - RETAINED FOR SELF-REFLECTION ONLY
@@ -850,38 +767,25 @@ If you choose to continue, your `action_type` must be `continue_current_task`.
 If you choose to `initiate_change`, provide the `action_type` and `details` for that change as usual.
 Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`"""
                         reflection_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=reflection_prompt_text)])
-                        adk_runner.agent = sim_agent 
-                        async for event in adk_runner.run_async(user_id=USER_ID, session_id=session_id_to_use, new_message=reflection_trigger_content):
-                            if event.error_message:
-                                logger.error(f"[{agent_name}] LLM Error during reflection prompt: {event.error_message}")
+                        # For reflection, instruction replacements are not typically needed as the prompt is self-contained.
+                        validated_reflection_intent = await _call_adk_agent_and_parse(
+                            adk_runner, sim_agent, session_id_to_use, USER_ID,
+                            reflection_trigger_content, SimulacraIntentResponse, f"Simulacra_{agent_name}_Reflection", logger
+                            # No original_instruction/replacements needed here as reflection prompt is specific
+                        )
+
+                        if validated_reflection_intent:
+                            if validated_reflection_intent.action_type == "continue_current_task":
+                                logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
                                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
-                                break
-                            
-                            if event.is_final_response() and event.content:
-                                validated_reflection_intent: Optional[SimulacraIntentResponse] = None
-                                if isinstance(event.content, SimulacraIntentResponse): # ADK parsed it!
-                                    validated_reflection_intent = event.content
-                                    logger.debug(f"[{agent_name}] ADK successfully parsed SimulacraIntentResponse schema (reflection).")
-                                elif event.content.parts: # Fallback to manual parsing
-                                    response_text = event.content.parts[0].text
-                                    response_dict = parse_json_output_last(response_text.strip())
-                                    if response_dict:
-                                        validated_reflection_intent = SimulacraIntentResponse.model_validate(response_dict)
-                                
-                                if validated_reflection_intent:
-                                    if validated_reflection_intent.action_type == "continue_current_task":
-                                        logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
-                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
-                                        # Probability remains as it was, task continues
-                                    else:
-                                        logger.info(f"[{agent_name}] Reflection: Chose to '{validated_reflection_intent.action_type}'. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
-                                        await event_bus.put({ "type": "intent_declared", "actor_id": agent_id, "intent": validated_reflection_intent.model_dump(exclude={'internal_monologue'}) })
-                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger) # Clear as action is changing
-                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
-                                else: # Parsing failed (ADK and manual)
-                                    logger.error(f"[{agent_name}] Error processing reflection response (parsing failed). Staying busy. Raw response was logged if available.")
-                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
-                                break 
+                            else:
+                                logger.info(f"[{agent_name}] Reflection: Chose to '{validated_reflection_intent.action_type}'. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
+                                await event_bus.put({ "type": "intent_declared", "actor_id": agent_id, "intent": validated_reflection_intent.model_dump(exclude={'internal_monologue'}) })
+                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
+                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                        else: # Parsing failed or LLM error
+                            logger.error(f"[{agent_name}] Error processing reflection response. Staying busy.")
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
 
     except asyncio.CancelledError:
         logger.info(f"[{agent_name}] Task cancelled.")
@@ -993,11 +897,11 @@ async def run_simulation(
     current_sub_genre = world_template_details_for_agents.get("sub_genre", "unknown")
 
     world_engine_agent = create_world_engine_llm_agent(
-        sim_id=first_sim_id, persona_name=first_persona_name, # Generic actor context for agent creation
+        sim_id=first_sim_id, persona_name=first_persona_name,
         world_type=current_world_type, sub_genre=current_sub_genre
     )
     narration_agent_instance = create_narration_llm_agent(
-        sim_id=first_sim_id, persona_name=first_persona_name, # Generic actor context
+        sim_id=first_sim_id, persona_name=first_persona_name,
         world_mood=world_mood_global, world_type=current_world_type, sub_genre=current_sub_genre
     )
     search_llm_agent_instance = create_search_llm_agent()
@@ -1068,7 +972,8 @@ async def run_simulation(
                     state=state,
                     narration_queue=narration_queue,
                     world_mood=world_mood_global,
-                    simulation_time_getter=get_current_sim_time
+                    simulation_time_getter=get_current_sim_time,
+                    live_display_object_ref=live # Pass the live object
                 ), 
                 name="SocketServer"
             ))
@@ -1123,20 +1028,19 @@ async def run_simulation(
         logger.info("All tasks cancelled or finished.")
 
         final_uuid_to_save = state.get("world_instance_uuid") 
-        if final_uuid_to_save:
-            final_state_path_to_save = os.path.join(STATE_DIR, f"simulation_state_{final_uuid_to_save}.json") 
+        if final_uuid_to_save and final_state_path: # final_state_path should be defined if final_uuid_to_save is valid
             logger.info("Saving final simulation state.")
             try:
                 if not isinstance(state.get("world_time"), (int, float)):
                      logger.warning(f"Final world_time is not a number ({type(state.get('world_time'))}). Saving as 0.0.")
                      state["world_time"] = 0.0
-                save_json_file(final_state_path_to_save, state) 
-                logger.info(f"Final simulation state saved to {final_state_path_to_save}")
-                console.print(f"Final state saved to {final_state_path_to_save}")
+                save_json_file(final_state_path, state) # Use final_state_path
+                logger.info(f"Final simulation state saved to {final_state_path}")
+                console.print(f"Final state saved to {final_state_path}")
             except Exception as save_e:
-                 logger.error(f"Failed to save final state to {final_state_path_to_save}: {save_e}", exc_info=True)
+                 logger.error(f"Failed to save final state to {final_state_path}: {save_e}", exc_info=True)
                  console.print(f"[red]Error saving final state: {save_e}[/red]")
-        else:
+        elif not final_uuid_to_save: # Only log error if UUID was the issue
              logger.error("Cannot save final state: world_instance_uuid is not defined in module state.")
              console.print("[bold red]Error: Cannot save final state (UUID unknown).[/bold red]")
 

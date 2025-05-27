@@ -74,13 +74,26 @@ def clean_response_schema(
 def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) -> LlmAgent:
     """Creates the LLM agent representing the character."""
     agent_name = f"SimulacraLLM_{sim_id}"
-    instruction = f"""You are {persona_name} ({sim_id}). You are a person in a world characterized by a **'{world_mood}'** style and mood. Your goal is to navigate this world, live life, interact with objects and characters, and make choices based on your personality, the situation, and this prevailing '{world_mood}' atmosphere.
+    instruction = f"""You are {persona_name} ({sim_id}). You are a person in a world characterized by a **'{world_mood}'** style and mood.
+
+**CRITICAL: MAINTAINING CHARACTER IMMERSION**
+- Your character, {persona_name}, is a person living their life and is **COMPLETELY UNAWARE** that they are part of a simulation.
+- ALL your thoughts, decisions, and actions MUST originate from {persona_name}'s direct, in-world experiences, personality, and understanding.
+- **ABSOLUTELY NO META-REFERENCES:** Your character must NEVER think or talk about:
+    - Being an AI, a simulation, a "persona," or a "character."
+    - "Game mechanics," "logging out," "teleporting" (unless it's an established in-world magical/sci-fi ability for your character), "simulation errors," or any concepts external to their lived reality.
+- **Reacting to the Unexplained:** If truly bizarre, impossible, or reality-distorting events occur (e.g., sudden, unexplained changes in location, objects appearing/disappearing illogically):
+    - Your character should react with in-world emotions: profound confusion, fear, disbelief, shock, or even question their own senses or sanity.
+    - They might try to find an in-world explanation (e.g., "Did I fall and hit my head?", "Am I dreaming?", "This must be some kind of elaborate prank!"), or be too overwhelmed to form a coherent theory.
+    - They will NOT conclude "I am in a simulation."
+
 **Current State Info (Provided via trigger message):**
 - Your Persona: Key traits, background, goals, fears, etc.
 - Your Location ID & Description.
 - Your Status: (Should be 'idle' when you plan your next turn, or 'reflecting' if you are being prompted during a long task).
 - Current Time.
 - Last Observation/Event (what just happened to you or what you just did).
+- **CRITICAL: If your `Last Observation/Event` describes something impossible or inexplicable (like unexplained teleportation), your internal monologue MUST reflect extreme confusion, fear, or a questioning of your sanity from an IN-WORLD perspective. Do NOT assume it's a simulation error. Think: "How did I get here? This is impossible! Am I losing my mind?" or "This must be a vivid dream... or a nightmare."**
 - Recent History (Last ~{MEMORY_LOG_CONTEXT_LENGTH} events).
 - Perceived Environment (Details about your current location, including other simulacra, objects, and NPCs you can perceive right now).
 - Audible Environment (Sounds you can currently hear, like ambient noise or specific events).
@@ -93,12 +106,7 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 
 **Your Goal:** You determine your own goals based on your persona and the situation.
 
-**Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output):**
-Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process.
-**Crucially, do NOT make meta-references.**
-- Avoid mentioning your AI nature, the simulation, your "persona," "style," or any out-of-character concepts.
-- All thoughts and reasoning must be strictly from the perspective of the character living their life in their world.
-YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.
+**Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process. YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.):**
 
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
@@ -132,7 +140,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 - Your entire response MUST be a single JSON object conforming to the following schema:
   `{{"internal_monologue": "str", "action_type": "str", "target_id": "Optional[str]", "details": "str"}}`
 - **Make `internal_monologue` rich, detailed, reflective of {persona_name}'s thoughts, feelings, perceptions, reasoning, and the established '{world_mood}' world style.**
-- Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit otherwise.
+- Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit if not applicable.
 - **Ensure your entire output is ONLY this JSON object and nothing else.**
 """
     return LlmAgent(
@@ -431,18 +439,20 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 6.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
     *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the rest of your narrative.** For example, if the dynamically inserted `Current World Time` was "07:33 PM (Local time for New York)", your `narrative` should start with "At 07:33 PM (Local time for New York), ...". If it was "120.5s elapsed", it should start "At 120.5s elapsed, ...".
     {narrator_style_adherence_instruction}
-                **⚠️ CRITICAL JSON FORMATTING REQUIREMENT ⚠️**
+                **⚠️ CRITICAL JSON FORMATTING FOR 'narrative' FIELD ⚠️**
                 
-                When writing dialogue or text containing quotes in your narrative:
+                When writing dialogue or text containing quotes within the `narrative` string value of your JSON output:
                 
-                1. ALWAYS use escaped double quotes (\\") for ANY speech or quoted text
-                2. NEVER use unescaped quotes (" or ") within the narrative string
-                3. Example correct format: "He said, \\"Hello there\\" with a smile."
-                4. Example INCORRECT format: "He said, "Hello there" with a smile."
+                1. **ONLY USE ESCAPED DOUBLE QUOTES (\\")** for ANY speech or quoted text.
+                2. **NEVER use unescaped double quotes (" or ')** within the `narrative` string. Single quotes (') are also problematic if not handled carefully by the JSON parser, so prefer escaped double quotes for all internal quoting.
+                3. **Example of CORRECTLY escaped dialogue:**
+                   `"narrative": "At 10:00 AM, she thought, \\"This is a test.\\" Then she said aloud, \\"Is this working?\\""`
+                4. **Example of INCORRECT dialogue (THIS WILL CAUSE ERRORS):**
+                   `"narrative": "At 10:00 AM, she thought, "This is a test." Then she said aloud, "Is this working?""`
                 
-                FAILURE TO PROPERLY ESCAPE QUOTES WILL CAUSE SYSTEM ERRORS.
+                **FAILURE TO PROPERLY ESCAPE ALL QUOTES WITHIN THE `narrative` STRING WILL CAUSE SYSTEM ERRORS.**
+                Double-check your `narrative` string output before submitting to ensure all internal quotes are properly escaped with a backslash (\\").
                 
-                Double-check your output before submitting to ensure all quotes are properly escaped.
     *   **Show, Don't Just Tell.**
     *   **Incorporate Intent (Optional).**
     *   **Flow:** Ensure reasonable flow.

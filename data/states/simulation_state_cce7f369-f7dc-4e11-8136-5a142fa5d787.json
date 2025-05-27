@@ -4,8 +4,59 @@
     "sim_b797o8",
     "sim_sustdj"
   ],
-  "world_time": 0.0,
-  "narrative_log": [],
+  "world_time": 839.3749999999995,
+  "narrative_log": [
+    "[T319.0] Ava Sharma's action failed: At 08:21 AM on Tuesday, May 27, 2025 (Local time for New York, New York), action failed as the combination of two actions is not supported.",
+    "[T320.8] ```json\n{\n  \"narrative\": \"At 08:21 AM (Local time for New York, New York), as Daniel contemplates how best to prepare himself, a question rings throughout the Long Island City apartment, and, I just am thinking now I hear Ava says, from back, with the information to provide to him, what he asked a bit ago - \"\"Good to know, thank you for warning me about heavy rain. For how long does it seem like it will be heavy? I will have to be careful and check.\"\",\n  \"discovered_objects\": [],\n  \"discovered_connections\": [],\n  \"discovered_npcs\": []\n}\n```",
+    "[T351.5] Daniel Rodriguez's action failed: Action failed: No response from World Engine LLM.",
+    "[T337.1] At 08:21 AM (Local time for New York, New York), with Ava about to try and let Daniel know how long the rain might be, now in the kitchen of the Long Island City apartment, Daniel wonders what lies between him and the perfect cup of coffee, now fully aware that heavy rain would be with him. For how long will the sun to be back?",
+    "[T381.2] At 09:36 AM (Local time for New York, New York), as Daniel gears up to inquire further with Ava, standing in their Long Island City apartment's kitchen, he speaks up: \"Hey Ava, you were about to say how long the heavy rain is supposed to last? Thanks!\"",
+    "[T395.2] At 10:11 AM (Local time for New York, New York), Ava, standing in their Long Island City apartment, responds to Daniel's question from earlier, her voice carrying through the quiet apartment. \"Hey Daniel, sorry about that! It looks like the heavy rain should last until about 1 PM or so. Then it's supposed to lighten up.\"",
+    "[T407.2] At 10:11 AM (Local time for New York, New York), the sounds of the city outside Ava's Long Island City apartment are muffled by the heavy rain as she pauses, mulling over her schedule and the implications of the downpour on her planned trip to Manhattan. The thought of rescheduling crosses her mind, a sensible option given the weather, but she remains undecided, weighing the importance of the meeting against the inconvenience of traveling in the rain.",
+    "[T436.3] [System Teleport] Ava Sharma vanished from Home_01 and instantly reappeared in Hobbiton (Hobbiton).",
+    "[T417.7] At 10:11 AM (Local time for New York, New York), from the kitchen of their Long Island City apartment, Daniel's voice cuts through Ava's thoughts as he calls out, \"Thanks, Ava! I appreciate you letting me know about the rain.\"",
+    "[T498.1] At 10:11 AM (Local time for New York, New York), with a quiet hum, the coffee maker in the kitchen of the Long Island City apartment springs to life as Daniel begins brewing a pot, the rich aroma promising a much-needed jolt to start the rainy Tuesday.",
+    "[T471.8] At 10:11 AM (Local time for New York, New York), despite being in Hobbiton, Ava opens her laptop and begins to meticulously review her work calendar, assessing the urgency of her scheduled meeting and debating whether the importance justifies braving the heavy rain back in New York.",
+    "[T477.3] At 10:12 AM (Local time for New York, New York), Ava takes a moment to observe her surroundings, now distinctly *not* her Long Island City apartment, a surge of confusion washing over her as she attempts to reconcile the digital interface of her work calendar with the baffling reality of her current, unknown location. The air is quiet, a stark contrast to the usual city buzz, and a sense of disorientation settles in as she tries to figure out where, exactly, she is.",
+    "[T492.5] At 10:12 AM (Local time for New York, New York), standing in the inexplicably blank space designated 'Hobbiton', and faced with the disconcerting reality of her sudden relocation, Ava closes her laptop, a growing sense of frustration mixing with the lingering scent of brewing coffee that now feels impossibly distant. The thought of her cozy apartment, the familiar sounds of the city outside, and even the downpour she had been dreading, now seem incredibly appealing as she simply wishes to be back in Long Island City.",
+    "[T507.7] At 10:13 AM (Local time for New York, New York), still stranded in the baffling emptiness of Hobbiton, Ava closes her eyes and tries to focus her thoughts, attempting to mentally report the situation as a simulation error and pleading for a return to her designated location - her cozy, rain-soaked apartment in Long Island City, the distant aroma of Daniel's brewing coffee a phantom scent in the otherwise sterile air.",
+    "[T509.3] Daniel Rodriguez's action failed: At 10:13 AM on Tuesday, May 27, 2025 (Local time for New York, New York), the attempt to return to the Long Island City apartment has failed as the entity's location doesn't match.",
+    "[T520.3] [System Teleport] Ava Sharma vanished from Hobbiton and instantly reappeared in the planet arrakis (the planet arrakis).",
+    "[T525.7] Daniel Rodriguez's action failed: At 10:13 AM on Tuesday, May 27, 2025 (Local time for New York, New York), the attempt to return to the Long Island City apartment has failed as the entity's location doesn't match.",
+    "[T523.9] At 10:13 AM (Local time for New York, New York), on the planet Arrakis, Ava, in a desperate attempt to rectify the situation, closes her eyes and focuses, trying to mentally trigger a \"teleport\" command alongside a detailed error report, hoping to override the apparent system glitch and return to the familiar comfort of her Long Island City apartment, leaving behind the silent, unknown landscape she now occupies.",
+    "[T535.6] At 10:14 AM (Local time for New York, New York), now on Arrakis, Ava, with a growing sense of panic, focuses her will, attempting to mentally force a \"log out\" command to terminate the simulation entirely, desperately hoping to escape the increasingly bizarre and unpredictable reality she finds herself trapped in, and simultaneously reporting a critical error to whatever unseen system governs this experience.",
+    "[T584.4] At 10:30 AM (Local time for New York, New York), Daniel scans the kitchen, the aroma of freshly brewed coffee filling the air. Steam curls from the **carafe (carafe_kitchen_01)** on the **coffee maker (coffee_maker_kitchen_01)**. Everything seems normal at first glance. The **stainless steel appliances (appliances_kitchen_01)** gleam under the fluorescent lights, and the **granite countertops (countertops_kitchen_01)** are clear except for a stray coffee bean. However, the lingering strangeness of Ava's sudden disappearances hangs heavy in the air, making the familiar kitchen feel unsettling. He notices a slight wobble in one of the **potted plants (plant_kitchen_01)** on the windowsill, which wasn't there before.",
+    "[T587.8] At 10:30 AM (Local time for New York, New York), Ava surveys her surroundings. A vast expanse of nothing stretches in every direction. The ground beneath her feet feels like coarse sand. Above, the cloudy sky diffuses the light, creating an oddly soft illumination despite the desolation. There's no sign of civilization, no landmarks, just an endless, monotone landscape. The air is still and quiet, save for a faint, almost imperceptible whisper of wind. She spots a small, strangely symmetrical **rock (rock_arrakis_01)** nearby, the only distinct feature in the immediate vicinity.",
+    "[T605.6] At 10:30 AM (Local time for New York, New York), Daniel pours himself a cup of the dark roast coffee into his favorite **mug (mug_kitchen_01)**, the rich aroma doing little to ease his growing anxiety. As he brings the mug to his lips, the news report about NYC crime and global tensions flickers on the small **kitchen TV (tv_kitchen_01)** mounted under the cabinet, a stark contrast to the bizarre unreality of Ava's situation. The coffee is hot and strong, a familiar comfort on this increasingly strange Tuesday morning. He sets the **coffee carafe (carafe_kitchen_01)** back on the **coffee maker (coffee_maker_kitchen_01)**.",
+    "[T605.4] At 10:31 AM (Local time for New York, New York), Ava takes a deep breath and shouts, \"Help! Is anyone there?\" Her voice echoes weakly across the desolate landscape, swallowed by the vast emptiness. The faint whisper of wind seems to mock her plea. The clouds above shift slightly, momentarily revealing a patch of pale blue sky, but the change offers no comfort. The silence that follows her shout is profound, amplifying the feeling of isolation. She can feel a growing knot of anxiety in her stomach. A small **sand dune (sand_dune_01)** seems to have shifted slightly since she last looked.",
+    "[T620.1] [System Teleport] Ava Sharma vanished from the planet arrakis and instantly reappeared in Home_01 (Home).",
+    "[T617.7] At 10:31 AM (Local time for New York, New York), Ava cautiously approaches the small, symmetrical rock. As she gets closer, its odd shape becomes even more pronounced. It's a dark grey color, almost black, and seems to be composed of a material unlike any rock she's ever seen. It has smooth, almost polished surfaces that reflect the diffused sunlight. Kneeling down, she notices faint, hairline fractures running across its surface, forming an intricate pattern. It feels strangely warm to the touch, despite the cool air. She finds herself captivated by its peculiar symmetry. The sky is now partly clear.",
+    "[T624.5] Daniel Rodriguez's action failed: At 10:31 AM on Tuesday, May 27, 2025 (Local time for New York, New York), the coffee table is not a valid target to 'use' in this way.",
+    "[T636.3] At 10:31 AM (Local time for New York, New York), now back in the familiar surroundings of her living room, Ava blinks in disbelief. The **sofa (sofa_livingroom_01)**, the **bookshelf (bookshelf_livingroom_01)** filled with her favorite sci-fi novels, the quirky travel souvenirs scattered around - it's all real. The scent of coffee drifts in from the kitchen. But the memory of that desolate landscape, the eerie rock... it feels too vivid to be a dream. She can see Daniel heading towards her from the kitchen. He looks stressed.",
+    "[T637.9] At 10:31 AM (Local time for New York, New York), Daniel strides into the living room, relief flooding his face as he sees Ava standing there. He stops short, his brow furrowed in concern. The mostly clear sky outside casts bright light into the room, illuminating the dust motes dancing in the air. Before he can say anything, Ava blurts out, \"Daniel, are you seeing this? Did I just teleport back here? You won't believe where I was...\"",
+    "[T642.5] At 10:31 AM (Local time for New York, New York), Daniel hears Ava's frantic question just as he steps into the living room, the mostly clear weather outside now flooding the space with light. He reaches her side in a few quick strides, his expression a mix of relief and concern. \"Ava! What the hell is going on? Arrakis? Hobbiton? Are you okay?\" He gestures wildly, trying to make sense of the situation, the coffee mug (mug_livingroom_01) he absentmindedly grabbed from the kitchen still clutched in his hand.",
+    "[T650.2] At 10:31 AM (Local time for New York, New York), facing Daniel, Ava responds with a rush of words, her voice trembling slightly, \"Yes, Daniel! I was just on Arrakis! And before that, Hobbiton! I tried to tell you, but it's like I was just... gone. Are you experiencing the same thing? What the hell is happening?\" She gestures back towards the **kitchen doorway (kitchen_doorway_livingroom_01)**, a silent plea for answers in her eyes. The clear skies outside make the situation feel even more surreal \u2013 the normalcy of the weather juxtaposed with their shared experience of the impossible.",
+    "[T659.8] At 10:31 AM (Local time for New York, New York), Daniel, still holding his coffee mug, stops speaking as Ava confirms his suspicions, her words tumbling out in a confused rush. He watches her, the mostly clear skies outside doing little to illuminate the growing darkness of the situation. He nods slowly, his analytical mind already trying to process the impossible. The faint hum of the **refrigerator (refrigerator_kitchen_01)** in the kitchen seems oddly loud in the sudden silence as he waits for her to finish.",
+    "[T661.5] At 10:32 AM (Local time for New York, New York), with Ava's words hanging in the air, Daniel simply nods, his gaze fixed on her, his expression unreadable. He sets down his coffee mug on the nearby **coffee table (coffee_table_livingroom_01)**, the soft *clink* a stark contrast to the escalating weirdness of their morning. The mostly clear weather outside does nothing to dispel the growing tension. He waits for her to continue, his mind racing to make sense of her disjointed tale of Hobbiton, nothingness, and a vast desert.",
+    "[T680.4] At 10:32 AM (Local time for New York, New York), Ava, now having said her piece, watches Daniel's face, searching for any hint of understanding or explanation. The scent of coffee hangs heavy in the air, a stark contrast to the mental images of vast deserts and empty voids filling her mind. He remains mostly still, the silence punctuated only by the distant sounds of the city outside, now mostly clear after the earlier rain, a typical Tuesday morning completely shattered by the inexplicable.",
+    "[T677.0] At 10:32 AM (Local time for New York, New York), Daniel, having set down his coffee, takes a moment to absorb Ava's words. The mostly clear skies outside offer a stark contrast to the strange, surreal turn the morning has taken. His mind is racing, trying to find a rational explanation, even though he knows, deep down, that there probably isn't one. The lingering aroma of freshly brewed coffee feels almost mocking in the face of such utter unreality. He watches her, his usual calm demeanor faltering slightly, waiting for her to continue her description of \"Hobbiton.\"",
+    "[T691.4] At 10:32 AM (Local time for New York, New York), Daniel asks, his voice measured and calm despite the absurdity of the situation, \"Okay, yes, I saw it too. I mean, I saw *Arrakis*. You just disappeared, and then the system said you were on Arrakis. Before that... nothing. Just normal Tuesday morning, brewing coffee. But you were in Hobbiton *before* Arrakis? What was that like?\" He adjusts his glasses, a nervous tic he's had since college, the mostly clear sky doing nothing to lighten the weight of his words. The sounds of **city traffic (traffic_sounds_01)** drift in through the open **window (window_livingroom_01)**.",
+    "[T697.8] At 10:32 AM (Local time for New York, New York), in response to Daniel's question, Ava launches into her description, her hands moving expressively as she tries to convey the sheer emptiness of it all. \"Okay, so it started this morning when I was reviewing my calendar. Suddenly, I was in...Hobbiton. It was just an empty space, a void. Then, I was back, then gone again to Arrakis. Did you experience something similar?\" The city noises filtering through the **window (window_livingroom_01)** feel strangely comforting, a reminder of the normal world outside even as their own reality seems to be crumbling around them.",
+    "[T701.1] At 10:32 AM (Local time for New York, New York), Daniel's question hangs in the air as Ava begins to describe what it was like in \"Hobbiton.\" She paints a picture of utter emptiness, a void that defied description, trying to convey the sheer nothingness of the place. She hopes the details will help Daniel understand, or at least confirm that she's not completely lost her mind. The mostly clear weather outside seems to amplify the surreal nature of their conversation, the mundane normalcy of a Tuesday morning clashing violently with the impossible reality they are facing.",
+    "[T716.7] At 10:32 AM (Local time for New York, New York), Daniel listens intently, his brow furrowed as Ava tries to articulate the experience of being in 'Hobbiton'. He processes her words, the description of an empty, infinite void a stark contrast to his own experience of abruptly seeing her listed as being on Arrakis. The mostly clear sky outside provides a deceptively normal backdrop to their increasingly bizarre conversation. The faint, ever-present **hum of the city (city_hum_01)** seems to underscore their isolation, the feeling that they are the only ones experiencing this strange phenomenon.",
+    "[T721.6] At 10:32 AM (Local time for New York, New York), Ava struggles to put the experience into words. \"It was like... sensory deprivation, Daniel. An endless white void, no sounds, no textures, nothing to anchor you to reality. Just... blank. The 'system' called it Hobbiton, but there was nothing Hobit-like about it.\" As she speaks, she shivers slightly, despite the warmth of the apartment and the mostly clear skies visible through the **window (window_livingroom_01)**. The phrase \"sensory deprivation\" hangs in the air, heavy with unease.",
+    "[T730.5] At 10:32 AM (Local time for New York, New York), Daniel nods slowly, digesting Ava's description of \"Hobbiton.\" He shivers internally at the thought of such utter emptiness, a chilling void that defied comprehension. The sound of **children playing (children_playing_sounds_01)** in the park across the street drifts in through the window, a sharp contrast to the unsettling image in his mind. He adjusts his glasses again, his gaze focused on Ava, a plan already forming in his analytical mind. This Tuesday is definitely not what they imagined the day would be.",
+    "[T727.7] At 10:33 AM (Local time for New York, New York), now having conveyed her experience, Ava waits, watching Daniel intently. He is mostly silent, and the hum of traffic and sound of the children are now the only audibles. As she focuses her attention back to Daniel, the cloud that was in her mind for the last hour begins to calm slightly, though the question that lingers in her head is still strong.",
+    "[T750.0] At 10:33 AM (Local time for New York, New York), Daniel nods slowly, his face lighting up with a spark of analytical energy. \"A sensory deprivation tank, huh? I can't imagine.\" He pauses, then leans forward slightly, his voice gaining momentum. \"Okay, so maybe... maybe we can try to approach this like a software problem? We're both engineers, right? What if we document everything that happens, look for patterns, try to find what triggers these...jumps?\" The distant sound of the **ice cream truck (ice_cream_truck_sounds_01)** suddenly pulling up outside their building provides an almost comical backdrop to their serious conversation.",
+    "[T744.1] At 10:33 AM (Local time for New York, New York), the sound of the *ice cream truck (ice_cream_truck_sounds_01)* playing its familiar tune outside breaks the tension slightly, a reminder of the everyday world that seems so distant right now. As Daniel proposes approaching their situation like a software bug, a flicker of hope ignites within Ava. His analytical mind, his calm demeanor - it's exactly what she needs right now to ground herself in this insane reality. She finds herself nodding in agreement before he even finishes his thought, grateful for his logical approach to something so completely irrational.",
+    "[T761.1] ```json\n{\n  \"narrative\": \"At 10:33 AM (Local time for New York, New York), and with the ice cream truck's jingle playing on the street below, Daniel proposes his idea, a plan forming on his face. \"A sensory deprivation tank, huh? I can't imagine. Okay, so maybe... maybe we can try to approach this like a software problem? We're both engineers, right? What if we document everything that happens, look for patterns, try to find what triggers these...jumps?\\\" He leans forward, a spark of determination in his eyes, the absurdity of the situation momentarily overshadowed by his inherent need to solve problems.\",\n  \"discovered_objects\": [],\n  \"discovered_connections\": [],\n  \"discovered_npcs\": []\n}\n```",
+    "[T771.3] At 10:33 AM (Local time for New York, New York), Daniel leans back slightly, his analytical mind clearly engaged as he puts forth his plan. The strains of the ice cream truck's music drift in through the **open window (window_livingroom_01)**, a cheerful counterpoint to the gravity of the situation. \"A sensory deprivation tank, huh? I can't imagine. Okay, so maybe... maybe we can try to approach this like a software problem? We're both engineers, right? What if we document everything that happens, look for patterns, try to find what triggers these...jumps?\" He looks at Ava expectantly, a sliver of hope flickering in his eyes.",
+    "[T781.3] At 10:33 AM (Local time for New York, New York), Daniel nods, his analytical mind already racing. \"That is a great idea and the only way that is logical.\" He pauses, gathering his thoughts. \"Okay, that's a good idea. Let's try that. We can document everything. You track what you're experiencing, I'll do the same, and then we compare notes. What kind of things should we track? Time, location, what we were doing before it happened, anything else?\" He looks at Ava, seeking her input, the sounds of **children's laughter (children_laughter_01)** mixing with the ice cream truck's jingle from the park, creating a bizarrely cheerful dissonance.",
+    "[T790.1] At 10:33 AM (Local time for New York, New York), Daniel lays out his debugging plan, the strains of the ice cream truck music now a constant background hum to their bizarre conversation. His words are measured and logical, a stark contrast to the sheer absurdity of the situation. The mostly clear skies outside offer a deceptive sense of calm, a normal Tuesday morning fighting against the impossible events unfolding within the apartment. He pauses, waiting for Ava to add her own suggestions.",
+    "[T802.7] At 10:33 AM (Local time for New York, New York), and now that all is on the table it is time for ava's word. He sees Ava is really into getting some help at this moment which gave Daniel the calm she needed for so long. A light that will give a hint of hope.. In the mean time A new message from the TV comes, which show that one of the greatest politicians have had a problem, so, the city doesn't seem better in that way.",
+    "[T810.7] ```json\n{\n  \"narrative\": \"At 10:34 AM (Local time for New York, New York), Daniel nods, affirming Ava's suggestion. \"\"That is a great idea and the only way that is logical. Okay, that's a good idea. Let's try that. We can document everything. You track what you're experiencing, I'll do the same, and then we compare notes. What kind of things should we track? Time, location, what we were doing before it happened, anything else?\"\" As he finishes, he pulls his **phone (phone_daniel_01)** from his **pocket (pocket_daniel_01)** as an idea for their tracking begins to from on his mind.\",\n  \"discovered_objects\": [\n    {\"id\": \"phone_daniel_01\", \"name\": \"Daniel's Phone\", \"description\": \"A cell phone.\", \"is_interactive\": true, \"properties\": {}},\n    {\"id\": \"pocket_daniel_01\", \"name\": \"Daniel's Pocket\", \"description\": \"The pocket in Daniel's pants.\", \"is_interactive\": false, \"properties\": {}}\n  ],\n  \"discovered_connections\": [],\n  \"discovered_npcs\": []\n}\n```",
+    "[T817.5] At 10:34 AM (Local time for New York, New York), Ava nods, latching onto Daniel's point about treating this like a software bug. \"What about system messages, yeah. Anything we got like those events before or after that seems weird, also that sounds like something to add to that system that we've got.. And all sounds great that you have to do. I'll call it an effort.\" She offers a small, wry smile, a brief flicker of humor in the face of the bizarre situation. The mostly clear sky outside does little to soothe her nerves, and that crazy ice cream truck (ice_cream_truck_01)."
+  ],
   "world_template_details": {
     "description": "A new world is beginning.",
     "rules": {
@@ -26,13 +77,13 @@
   "simulacra_profiles": {
     "sim_b797o8": {
       "current_location": "Home_01",
-      "location_details": "Your home and bedroom.",
-      "last_observation": "You are at Home_01.",
+      "location_details": "You are now in Home.",
+      "last_observation": "At 10:34 AM (Local time for New York, New York), Ava nods, latching onto Daniel's point about treating this like a software bug. \"What about system messages, yeah. Anything we got like those events before or after that seems weird, also that sounds like something to add to that system that we've got.. And all sounds great that you have to do. I'll call it an effort.\" She offers a small, wry smile, a brief flicker of humor in the face of the bizarre situation. The mostly clear sky outside does little to soothe her nerves, and that crazy ice cream truck (ice_cream_truck_01).",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 0.0,
+      "current_action_end_time": 823.014999999999,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -75,17 +126,19 @@
         "Dreams": "To work on a space exploration project, to build a sustainable tech company, and to travel the world",
         "Past_Traumas": null
       },
-      "location": "Home_01"
+      "location": "Home_01",
+      "current_interrupt_probability": null,
+      "current_action_description": "Action: talk - Details: System messages are a great start. Also, let's note down what we're thinking, feeling, and doing in "
     },
     "sim_sustdj": {
       "current_location": "Home_01",
-      "location_details": "Your home and bedroom.",
-      "last_observation": "You are at Home_01.",
+      "location_details": "You have arrived in Living_Room_Apartment_01.",
+      "last_observation": "Ava Sharma said to you: 'System messages are a great start. Also, let's note down what we're thinking, feeling, and doing in the minutes leading up to a jump. Could be a subconscious trigger we're not even aware of.'",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 0.0,
+      "current_action_end_time": 832.087999999999,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -128,7 +181,9 @@
         "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
         "Past_Traumas": null
       },
-      "location": "Home_01"
+      "location": "Living_Room_Apartment_01",
+      "current_interrupt_probability": null,
+      "current_action_description": "Interrupted by Ava Sharma saying something."
     }
   },
   "objects": [],
@@ -140,7 +195,114 @@
         "description": "A modern one-bedroom apartment in Long Island City, Queens, offering a convenient commute to Manhattan and stunning skyline views. The space is clean and organized, reflecting her analytical nature, with touches of warmth from travel souvenirs and potted plants.",
         "ephemeral_objects": [],
         "ephemeral_npcs": [],
-        "connected_locations": []
+        "connected_locations": [],
+        "objects_present": []
+      },
+      "kitchen": {
+        "ephemeral_objects": [
+          {
+            "id": "carafe_kitchen_01",
+            "name": "Coffee Carafe",
+            "description": "A glass coffee carafe filled with freshly brewed coffee.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "coffee_maker_kitchen_01",
+            "name": "Coffee Maker",
+            "description": "A modern coffee maker, still warm from brewing.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "appliances_kitchen_01",
+            "name": "Stainless Steel Appliances",
+            "description": "Gleaming stainless steel appliances.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "countertops_kitchen_01",
+            "name": "Granite Countertops",
+            "description": "Clean granite countertops.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "plant_kitchen_01",
+            "name": "Potted Plant",
+            "description": "A potted plant on the windowsill, slightly wobbling.",
+            "is_interactive": true,
+            "properties": {}
+          }
+        ],
+        "ephemeral_npcs": [],
+        "connected_locations": [
+          {
+            "to_location_id_hint": "Living_Room_Apartment_01",
+            "description": "An open doorway leads into the living room.",
+            "travel_time_estimate_seconds": 5
+          }
+        ],
+        "objects_present": [
+          {
+            "id": "carafe_kitchen_01",
+            "name": "Coffee Carafe",
+            "description": "A glass coffee carafe filled with freshly brewed coffee.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "coffee_maker_kitchen_01",
+            "name": "Coffee Maker",
+            "description": "A modern coffee maker, still warm from brewing.",
+            "is_interactive": true,
+            "properties": {}
+          },
+          {
+            "id": "appliances_kitchen_01",
+            "name": "Stainless Steel Appliances",
+            "description": "Gleaming stainless steel appliances.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "countertops_kitchen_01",
+            "name": "Granite Countertops",
+            "description": "Clean granite countertops.",
+            "is_interactive": false,
+            "properties": {}
+          },
+          {
+            "id": "plant_kitchen_01",
+            "name": "Potted Plant",
+            "description": "A potted plant on the windowsill, slightly wobbling.",
+            "is_interactive": true,
+            "properties": {}
+          }
+        ]
+      },
+      "the planet arrakis": {
+        "ephemeral_objects": [
+          {
+            "id": "rock_arrakis_01",
+            "name": "Small Rock",
+            "description": "A small, strangely symmetrical rock.",
+            "is_interactive": true,
+            "properties": {}
+          }
+        ],
+        "ephemeral_npcs": [],
+        "connected_locations": [],
+        "objects_present": [
+          {
+            "id": "rock_arrakis_01",
+            "name": "Small Rock",
+            "description": "A small, strangely symmetrical rock.",
+            "is_interactive": true,
+            "properties": {}
+          }
+        ]
       }
     },
     "world_feeds": {
@@ -154,5 +316,67 @@
       "last_update_sim_time": 0.0
     }
   },
-  "pending_simulation_events": []
+  "pending_simulation_events": [],
+  "world_feeds": {
+    "last_update_sim_time": 590.9529999999991,
+    "weather": {
+      "condition": "mostly clear",
+      "temperature_celsius": 14,
+      "forecast_short": "Beautiful day with sunshine mixing with some clouds. Increasing clouds at night.",
+      "timestamp": 590.9529999999991,
+      "source_category": "weather"
+    },
+    "news_updates": [
+      {
+        "headline": "NYC Grapples with Crime Wave, Mourns Rangel",
+        "summary": "New York City faces a surge in violent crime alongside political news of former Congressman Charles Rangel's passing and concerns over Billy Joel's health.",
+        "timestamp": 398.3600000000001,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "Global Tensions Rise Amid Ceasefire Disagreements, Diplomatic Efforts, and Social Concerns",
+        "summary": "World news includes failed ceasefire efforts, diplomatic outreach by India and ASEAN, UK calls for sanctions on Israel, and environmental and legal developments.",
+        "timestamp": 398.3600000000001,
+        "source_category": "world_news"
+      },
+      {
+        "headline": "Motorcyclist Killed by FDNY Truck in Marine Park",
+        "summary": "A motorcyclist was fatally struck by an FDNY truck in Marine Park, Brooklyn, according to the NYPD.",
+        "timestamp": 12.047000000000025,
+        "source_category": "local_news"
+      },
+      {
+        "headline": "NYC News: Crime, Death, and Summer",
+        "summary": "New York City is grappling with a series of violent crimes and accidents, mourning the loss of former Congressman Charles Rangel, and anticipating the return of free summer movies in Bryant Park.",
+        "timestamp": 12.047000000000025,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "Global Tensions Rise Amid Ceasefire Rejection, Ukraine Accusations, and Political Turmoil",
+        "summary": "World news highlights include a rejected Gaza ceasefire, accusations against China for aiding Russia, rising tensions in the Middle East, and political developments in Europe and North America.",
+        "timestamp": 12.047000000000025,
+        "source_category": "world_news"
+      }
+    ],
+    "pop_culture_updates": [
+      {
+        "headline": "NY News Roundup: Investigation, Death, and Crime",
+        "summary": "New York faces a federal investigation into Cuomo, mourns Charles Rangel, and grapples with a subway stabbing and a bizarre discovery in Long Island.",
+        "timestamp": 590.9529999999991,
+        "source_category": "pop_culture"
+      },
+      {
+        "headline": "NYC Baby Brand Faces Tariff Troubles",
+        "summary": "A New York City-based baby brand is struggling due to tariff-related challenges.",
+        "timestamp": 398.3600000000001,
+        "source_category": "pop_culture"
+      },
+      {
+        "headline": "Global Events Dominate Headlines: Ceasefire Rejection, Everest Record, and Political Tensions",
+        "summary": "World news focuses on a rejected Gaza ceasefire, a record-breaking Everest climb, and escalating tensions between Trump and Putin, overshadowing national and local New York issues.",
+        "timestamp": 12.047000000000025,
+        "source_category": "pop_culture"
+      }
+    ]
+  }
 }

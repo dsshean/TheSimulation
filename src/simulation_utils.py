@@ -25,10 +25,10 @@ from timezonefinder import TimezoneFinder
 
 # Import constants from the config module
 from .config import APP_NAME  # Added APP_NAME for geopy user_agent
-from .config import (  # PROB_INTERJECT_AS_NARRATIVE removed; SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"; Added SIMULACRA_KEY
+from .config import (  # PROB_INTERJECT_AS_NARRATIVE removed; SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"; Added SIMULACRA_KEY; Added WORLD_STATE_KEY, LOCATION_DETAILS_KEY
     ACTIVE_SIMULACRA_IDS_KEY, LOCATION_DETAILS_KEY, LOCATION_KEY, MODEL_NAME,
     PROB_INTERJECT_AS_SELF_REFLECTION, SIMULACRA_KEY, USER_ID, WORLD_STATE_KEY,
-    WORLD_TEMPLATE_DETAILS_KEY)
+    WORLD_TEMPLATE_DETAILS_KEY, WORLD_FEEDS_KEY) # Added WORLD_FEEDS_KEY
 from .loop_utils import \
     get_nested  # Assuming get_nested remains in loop_utils or is moved here
 
@@ -541,3 +541,35 @@ def get_random_style_combination(
     if selected_styles:
         logger_instance.info(f"Selected {len(selected_styles)} styles from {style_categories_used} categories: {', '.join(selected_styles)}")
     return ", ".join(selected_styles)
+
+def get_target_entity_state(
+    current_state: Dict[str, Any],
+    target_id: str,
+    actor_location_id: Optional[str] = None # Needed for ephemeral entities
+) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves the state of a target entity (Simulacra, Static Object, Ephemeral Object, or Ephemeral NPC).
+    """
+    if not target_id:
+        return None
+
+    # 1. Check Simulacra
+    entity_data = get_nested(current_state, SIMULACRA_KEY, target_id, default=None)
+    if entity_data:
+        return entity_data
+
+    # 2. Check Static Objects (list of dicts in state["objects"])
+    static_objects_list = current_state.get("objects", [])
+    for obj in static_objects_list:
+        if isinstance(obj, dict) and obj.get("id") == target_id:
+            return obj
+    
+    # 3. Check Ephemeral Entities in actor's current location (if location provided)
+    if actor_location_id:
+        for ephemeral_key in ["ephemeral_objects", "ephemeral_npcs"]:
+            ephemeral_list = get_nested(current_state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, ephemeral_key, default=[])
+            for eph_entity in ephemeral_list:
+                if isinstance(eph_entity, dict) and eph_entity.get("id") == target_id:
+                    return eph_entity
+                
+    return None # Target not found

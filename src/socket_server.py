@@ -6,8 +6,8 @@ import re
 from typing import Dict, Any, Optional, Union
 
 from .simulation_utils import _update_state_value
-from .loop_utils import get_nested
-from .config import SIMULACRA_KEY, ACTIVE_SIMULACRA_IDS_KEY
+from .loop_utils import get_nested # Keep this
+from .config import SIMULACRA_KEY, ACTIVE_SIMULACRA_IDS_KEY, CURRENT_LOCATION_KEY, WORLD_STATE_KEY, LOCATION_DETAILS_KEY
 
 # Configuration constants
 SOCKET_SERVER_HOST = "127.0.0.1"  # localhost
@@ -21,6 +21,7 @@ async def socket_server_task(
     narration_queue: asyncio.Queue,
     world_mood: str,
     simulation_time_getter: callable,  # Function that returns current sim time
+    live_display_object_ref: Optional[Any] = None # Added for cleaner access
 ):
     """Socket server that allows external connections to inject content into the simulation"""
     logger.info("[SocketServer] Starting socket server...")
@@ -51,7 +52,8 @@ async def socket_server_task(
                         state, 
                         narration_queue, 
                         world_mood,
-                        simulation_time_getter
+                        simulation_time_getter,
+                        live_display_object_ref # Pass down
                     ))
                     
                 except BlockingIOError:
@@ -77,7 +79,8 @@ async def handle_client(
     state: Dict[str, Any],
     narration_queue: asyncio.Queue,
     world_mood: str,
-    simulation_time_getter: callable
+    simulation_time_getter: callable,
+    live_display_object_ref: Optional[Any] = None # Added for cleaner access
 ):
     """Handle a connected client"""
     logger.info(f"[SocketServer] Handling client: {address}")
@@ -104,16 +107,12 @@ async def handle_client(
                         state,
                         narration_queue,
                         world_mood,
-                        simulation_time_getter
+                        simulation_time_getter,
+                        live_display_object_ref # Pass down
                     )
                     
-                    # Send response back to client
-                    response = {
-                        "success": bool(result),
-                        "message": "Command processed successfully" if result else "Failed to process command",
-                        "data": result if isinstance(result, dict) else None
-                    }
-                    response_data = json.dumps(response).encode('utf-8') + b'\n'
+                    # Send the result (which should now be a standardized dictionary) back to client
+                    response_data = json.dumps(result).encode('utf-8') + b'\n'
                     await asyncio.to_thread(client_socket.sendall, response_data)
                     
             except BlockingIOError:
@@ -132,8 +131,9 @@ async def process_message(
     state: Dict[str, Any],
     narration_queue: asyncio.Queue,
     world_mood: str,
-    simulation_time_getter: callable
-) -> Union[Dict[str, Any], bool]:
+    simulation_time_getter: callable,
+    live_display_object_ref: Optional[Any] = None # Added for cleaner access
+) -> Dict[str, Any]: # Always return a dictionary
     """Process a received message and route it to the appropriate component"""
     try:
         message = json.loads(message_str)
@@ -162,27 +162,19 @@ async def process_message(
                 from rich.panel import Panel  # Import within function
                 from rich.console import Console
                 console = Console()
+                panel_to_display = Panel( # Create panel once
+                    narrative_text, 
+                    title=f"External Narrative @ {current_sim_time:.1f}s",
+                    border_style="cyan", 
+                    expand=False
+                )
                 try:
-                    # Try to use the live display if it exists
-                    live_display = None
-                    if 'live_display_object' in globals():
-                        live_display = globals()['live_display_object']
-                    
-                    if live_display:
-                        live_display.console.print(Panel(
-                            narrative_text, 
-                            title=f"External Narrative @ {current_sim_time:.1f}s",
-                            border_style="cyan", 
-                            expand=False
-                        ))
+                    if live_display_object_ref: # Use the passed reference
+                        live_display_object_ref.console.print(panel_to_display)
                     else:
                         # Fallback to direct console print
-                        console.print(Panel(
-                            narrative_text, 
-                            title=f"External Narrative @ {current_sim_time:.1f}s",
-                            border_style="cyan", 
-                            expand=False
-                        ))
+                        # Create a new Console instance here for fallback if not using live_display
+                        Console().print(panel_to_display)
                 except Exception as e:
                     logger.error(f"[SocketServer] Error displaying narrative: {e}")
                 
@@ -224,8 +216,8 @@ async def process_message(
                 
                 return {
                     "success": True, 
-                    "timestamp": current_sim_time, 
-                    "message": f"Narrative injected and {len(active_sim_ids)} agents updated"
+                    "message": f"Narrative injected and {len(active_sim_ids)} agents updated",
+                    "data": {"timestamp": current_sim_time} 
                 }
                 
         elif command == "inject_event":
@@ -237,7 +229,11 @@ async def process_message(
                 logger.info(f"[SocketServer] Injecting event for agent {agent_id}: {event_description[:50]}...")
                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", event_description, logger)
-                return {"success": True, "timestamp": current_sim_time, "message": "Event injected successfully"}
+                return {
+                    "success": True, 
+                    "message": "Event injected successfully",
+                    "data": {"timestamp": current_sim_time}
+                }
         
         elif command == "world_info":
             # Update world info like weather or news
@@ -251,7 +247,10 @@ async def process_message(
                 elif category == "news":
                     news_item = {"headline": info, "timestamp": current_sim_time}
                     state.setdefault("world_feeds", {}).setdefault("news_updates", []).insert(0, news_item)
-                return {"success": True, "message": f"World info ({category}) updated successfully"}
+                return {
+                    "success": True, 
+                    "message": f"World info ({category}) updated successfully"
+                }
         
         elif command == "fix_json":
             # Special command to fix JSON output from the narrator
@@ -292,62 +291,102 @@ async def process_message(
                         
                     return {
                         "success": valid_json, 
-                        "fixed_json": fixed_json,
-                        "message": "JSON successfully fixed" if valid_json else "Warning: JSON may still have issues"
+                        "message": "JSON successfully fixed" if valid_json else "Warning: JSON may still have issues",
+                        "data": {
+                            "fixed_json": fixed_json
+                        }
                     }
                 except Exception as e:
                     logger.error(f"[SocketServer] Error fixing JSON: {e}")
                     return {"success": False, "message": f"Error fixing JSON: {str(e)}"}
         
+        elif command == "teleport_agent":
+            agent_id = message.get("agent_id")
+            new_location_id = message.get("new_location_id")
+
+            if not agent_id or not new_location_id:
+                logger.warning(f"[SocketServer] Teleport command missing agent_id or new_location_id: {message}")
+                return {"success": False, "message": "Missing agent_id or new_location_id for teleport."}
+
+            if agent_id not in get_nested(state, SIMULACRA_KEY, default={}):
+                logger.warning(f"[SocketServer] Cannot teleport agent {agent_id}: Agent ID not found.")
+                return {"success": False, "message": f"Agent {agent_id} not found."}
+
+            # Ensure the new location exists in the world's defined locations, or at least log a warning
+            if new_location_id not in get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={}):
+                logger.warning(f"[SocketServer] Teleporting agent {agent_id} to new location '{new_location_id}' which is not yet defined in world_state.location_details. Agent might perceive an undescribed place until look_around.")
+
+            old_location_id = get_nested(state, SIMULACRA_KEY, agent_id, CURRENT_LOCATION_KEY, default="Unknown")
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.{CURRENT_LOCATION_KEY}", new_location_id, logger)
+            
+            new_loc_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
+            agent_loc_details_update = f"You are now in {new_loc_name}."
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.location_details", agent_loc_details_update, logger)
+            
+            # Also update the deprecated 'location' field for broader compatibility if it exists
+            if "location" in get_nested(state, SIMULACRA_KEY, agent_id, default={}):
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.location", new_location_id, logger)
+
+            # Set agent to idle and update last_observation
+            teleport_observation = f"You have been instantly teleported from {old_location_id} to {new_location_id} ({new_loc_name})."
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", teleport_observation, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
+
+            # Add to narrative log
+            agent_name_for_log = get_nested(state, SIMULACRA_KEY, agent_id, "persona_details", "Name", default=agent_id)
+            narrative_teleport_entry = f"[T{current_sim_time:.1f}] [System Teleport] {agent_name_for_log} vanished from {old_location_id} and instantly reappeared in {new_location_id} ({new_loc_name})."
+            state.setdefault("narrative_log", []).append(narrative_teleport_entry)
+
+            logger.info(f"[SocketServer] Teleported agent {agent_id} from {old_location_id} to {new_location_id} via dedicated command.")
+            return {
+                "success": True, 
+                "message": f"Agent {agent_id} teleported to {new_location_id}.",
+                "data": {
+                    "agent_id": agent_id, "new_location_id": new_location_id # Include this in data for client
+                }
+            }
+        
         elif command == "get_state":
             # Get current simulation state with better simulacra detection
             current_sim_time = simulation_time_getter()
             
-            # More robust detection of active simulacra
+            # Primary method: Use ACTIVE_SIMULACRA_IDS_KEY
             active_sim_ids = []
+            if ACTIVE_SIMULACRA_IDS_KEY in state:
+                active_sim_ids = list(state.get(ACTIVE_SIMULACRA_IDS_KEY, [])) # Ensure it's a list copy
             
-            # Method 1: Try getting from SIMULACRA_KEY directly (most reliable)
-            if SIMULACRA_KEY in state:
-                simulacra_dict = state.get(SIMULACRA_KEY, {})
-                # Get all simulacra that aren't terminated
+            # Fallback: If ACTIVE_SIMULACRA_IDS_KEY is empty or missing, try to infer from SIMULACRA_KEY (profiles)
+            if not active_sim_ids and SIMULACRA_KEY in state:
+                logger.info(f"[SocketServer] ACTIVE_SIMULACRA_IDS_KEY was empty/missing. Inferring active IDs from {SIMULACRA_KEY}.")
+                simulacra_profiles = state.get(SIMULACRA_KEY, {})
                 active_sim_ids = [
-                    sim_id for sim_id, sim_data in simulacra_dict.items()
-                    if isinstance(sim_data, dict) and sim_data.get("status") != "terminated"
+                    sim_id for sim_id, sim_data in simulacra_profiles.items()
+                    if isinstance(sim_data, dict) and sim_data.get("status") != "terminated" # Basic check for active status
                 ]
-            
-            # Method 2: Try getting from ACTIVE_SIMULACRA_IDS_KEY as fallback
-            if not active_sim_ids and ACTIVE_SIMULACRA_IDS_KEY in state:
-                active_sim_list = state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
-                # Sometimes it's a list of strings, sometimes a list of objects
-                if active_sim_list and len(active_sim_list) > 0:
-                    if isinstance(active_sim_list[0], str):
-                        active_sim_ids = active_sim_list
-                    elif isinstance(active_sim_list[0], dict) and "id" in active_sim_list[0]:
-                        active_sim_ids = [sim["id"] for sim in active_sim_list]
-            
-            # Log what we found for debugging
+
             logger.info(f"[SocketServer] Found {len(active_sim_ids)} active simulacra IDs: {active_sim_ids}")
-            
             return {
                 "success": True,
+                "message": "State retrieved successfully.",
                 "data": {
-                    "agent_ids": active_sim_ids  # This is the primary format client looks for
-                },
-                "state": {
-                    "simulacra_profiles": {
-                        agent_id: {
-                            "id": agent_id,
-                            "location": get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown"),
-                            "status": get_nested(state, SIMULACRA_KEY, agent_id, "status", default="unknown")
+                    "agent_ids": active_sim_ids,  # This is the primary format client looks for for agent selection
+                    "state_summary": { # Keep the detailed state under a sub-key if needed by client
+                        "simulacra_profiles": {
+                            agent_id: {
+                                "id": agent_id,
+                                "location": get_nested(state, SIMULACRA_KEY, agent_id, "location", default="unknown"),
+                                "status": get_nested(state, SIMULACRA_KEY, agent_id, "status", default="unknown")
+                            }
+                            for agent_id in active_sim_ids
                         }
-                        for agent_id in active_sim_ids
+                    },
+                    "time": current_sim_time,
+                    "world_mood": world_mood,
+                    # Keep these for client compatibility if it uses them directly from response.data
+                    "agents": active_sim_ids, 
+                    "simulacra_profiles": { 
+                        agent_id: {"id": agent_id} for agent_id in active_sim_ids
                     }
-                },
-                "time": current_sim_time,
-                "world_mood": world_mood,
-                "agents": active_sim_ids,  # Redundant but ensures compatibility with client's fallbacks
-                "simulacra_profiles": {
-                    agent_id: {"id": agent_id} for agent_id in active_sim_ids
                 }
             }
         
@@ -466,7 +505,9 @@ async def process_message(
             return {
                 "success": True,
                 "message": "Interaction event sent to agent",
-                "timestamp": current_sim_time
+                "data": {
+                    "timestamp": current_sim_time
+                }
             }
         elif command == "get_agent_responses":
             # Get all narrative entries since a timestamp
@@ -522,8 +563,11 @@ async def process_message(
 
             return {
                 "success": True,
-                "responses": processed_responses,
-                "current_time": simulation_time_getter()
+                "message": "Agent responses retrieved.",
+                "data": {
+                    "responses": processed_responses,
+                    "current_time": simulation_time_getter()
+                }
             }
         
         logger.warning(f"[SocketServer] Unknown command or invalid parameters: {message_str}")

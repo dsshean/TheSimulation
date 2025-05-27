@@ -159,6 +159,18 @@ def display_response(command: Dict, response: Dict):
                 border_style="red",
                 expand=False
             ))
+    elif command_type == "teleport_agent":
+        agent_id = command.get("agent_id", "unknown")
+        new_location_id = command.get("new_location_id", "unknown")
+        location_description = command.get("location_description", "N/A")
+        console.print(Panel(
+            f"[bold yellow]Agent Teleported:[/]\nAgent ID: {agent_id}\nNew Location: {new_location_id}\nDescription: {location_description}\n\n[green]Response:[/] {response.get('message', 'No message')}",
+            title=f"[{timestamp}] Teleport Agent",
+            border_style="yellow",
+            expand=False
+        ))
+
+
     
     else:
         # Generic response display
@@ -191,16 +203,21 @@ def show_history():
             cmd_preview = f"{cmd.get('category', 'unknown')} update"
         elif cmd_type == "fix_json":
             cmd_preview = "JSON fix"
+        elif cmd_type == "teleport_agent":
+            desc_preview = f" w/ desc: {cmd.get('location_description', '')[:15]}..." if cmd.get('location_description') and cmd.get('location_description') != "No specific description provided" else ""
+            cmd_preview = f"teleport {cmd.get('agent_id', 'N/A')} to {cmd.get('new_location_id', 'N/A')}{desc_preview}"
             
         status = "[green]Success[/]" if resp.get("success") else "[red]Failed[/]"
         table.add_row(str(i), time, cmd_preview, status)
     
     console.print(table)
 
-def interactive_session(client: SimulationClient):
-    console.rule("[bold blue]Interactive Mode with Simulacra[/]")
-    
-    # Get available agents
+def _fetch_and_parse_agent_details(client: SimulationClient) -> List[Dict[str, str]]:
+    """
+    Fetches simulation state from the server and extracts agent IDs and their statuses.
+    Returns a list of dictionaries, each containing 'id' and 'status', 
+    or an empty list if an error occurs or no agents are found.
+    """
     command = {"command": "get_state"}
     response = client.send_command(command)
     
@@ -209,72 +226,114 @@ def interactive_session(client: SimulationClient):
     console.print(Syntax(json.dumps(response, indent=2), "json", theme="monokai"))
     
     if not response or not response.get("success", False):
-        console.print("[red]Failed to get simulation state[/]")
-        return
+        console.print(f"[red]Failed to get simulation state.[/red]")
+        return []
     
-    # Enhanced agent ID extraction with more patterns
     agent_ids = []
+    agent_details_list = []
+
+    # Primary way to get agent_ids and their details
+    sim_profiles = response.get("data", {}).get("state_summary", {}).get("simulacra_profiles", {})
+    if sim_profiles and isinstance(sim_profiles, dict):
+        for agent_id, details in sim_profiles.items():
+            agent_ids.append(agent_id) # Keep a list of IDs for selection logic later
+            agent_details_list.append({
+                "id": agent_id,
+                "status": details.get("status", "unknown")
+            })
     
-    # Try multiple paths to find agent_ids in the response
-    if response.get("data", {}).get("data", {}).get("agent_ids"):
-        agent_ids = response["data"]["data"]["agent_ids"]
-    elif response.get("data", {}).get("agent_ids"):
-        agent_ids = response["data"]["agent_ids"]
-    elif response.get("state", {}).get("simulacra_profiles"):
-        # Extract from simulacra_profiles if available
-        agent_ids = list(response["state"]["simulacra_profiles"].keys())
-    elif response.get("simulacra_profiles"):
-        # Direct simulacra_profiles at root
-        agent_ids = list(response["simulacra_profiles"].keys())
-    elif response.get("data", {}).get("simulacra"):
-        # Another possible format
-        agent_ids = list(response["data"]["simulacra"].keys())
-    elif response.get("agents"):
-        # Direct agents list
-        agent_ids = response["agents"]
-    
-    # Try to extract from any list-like field that might contain agent IDs
+    # Fallback if primary way fails, try to get just IDs from various known paths
     if not agent_ids:
-        for key, value in response.items():
-            if isinstance(value, list) and value and isinstance(value[0], str) and value[0].startswith("sim_"):
-                agent_ids = value
-                console.print(f"[yellow]Found potential agent IDs in field '{key}'[/]")
-                break
-            elif isinstance(value, dict):
-                for subkey, subvalue in value.items():
-                    if isinstance(subvalue, list) and subvalue and isinstance(subvalue[0], str) and subvalue[0].startswith("sim_"):
-                        agent_ids = subvalue
-                        console.print(f"[yellow]Found potential agent IDs in field '{key}.{subkey}'[/]")
-                        break
+        if response.get("data", {}).get("agent_ids"):
+            agent_ids = response["data"]["agent_ids"]
+        elif response.get("data", {}).get("data", {}).get("agent_ids"):
+            agent_ids = response["data"]["data"]["agent_ids"]
+        elif response.get("state", {}).get("simulacra_profiles"):
+            agent_ids = list(response["state"]["simulacra_profiles"].keys())
+        elif response.get("simulacra_profiles"):
+            agent_ids = list(response["simulacra_profiles"].keys())
+        elif response.get("data", {}).get("simulacra"):
+            agent_ids = list(response["data"]["simulacra"].keys())
+        elif response.get("agents"):
+            agent_ids = response["agents"]
+        
+        if not agent_ids: # Try broader search if still no IDs
+            for key, value in response.items():
+                if isinstance(value, list) and value and isinstance(value[0], str) and value[0].startswith("sim_"):
+                    agent_ids = value
+                    console.print(f"[yellow]Found potential agent IDs in field '{key}'[/]")
+                    break
+                elif isinstance(value, dict):
+                    for subkey, subvalue in value.items():
+                        if isinstance(subvalue, list) and subvalue and isinstance(subvalue[0], str) and subvalue[0].startswith("sim_"):
+                            agent_ids = subvalue
+                            console.print(f"[yellow]Found potential agent IDs in field '{key}.{subkey}'[/]")
+                            break
+        
+        if not agent_ids: # Regex scan as last resort for IDs
+            console.print("[yellow]Scanning response for agent IDs...[/]")
+            response_str = json.dumps(response)
+            import re
+            potential_ids = re.findall(r'"(sim_[a-zA-Z0-9_]+)"', response_str)
+            if potential_ids:
+                agent_ids = list(set(potential_ids))
+                console.print(f"[yellow]Found {len(agent_ids)} potential agent IDs by regex search[/]")
+
+        # If we found IDs through fallback, create basic detail entries
+        if agent_ids and not agent_details_list:
+            for agent_id in agent_ids:
+                agent_details_list.append({"id": agent_id, "status": "unknown (fallback)"})
+
+    return agent_details_list
+
+def _display_active_agents(client: SimulationClient) -> List[Dict[str, str]]:
+    """
+    Fetches and displays the list of active simulacra.
+    Returns the list of agent details (dict with 'id' and 'status'), or an empty list if none are found.
+    """
+    console.rule("[bold cyan]Active Simulacra[/]")
+    agent_details_list = _fetch_and_parse_agent_details(client)
+    if not agent_details_list:
+        console.print("[red]No active simulacra found in the simulation.[/red]")
+        return []
     
-    # Last resort: scan for any fields that might contain agent IDs (strings starting with "sim_")
-    if not agent_ids:
-        console.print("[yellow]Scanning response for agent IDs...[/]")
-        response_str = json.dumps(response)
-        import re
-        potential_ids = re.findall(r'"(sim_[a-zA-Z0-9_]+)"', response_str)
-        if potential_ids:
-            agent_ids = list(set(potential_ids))  # Remove duplicates
-            console.print(f"[yellow]Found {len(agent_ids)} potential agent IDs by regex search[/]")
+    console.print("[bold green]Currently active simulacra:[/]")
+    for i, agent_detail in enumerate(agent_details_list, 1):
+        console.print(f"{i}. ID: {agent_detail['id']} - Status: {agent_detail['status']}")
+    return agent_details_list
+
+def _select_agent_from_server_state(client: SimulationClient, action_description: str) -> Optional[str]:
+    """
+    Fetches simulation state, lists agent IDs, and prompts user to select one.
+    """
+    agent_details_list = _fetch_and_parse_agent_details(client)
     
-    if not agent_ids:
-        console.print("[red]No active simulacra found[/]")
-        # Add manual agent ID entry as fallback
-        use_manual = Prompt.ask("[yellow]Enter agent ID manually?[/]", choices=["y", "n"], default="y")
+    if not agent_details_list:
+        console.print(f"[red]No active simulacra found for {action_description}[/]")
+        use_manual = Prompt.ask(f"[yellow]Enter agent ID manually for {action_description}?[/]", choices=["y", "n"], default="y")
         if use_manual.lower() == "y":
             agent_id = Prompt.ask("Enter agent ID")
-            agent_ids = [agent_id]
+            return agent_id
         else:
-            return
+            return None 
     
-    # Show available agents
     console.print("[bold cyan]Available simulacra:[/]")
-    for i, agent_id in enumerate(agent_ids, 1):
-        console.print(f"{i}. {agent_id}")
+    if not agent_details_list: # Should be redundant due to check above, but safe
+        console.print("[red]No agents available to select.[/red]")
+        return None
+        
+    for i, agent_detail in enumerate(agent_details_list, 1):
+        console.print(f"{i}. ID: {agent_detail['id']} - Status: {agent_detail['status']}")
     
-    # Select an agent
-    agent_idx = IntPrompt.ask("Select agent to interact with", choices=[str(i) for i in range(1, len(agent_ids)+1)])
-    selected_agent = agent_ids[int(agent_idx)-1]
+    agent_idx = IntPrompt.ask(f"Select agent for {action_description}", choices=[str(i) for i in range(1, len(agent_details_list)+1)])
+    return agent_details_list[int(agent_idx)-1]['id'] # Return only the ID
+
+def interactive_session(client: SimulationClient):
+    console.rule("[bold blue]Interactive Mode with Simulacra[/]")
+    
+    selected_agent = _select_agent_from_server_state(client, "interactive mode")
+    if not selected_agent:
+        return
     
     # Start interaction mode
     start_cmd = {"command": "start_interaction_mode", "agent_id": selected_agent}
@@ -294,14 +353,13 @@ def interactive_session(client: SimulationClient):
     console.print("- [bold cyan]noise:[/] [cyan]<description>[/] - Make a noise")
     console.print("- [bold cyan]exit[/] - End interaction mode")
     
-    # Start a background thread to poll for responses
     last_check_time = 0.0
     stop_polling = threading.Event()
     
     def poll_for_responses():
         nonlocal last_check_time
         while not stop_polling.is_set():
-            time.sleep(1.0)  # Poll every second
+            time.sleep(1.0)
             try:
                 poll_cmd = {
                     "command": "get_agent_responses", 
@@ -311,74 +369,53 @@ def interactive_session(client: SimulationClient):
                 poll_response = client.send_command(poll_cmd)
                 
                 if poll_response and poll_response.get("success", False):
-                    responses = poll_response.get("responses", [])
+                    # Access responses from response.get("data", {}).get("responses", [])
+                    responses = poll_response.get("data", {}).get("responses", [])
                     if responses:
                         for resp in responses:
                             content = resp.get("content", "")
-                            
-                            # Skip interaction event messages (these are what we sent)
                             if "[InteractionMode]" in content:
                                 continue
-                            
-                            # Only process if it might contain agent's response
                             if selected_agent in content:
-                                # Try different parsing strategies to find the agent's response
                                 if "decides to" in content:
                                     parts = content.split("decides to", 1)
                                     action_part = parts[1].strip() if len(parts) > 1 else content
                                     console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{action_part}[/]")
-                                
                                 elif "says" in content and selected_agent in content.split("says")[0]:
                                     parts = content.split("says", 1)
                                     speech_part = parts[1].strip() if len(parts) > 1 else content
                                     console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{speech_part}[/]")
-                                
                                 elif ":" in content and content.index(":") > content.index(selected_agent):
                                     parts = content.split(":", 1)
                                     speech_part = parts[1].strip() if len(parts) > 1 else content
                                     console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{speech_part}[/]")
-                                    
                                 elif "responds" in content and selected_agent in content.split("responds")[0]:
                                     parts = content.split("responds", 1)
                                     second_part = parts[1].strip() if len(parts) > 1 else content
-                                    
-                                    # Further split by quotes or just use the text
                                     if '"' in second_part:
                                         quote_parts = second_part.split('"')
                                         speech_part = quote_parts[1] if len(quote_parts) > 1 else second_part
                                     else:
                                         speech_part = second_part
-                                        
                                     console.print(f"[bold magenta]{selected_agent}:[/] [italic cyan]{speech_part}[/]")
-                                
                                 else:
-                                    # Last resort: just show the raw content
                                     console.print(f"[dim]{content}[/]")
-                        
-                        # Update timestamp to latest response time
-                        last_check_time = poll_response.get("current_time", last_check_time)
-            
+                        # Update timestamp from response.get("data", {}).get("current_time", ...)
+                        last_check_time = poll_response.get("data", {}).get("current_time", last_check_time)
             except Exception as e:
-                # Just log the error but keep polling
                 print(f"Error polling for responses: {e}")
     
-    # Start polling thread
     polling_thread = threading.Thread(target=poll_for_responses)
     polling_thread.daemon = True
     polling_thread.start()
     
     try:
-        # Main interaction loop
         while True:
             user_input = Prompt.ask("[bold green]You[/]")
-            
             if user_input.lower() == 'exit':
                 break
-            
-            # Parse input for command type
             event_type = "text_message"
             content = user_input
-            
             if user_input.startswith("text:"):
                 event_type = "text_message"
                 content = user_input[5:].strip()
@@ -397,28 +434,22 @@ def interactive_session(client: SimulationClient):
             elif user_input.startswith("noise:"):
                 event_type = "noise"
                 content = user_input[6:].strip()
-            
-            # Send event to agent
             event_cmd = {
                 "command": "interaction_event", 
                 "agent_id": selected_agent,
                 "event_type": event_type,
                 "content": content
             }
-            
             event_response = client.send_command(event_cmd)
             if not event_response or not event_response.get("success", False):
                 console.print("[red]Failed to send interaction event[/]")
-    
     finally:
-        # End interaction mode
         stop_polling.set()
         console.print("[yellow]Ending interactive mode...[/]")
         end_cmd = {"command": "end_interaction_mode", "agent_id": selected_agent}
         client.send_command(end_cmd)
         console.print(f"[green]{selected_agent} has returned to the simulation[/]")
 
-# Add to menu functions
 def main_menu() -> bool:
     console.rule("[bold green]TheSimulation Control Panel[/]")
     console.print("[bold cyan]Available Commands:[/]")
@@ -427,10 +458,12 @@ def main_menu() -> bool:
     console.print("3. Update world info")
     console.print("4. Fix broken JSON")
     console.print("5. View command history")
-    console.print("6. Interactive mode with simulacra")  # New option
-    console.print("0. Exit")
+    console.print("6. Interactive mode with simulacra")
+    console.print("7. Teleport Simulacrum")
+    console.print("8. List Active Simulacra") # New option
+    console.print("0. Exit") 
     
-    choice = IntPrompt.ask("Select command", choices=["0", "1", "2", "3", "4", "5", "6"], default=1)
+    choice = IntPrompt.ask("Select command", choices=["0", "1", "2", "3", "4", "5", "6", "7", "8"], default=1)
     
     return process_menu_choice(choice)
 
@@ -439,9 +472,9 @@ def process_menu_choice(choice: int) -> bool:
     
     try:
         if choice == 0:
-            return False  # Exit
+            return False
         
-        elif choice == 1:  # Narrate
+        elif choice == 1:
             console.rule("[bold cyan]Inject Narrative[/]")
             text = Prompt.ask("Enter narrative text")
             if text:
@@ -450,7 +483,7 @@ def process_menu_choice(choice: int) -> bool:
                 if response:
                     display_response(command, response)
         
-        elif choice == 2:  # Agent event
+        elif choice == 2:
             console.rule("[bold magenta]Send Event to Agent[/]")
             agent_id = Prompt.ask("Enter agent ID (e.g., sim_xxt27r)")
             description = Prompt.ask("Enter event description")
@@ -460,7 +493,7 @@ def process_menu_choice(choice: int) -> bool:
                 if response:
                     display_response(command, response)
         
-        elif choice == 3:  # World info
+        elif choice == 3:
             console.rule("[bold yellow]Update World Info[/]")
             console.print("[cyan]Categories:[/] weather, news")
             category = Prompt.ask("Enter category", choices=["weather", "news"])
@@ -471,7 +504,7 @@ def process_menu_choice(choice: int) -> bool:
                 if response:
                     display_response(command, response)
         
-        elif choice == 4:  # Fix JSON
+        elif choice == 4:
             console.rule("[bold green]Fix Broken JSON[/]")
             console.print("Enter or paste the broken JSON (Ctrl+D or Ctrl+Z on empty line to finish):")
             lines = []
@@ -488,18 +521,40 @@ def process_menu_choice(choice: int) -> bool:
                 if response:
                     display_response(command, response)
         
-        elif choice == 5:  # View history
+        elif choice == 5:
             console.rule("[bold blue]Command History[/]")
             show_history()
         
-        elif choice == 6:  # Interactive mode
+        elif choice == 6:
             interactive_session(client)
+
+        elif choice == 7:
+            console.rule("[bold yellow]Teleport Simulacrum[/]")
+            selected_agent_id = _select_agent_from_server_state(client, "teleportation")
+            if selected_agent_id:
+                new_location_id = Prompt.ask(f"Enter new location ID for {selected_agent_id} (e.g., Home_01, Park_Central)")
+                if new_location_id.strip(): # Ensure new_location_id is not just whitespace
+                    location_description = Prompt.ask(
+                        f"Enter description for '{new_location_id}' (optional)",
+                        default="No specific description provided.",
+                        show_default=True # Show the default value in the prompt
+                    )
+                    command = {"command": "teleport_agent", "agent_id": selected_agent_id, "new_location_id": new_location_id.strip(), "location_description": location_description}
+                    response = client.send_command(command)
+                    if response:
+                        display_response(command, response)
+                else:
+                    console.print("[yellow]Teleportation cancelled: No location ID provided.[/yellow]")
+        
+        elif choice == 8: # List Active Simulacra
+            _display_active_agents(client)
+
         
     finally:
         if client:
             client.close()
     
-    return True  # Continue running
+    return True
 
 if __name__ == "__main__":
     console.print(Panel.fit(
