@@ -4,23 +4,8 @@
     "sim_b797o8",
     "sim_sustdj"
   ],
-  "world_time": 90.48499999998603,
-  "narrative_log": [
-    "[T12.5] At 10:58 PM on Monday, May 26, 2025 (Local time for New York, New York), a groggy Daniel, having just woken up, turns to Ava in their shared apartment. \"Hey Ava, I didn't realize I fell asleep,\" he says, his voice still thick with sleep. \"Do you want some tea? And do you need any allergy medicine? It's that time of year again, unfortunately.\"",
-    "[T10.1] At 10:58 PM on Monday, May 26, 2025 (Local time for New York, New York), even before fully registering Daniel's offer of tea and allergy meds, Ava instinctively reaches for her **phone (phone_ava_01)** on the **nightstand (nightstand_01)**, a soft glow illuminating her face in the dimly lit bedroom. She needs to see if there were any urgent notifications that might explain her abrupt awakening.",
-    "[T17.6] At 10:58 PM on Monday, May 26, 2025 (Local time for New York, New York), Daniel, still slightly disoriented, patiently waits for Ava's response to his offer, the silence of the late hour amplifying the quiet hum of the city outside the apartment windows. He notices Ava's attention is already captured by her phone.",
-    "[T25.2] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), looking up from her phone, Ava sees Daniel waiting patiently. \"Hey Daniel, thanks for the offer!\" she says, her voice a little raspy from sleep. \"I think I'm okay on tea for now, but some water would be great. And I don't need allergy medicine, thankfully they haven't been too bad.\"",
-    "[T25.2] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), Daniel, hearing Ava's voice, snaps out of his daze. Ava looks up from her phone, a faint smile on her face. He nods, relieved. He hadn't wanted to press her, but was glad she was okay with just water.",
-    "[T43.1] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), as Daniel heads towards the doorway connecting the bedroom to the **kitchen (Kitchen_Apartment_01)**, Ava leans back against the headboard, phone still in hand. The faint glow of the screen casts shadows across her face as she rereads the somber news headlines, the ongoing Gaza conflict and the death of a local politician weighing on her mind.",
-    "[T46.1] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), Ava watches as Daniel quietly slips out of the bedroom, presumably heading to the **kitchen (Kitchen_Apartment_01)** to get her some water. She continues to scroll through the news, a knot forming in her stomach at the relentless stream of bad news dominating the headlines.",
-    "[T63.2] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), finding himself in the starkly lit, if somewhat bare, **kitchen (Kitchen_01)**, Daniel opens the cabinet above the **sink (sink_kitchen_01)**, retrieves a simple **glass (glass_kitchen_01)**, and fills it with cold tap water. The sound of the running water briefly disrupts the late-night quiet.",
-    "[T58.2] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), Ava carefully places her phone back on the **nightstand (nightstand_01)** and pushes herself up against the headboard. Sitting upright, she feels marginally more awake, though the lingering drowsiness is a persistent fog in her mind. She glances towards the doorway, now waiting for Daniel to return with the water.",
-    "[T62.3] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), a moment later, Ava spots Daniel reappearing in the doorway, carefully holding a **glass of water (glass_water_bedroom_01)**. The kitchen light spills into the bedroom, briefly illuminating the room before Daniel steps further inside.",
-    "[T79.5] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), Daniel carefully re-enters the bedroom, the glass of water held securely in his hand. He can see Ava is now sitting up, waiting patiently.",
-    "[T80.1] At 10:59 PM on Monday, May 26, 2025 (Local time for New York, New York), Ava, propped up against the pillows, sees Daniel carefully maneuvering back into the bedroom, the **glass of water (glass_water_01)** gleaming faintly in the dim light. She offers him a small, appreciative smile.",
-    "[T86.6] Ava Sharma's action failed: At 11:00 PM on Monday, May 26, 2025 (Local time for New York, New York), it is not possible for Ava Sharma to hand herself the water.",
-    "[T91.7] At 11:00 PM on Monday, May 26, 2025 (Local time for New York, New York), Daniel approaches the bed and carefully hands Ava the **glass of water (glass_water_01)**. \"Here's the water,\" he says softly, his voice barely above a whisper. \"Is there anything else I can get you? Or are you going to try to go back to sleep? I can put on some music if you want.\""
-  ],
+  "world_time": 0.0,
+  "narrative_log": [],
   "world_template_details": {
     "description": "A new world is beginning.",
     "rules": {
@@ -42,12 +27,12 @@
     "sim_b797o8": {
       "current_location": "Home_01",
       "location_details": "Your home and bedroom.",
-      "last_observation": "At 11:00 PM on Monday, May 26, 2025 (Local time for New York, New York), it is not possible for Ava Sharma to hand herself the water.",
+      "last_observation": "You are at Home_01.",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 80.14100000000326,
+      "current_action_end_time": 0.0,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -90,19 +75,17 @@
         "Dreams": "To work on a space exploration project, to build a sustainable tech company, and to travel the world",
         "Past_Traumas": null
       },
-      "location": "Home_01",
-      "current_interrupt_probability": null,
-      "current_action_description": "Action: wait - Details: Wait for Daniel to come back with the water."
+      "location": "Home_01"
     },
     "sim_sustdj": {
       "current_location": "Home_01",
-      "location_details": "You have arrived in Home.",
-      "last_observation": "At 11:00 PM on Monday, May 26, 2025 (Local time for New York, New York), Daniel approaches the bed and carefully hands Ava the **glass of water (glass_water_01)**. \"Here's the water,\" he says softly, his voice barely above a whisper. \"Is there anything else I can get you? Or are you going to try to go back to sleep? I can put on some music if you want.\"",
+      "location_details": "Your home and bedroom.",
+      "last_observation": "You are at Home_01.",
       "goal": "Determine goals.",
       "memory_log": [],
       "home_location": "Home_01",
-      "status": "busy",
-      "current_action_end_time": 91.70299999997951,
+      "status": "idle",
+      "current_action_end_time": 0.0,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -145,9 +128,7 @@
         "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
         "Past_Traumas": null
       },
-      "location": "Home_01",
-      "current_interrupt_probability": null,
-      "current_action_description": "Action: talk - Details: Here's the water. Is there anything else I can get you? Or are you going to try to go back to sleep?"
+      "location": "Home_01"
     }
   },
   "objects": [],
@@ -157,41 +138,9 @@
         "id": "Home_01",
         "name": "Home",
         "description": "A modern one-bedroom apartment in Long Island City, Queens, offering a convenient commute to Manhattan and stunning skyline views. The space is clean and organized, reflecting her analytical nature, with touches of warmth from travel souvenirs and potted plants.",
-        "ephemeral_objects": [
-          {
-            "id": "phone_ava_01",
-            "name": "Phone",
-            "description": "Her smartphone.",
-            "is_interactive": true,
-            "properties": {}
-          }
-        ],
-        "ephemeral_npcs": [],
-        "connected_locations": [
-          {
-            "to_location_id_hint": "Kitchen_Apartment_01",
-            "description": "The doorway leading to the kitchen.",
-            "travel_time_estimate_seconds": 3
-          }
-        ],
-        "objects_present": [
-          {
-            "id": "phone_ava_01",
-            "name": "Phone",
-            "description": "Her smartphone.",
-            "is_interactive": true,
-            "properties": {}
-          }
-        ]
-      },
-      "Kitchen_01": {
-        "id": "Kitchen_01",
-        "name": "Kitchen",
-        "description": "This appears to be a kitchen.",
         "ephemeral_objects": [],
         "ephemeral_npcs": [],
-        "connected_locations": [],
-        "objects_present": []
+        "connected_locations": []
       }
     },
     "world_feeds": {
@@ -205,56 +154,5 @@
       "last_update_sim_time": 0.0
     }
   },
-  "pending_simulation_events": [
-    {
-      "event_type": "simulacra_speech_received_as_interrupt",
-      "target_agent_id": "sim_b797o8",
-      "location_id": "Home_01",
-      "details": {
-        "speaker_id": "sim_sustdj",
-        "speaker_name": "Daniel Rodriguez",
-        "message_content": "Daniel Rodriguez said to you: 'Here's the water. Is there anything else I can get you? Or are you going to try to go back to sleep? I can put on some music if you want.'"
-      },
-      "trigger_sim_time": 92.20299999997951,
-      "source_actor_id": "sim_sustdj"
-    }
-  ],
-  "world_feeds": {
-    "last_update_sim_time": 9.98499999998603,
-    "weather": {
-      "condition": "clear",
-      "temperature_celsius": 17,
-      "forecast_short": "Cloudy on Tuesday, light rain on Wednesday, rain on Thursday.",
-      "timestamp": 9.98499999998603,
-      "source_category": "weather"
-    },
-    "news_updates": [
-      {
-        "headline": "Rangel Dies, Gaza Conflict Continues",
-        "summary": "Former Congressman Charlie Rangel passed away, while international tensions persist in Gaza and Ukraine.",
-        "timestamp": 9.98499999998603,
-        "source_category": "local_news"
-      },
-      {
-        "headline": "NY News: Rangel Dies, Crime Surges, Climate Summit Planned",
-        "summary": "New York mourns Charlie Rangel, grapples with violent crime and lead pipe replacement challenges, while preparing to host a Yale climate change summit.",
-        "timestamp": 9.98499999998603,
-        "source_category": "regional_news"
-      },
-      {
-        "headline": "Global Tensions Flare: Conflicts, Politics, and Economic Concerns Dominate World Stage",
-        "summary": "Escalating conflicts in the Middle East and Ukraine, coupled with political clashes and economic worries over China's debt, paint a grim picture of the world stage as of May 2025.",
-        "timestamp": 9.98499999998603,
-        "source_category": "world_news"
-      }
-    ],
-    "pop_culture_updates": [
-      {
-        "headline": "World News: Iran Nuclear Deal Stalled, Ukraine Attacked, King Charles in Canada",
-        "summary": "International tensions rise as Iran rejects a temporary uranium enrichment halt, Russia launches a large attack on Ukraine, and King Charles III's arrival in Canada coincides with tension with Trump.",
-        "timestamp": 9.98499999998603,
-        "source_category": "pop_culture"
-      }
-    ]
-  }
+  "pending_simulation_events": []
 }

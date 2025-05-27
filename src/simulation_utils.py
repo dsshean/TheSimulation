@@ -428,3 +428,116 @@ def get_time_string_for_prompt(
     elif sim_elapsed_time_seconds is not None:
         return f"{sim_elapsed_time_seconds:.1f}s elapsed"
     return "Time unknown (elapsed not provided for non-realtime or state missing)"
+
+# --- Helper for Event Logging ---
+def _log_event(sim_time: float, agent_id: str, event_type: str, data: Dict[str, Any], logger_instance: logging.Logger, event_logger_global: logging.Logger):
+    """Logs a structured event to the dedicated event logger."""
+    if event_logger_global:
+        log_entry = {
+            "sim_time_s": round(sim_time, 2), # Round time for cleaner logs
+            "agent_id": agent_id,
+            "event_type": event_type,
+            "data": data
+        }
+        try:
+            event_logger_global.info(json.dumps(log_entry))
+        except Exception as e:
+            logger_instance.error(f"Failed to log event (type: {event_type}, agent: {agent_id}) to event log: {e}", exc_info=True)
+
+def get_random_style_combination(
+    logger_instance: logging.Logger, # Added logger_instance parameter
+    include_general=True,
+    num_general=1,
+    include_lighting=True,
+    num_lighting=1,
+    include_color=True,
+    num_color=1,
+    include_technique=True,
+    num_technique=1,
+    include_composition=True, # New category for composition
+    num_composition=1,
+    include_atmosphere=True,  # New category for atmosphere/mood
+    num_atmosphere=1
+):
+    """
+    Generates a random combination of photographic styles.
+
+    Args:
+        logger_instance (logging.Logger): Logger for logging selected styles.
+        include_general (bool): Whether to include general photographic styles.
+        num_general (int): Number of general styles to sample (if included).
+        include_lighting (bool): Whether to include lighting/mood styles.
+        num_lighting (int): Number of lighting/mood styles to sample (if included).
+        include_color (bool): Whether to include color/tone styles.
+        num_color (int): Number of color/tone styles to sample (if included).
+        include_technique (bool): Whether to include camera technique styles.
+        num_technique (int): Number of camera technique styles to sample (if included).
+        include_composition (bool): Whether to include compositional styles.
+        num_composition (int): Number of compositional styles to sample.
+        include_atmosphere (bool): Whether to include atmospheric/emotional styles.
+        num_atmosphere (int): Number of atmospheric styles to sample.
+
+    Returns:
+        str: A comma-separated string of randomly selected styles.
+             Returns an empty string if no categories are included or no styles are sampled.
+    """
+
+    # Define the lists of styles by category
+    general_styles = [
+        "Documentary Photography", "Street Photography", "Fine Art Photography",
+        "Environmental Portraiture", "Minimalist Photography", "Abstract Photography", "Photojournalism",
+        "Conceptual Photography", "Urban Photography", "Landscape Photography",
+        "Still Life Photography", "Fashion Photography", "Architectural Photography"
+    ]
+
+    lighting_styles = [
+        "Cinematic Lighting", "Soft Natural Light", "High Key", "Low Key",
+        "Golden Hour Photography", "Blue Hour Photography", "Dramatic Lighting",
+        "Rim Lighting", "Backlit", "Chiaroscuro", "Studio Lighting", "Available Light"
+    ]
+
+    color_styles = [
+        "Monochromatic (Black and White)", "Vibrant and Saturated", "Muted Tones",
+        "Sepia Tone", "High Contrast Color", "Pastel Colors", "Duotone", "Cross-processed look",
+        "Natural Color Palette", "Warm Tones", "Cool Tones"
+    ]
+
+    technique_styles = [
+        "Bokeh-rich", "Shallow Depth of Field", "Deep Depth of Field", "Long Exposure", "Motion Blur",
+        "Panning Shot", "High-Speed Photography", "Tilt-Shift Effect", "Lens Flare (subtle)",
+        "Wide-Angle Perspective", "Telephoto Compression", "Macro Detail", "Clean and Sharp"
+    ]
+
+    compositional_styles = [
+        "Rule of Thirds", "Leading Lines", "Symmetrical Composition", "Asymmetrical Balance",
+        "Frame within a Frame", "Dynamic Symmetry", "Golden Ratio", "Negative Space Emphasis",
+        "Pattern and Repetition", "Centered Subject", "Off-center Subject"
+    ]
+
+    atmospheric_styles = [
+        "Ethereal Mood", "Dreamlike Atmosphere", "Gritty Realism", "Nostalgic Feel",
+        "Serene and Calm", "Dynamic and Energetic", "Mysterious Ambiance", "Whimsical Charm",
+        "Dramatic and Intense", "Melancholic Tone", "Uplifting and Bright", "Crisp Morning Air",
+        "Humid Haze", "Foggy Overlay"
+    ]
+
+    selected_styles = []
+    style_categories_used = 0 
+
+    if include_general and num_general > 0:
+        k = min(num_general, len(general_styles)); selected_styles.extend(random.sample(general_styles, k))
+    if include_lighting and num_lighting > 0:
+        k = min(num_lighting, len(lighting_styles)); selected_styles.extend(random.sample(lighting_styles, k)); style_categories_used +=1 if k > 0 else 0
+    if include_color and num_color > 0:
+        k = min(num_color, len(color_styles)); selected_styles.extend(random.sample(color_styles, k)); style_categories_used +=1 if k > 0 else 0
+    if include_technique and num_technique > 0: # Corrected variable name
+        k = min(num_technique, len(technique_styles)); selected_styles.extend(random.sample(technique_styles, k)); style_categories_used +=1 if k > 0 else 0
+    if include_composition and num_composition > 0:
+        k = min(num_composition, len(compositional_styles)); selected_styles.extend(random.sample(compositional_styles, k)); style_categories_used +=1 if k > 0 else 0
+    if include_atmosphere and num_atmosphere > 0:
+        k = min(num_atmosphere, len(atmospheric_styles)); selected_styles.extend(random.sample(atmospheric_styles, k)); style_categories_used +=1 if k > 0 else 0
+
+    random.shuffle(selected_styles)
+    if selected_styles:
+        logger_instance.info(f"Selected {len(selected_styles)} styles from {style_categories_used} categories: {', '.join(selected_styles)}")
+    return ", ".join(selected_styles)
