@@ -56,10 +56,15 @@ async def time_manager_task(
                 if agent_state_data.get("status") == "busy":
                     action_end_time = agent_state_data.get("current_action_end_time", -1.0)
                     if action_end_time <= new_sim_time:
+                        old_location_before_results_apply = agent_state_data.get("current_location") # Get location before results
                         logger_instance.info(f"[TimeManager] Applying completed action effects for {agent_id} at time {new_sim_time:.1f} (due at {action_end_time:.1f}).")
                         pending_results = agent_state_data.get("pending_results", {}) # Get a copy or ensure it's mutable if needed
                         if pending_results:
                             for key_path, value in list(pending_results.items()):
+                                # If this result is updating the agent's current_location,
+                                # set their previous_location_id first.
+                                if key_path == f"{SIMULACRA_KEY}.{agent_id}.current_location" and old_location_before_results_apply and old_location_before_results_apply != value:
+                                    _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.previous_location_id", old_location_before_results_apply, logger_instance)
                                 success = _update_state_value(current_state, key_path, value, logger_instance)
                                 # Check if the memory_log for this specific agent was updated
                                 if success and key_path == f"{SIMULACRA_KEY}.{agent_id}.memory_log":

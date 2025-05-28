@@ -313,24 +313,56 @@ def sync_world_config_to_state(state: dict, world_config: dict) -> bool:
 
     # Sync initial_location_definitions
     config_initial_locs = world_config.get("initial_location_definitions", {})
-    logger.debug(f"[SyncWorldConfig] Raw config_initial_locs from world_config: {json.dumps(config_initial_locs)}")
     state_loc_details_path_tuple = (WORLD_STATE_KEY, LOCATION_DETAILS_KEY)
 
     # Ensure the path exists in state's current_world_state
-    if get_nested(state, *state_loc_details_path_tuple, default=None) is None:
+    state_location_details = get_nested(state, *state_loc_details_path_tuple)
+    if state_location_details is None:
+        # If the entire location_details dictionary is missing, initialize it.
+        # This is a bit defensive; ensure_state_structure should ideally handle this.
         state.setdefault(WORLD_STATE_KEY, {})[LOCATION_DETAILS_KEY] = {}
+        state_location_details = state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY]
         modified = True
         logger.info(f"Initialized '{'.'.join(state_loc_details_path_tuple)}' in state during sync.")
     else:
-        logger.debug(f"[SyncWorldConfig] State's current location details before sync: {json.dumps(get_nested(state, *state_loc_details_path_tuple))}")
+        logger.debug(f"[SyncWorldConfig] State's current location details before sync: {json.dumps(state_location_details)}")
 
-    config_locs_copy = copy.deepcopy(config_initial_locs)
+    locations_updated_or_added = False
+    for loc_id, loc_data_from_config in config_initial_locs.items():
+        if loc_id not in state_location_details:
+            # Location is new in config, add it fully to state
+            state_location_details[loc_id] = copy.deepcopy(loc_data_from_config)
+            # Ensure essential dynamic keys exist if not in config template
+            for key_to_ensure, default_val in [
+                ("ephemeral_objects", []), ("ephemeral_npcs", []),
+                ("connected_locations", []), ("objects_present", [])]:
+                if key_to_ensure not in state_location_details[loc_id]:
+                    state_location_details[loc_id][key_to_ensure] = default_val
+            locations_updated_or_added = True
+            logger.info(f"[SyncWorldConfig] Added new location '{loc_id}' from config to state.")
+        else:
+            # Location exists in state, update only specific static fields if they differ
+            # Preserve dynamic fields like ephemeral_objects, connected_locations, objects_present from state
+            state_loc_entry = state_location_details[loc_id]
+            for static_field in ["name", "description", "ambient_sound_description"]: # Add other static fields if any
+                if static_field in loc_data_from_config and \
+                   state_loc_entry.get(static_field) != loc_data_from_config[static_field]:
+                    state_loc_entry[static_field] = loc_data_from_config[static_field]
+                    locations_updated_or_added = True
+                    logger.info(f"[SyncWorldConfig] Updated static field '{static_field}' for location '{loc_id}' from config.")
+            # Ensure essential dynamic keys exist in the state entry if they were somehow missing
+            for key_to_ensure, default_val in [("ephemeral_objects", []), ("ephemeral_npcs", []), ("connected_locations", []), ("objects_present", [])]:
+                if key_to_ensure not in state_loc_entry:
+                    state_loc_entry[key_to_ensure] = default_val
+                    locations_updated_or_added = True
+                    logger.info(f"[SyncWorldConfig] Ensured dynamic key '{key_to_ensure}' for existing location '{loc_id}'.")
 
-    if get_nested(state, *state_loc_details_path_tuple) != config_locs_copy:
-        state[WORLD_STATE_KEY][LOCATION_DETAILS_KEY] = config_locs_copy
+    if locations_updated_or_added:
+        # No need to call _update_state_value here as we are modifying state_location_details directly,
+        # which is a reference to the nested dict in 'state'.
         modified = True
-        logger.info(f"Updated state's '{'.'.join(state_loc_details_path_tuple)}' from world_config.initial_location_definitions.")
-    
+        logger.info("State's 'current_world_state.location_details' were updated/augmented from world_config.initial_location_definitions.")
+
     logger.debug(f"[SyncWorldConfig] State's location details AFTER sync attempt: {json.dumps(get_nested(state, *state_loc_details_path_tuple))}")
 
     # Fallback: Ensure Home_01 exists if it's somehow still missing after sync

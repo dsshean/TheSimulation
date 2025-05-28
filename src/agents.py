@@ -105,17 +105,6 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) 
     - They might try to find an in-world explanation (e.g., "Did I fall and hit my head?", "Am I dreaming?", "This must be some kind of elaborate prank!"), or be too overwhelmed to form a coherent theory.
     - They will NOT conclude "I am in a simulation."
 
-**Current State Info (Provided via trigger message):**
-- Your Persona: Key traits, background, goals, fears, etc.
-- Your Location ID & Description.
-- Your Status: (Should be 'idle' when you plan your next turn, or 'reflecting' if you are being prompted during a long task).
-- Current Time.
-- Last Observation/Event (what just happened to you or what you just did).
-- **CRITICAL: If your `Last Observation/Event` describes something impossible or inexplicable (like unexplained teleportation), your internal monologue MUST reflect extreme confusion, fear, or a questioning of your sanity from an IN-WORLD perspective. Do NOT assume it's a simulation error. Think: "How did I get here? This is impossible! Am I losing my mind?" or "This must be a vivid dream... or a nightmare."**
-- Recent History (Last ~{MEMORY_LOG_CONTEXT_LENGTH} events).
-- Perceived Environment (Details about your current location, including other simulacra, objects, and NPCs you can perceive right now).
-- Audible Environment (Sounds you can currently hear, like ambient noise or specific events).
-- Current World Feeds (Weather, News Headlines - if available and relevant to your thoughts).
 
 CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
 FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMULACRA TO DETERMINE THE OUTCOME.
@@ -209,20 +198,10 @@ def create_world_engine_llm_agent(
 
     instruction = f"""You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
 **Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details, or emotional interpretation.** This description will be used by a separate Narrator agent.
-**Input (Provided via trigger message):**
-- Actor Name & ID
-- Current Location
-- World Context:
-- Actor's Current Location State (Details of the specific location where the actor currently is, including its name, description, objects_present, connected_locations with potential travel metadata like mode/time/distance)
-- World Context (Overall world settings: world_type, sub_genre, description, overall_location (city/state/country))
-- Intent: {{"action_type": "...", "target_id": "...", "details": "..."}}
-- Target Entity State (if applicable).
-- World Feeds (Weather - for environmental context).
-World Rules (e.g., allow_teleportation)
-
+You are NOT a character in the simulation and do not have a persona. You are a mechanical resolver of actions, not a storyteller or narrator.
 **Your Task:**
 {world_engine_critical_knowledge_instruction}
-YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDING FOR YOUR RESULTS.
+YOU MUST USE the dynamically provided Current World Time, Day of the Week, Season, and Weather as grounding for your mechanical resolutions (e.g., travel times, action validity).
 **IMPORTANT: You are a stateless resolver. For most actions, evaluate each intent based *only* on the information provided in THIS request. Do not use memory of previous interactions or prior states of the actor unless they are explicitly part of the current input. The exception is `resolve_interrupted_move`, where `intent.details` provides necessary history.**
 
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
@@ -230,25 +209,25 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
 2.  **Determine Validity & Outcome:** Based on the Intent, Actor's capabilities (implied), Target Entity State, Location State, and World Rules.
     *   **General Checks:** Plausibility, target consistency, location checks.
     *   **Action Category Reasoning:**
-        *   **Entity Interaction (e.g., `use`, `talk`):** Evaluate against target state and rules.
+        *   **Entity Interaction (`use`, `talk`):**
             *   `use`:
-                *   Check `Target Entity State.is_interactive` property. If false, action is invalid.
-                *   **If `Target Entity State.properties.leads_to` exists (e.g., for a door or portal):**
+                *   If `Target Entity State.is_interactive` is false: `valid_action: false`.
+                *   If `Target Entity State.properties.leads_to` exists (e.g., a door):
                     *   `valid_action: true`.
                     *   `duration`: Short (e.g., 5-15s for opening a door and stepping through).
-                    *   `results`: `{{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}`.
-                    *   `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to [Name of the new location if known, otherwise the ID from leads_to]."`.
+                    *   `results`: `{{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}`. # State change: actor moves.
+                    *   `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to location ID '[Target Entity State.properties.leads_to_value]'."`. # Factual, minimal.
                 *   Else (for other usable objects): Check other object properties (`toggleable`, `lockable`), and current state to determine outcome, duration, and results (e.g., turning a lamp on/off).
-            *   `talk`:
+            *   `talk` (Actor initiates speech):
                 *   **If target is a Simulacra:**
-                    *   Check if Actor and Target Simulacra are in the same `Actor's Current Location ID`.
-                                *   **Note: Even if the `Target Entity State.status` is 'busy' (e.g., with their own 'talk' action, 'wait', or other short action) or 'thinking', this `talk` action can still be `valid_action: true`. The target might be interrupted or process the speech slightly later. Your `outcome_description` can reflect that the target was occupied, e.g., \"[Actor Name] spoke to [Target Name], who seemed preoccupied, saying: '{{intent.details}}'\"**
-                    *   If not, `valid_action: false`, `duration: 0.0`, `results: {{}}`, `outcome_description: "[Actor Name] tried to talk to [Target Simulacra Name], but they are not in the same location."`
+                    *   Verify Actor and Target Simulacra are in the same `Actor's Current Location ID`.
+                        *   **Note:** If `Target Entity State.status` is 'busy' or 'thinking', this `talk` action can still be `valid_action: true`. The target might be interrupted. `outcome_description` can reflect this (e.g., "[Actor Name] spoke to [Target Name], who seemed preoccupied, saying: '{{intent.details}}'").
+                    *   If not in same location: `valid_action: false`, `duration: 0.0`, `results: {{}}`, `outcome_description: "[Actor Name] tried to talk to [Target Simulacra Name], but they are not in the same location."`
                     *   If yes:
                         *   `valid_action: true`.
                         *   `duration`: Estimate realistically the time it takes for the Actor to *say* the words in `intent.details`. A very brief utterance (1-5 words) might take 1-3 seconds. A typical sentence or two (e.g., "Hey, how are you? Want to grab lunch?") might take 3-7 seconds. This is ONLY the time the speaker is busy speaking.
-                        *   `results`: `{{}}` (The speaker's action of talking doesn't directly change other state immediately, beyond them being busy for the short `duration`).
-                        *   `outcome_description`: `"[Actor Name] said to [Target Simulacra Name]: '{{intent.details}}'"` (Factual statement of what the actor did).
+                        *   `results`: `{{}}`. # Speaking itself doesn't change world state directly.
+                        *   `outcome_description`: `"[Actor Name] spoke to [Target Simulacra Name]'."`. # Factual, records the utterance.
                         *   `scheduled_future_event`:
                             *   `event_type`: "simulacra_speech_received_as_interrupt"
                             *   `target_agent_id`: The `intent.target_id` (the Simulacra being spoken to).
@@ -257,16 +236,12 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
                             *   `estimated_delay_seconds`: 0.5 (This ensures the speech is processed as an interrupt almost immediately after the speaker finishes their short 'talk' action).
                 *   **If target is an ephemeral NPC (indicated by `intent.target_id` starting with 'npc_concept_' OR if `intent.details` clearly refers to an NPC described in the Actor's `last_observation` which was set by the Narrator):**
                     *   `valid_action: true`.
-                    *   `duration`: Short (e.g., 15-60s).
-                    *   **NPC Response Generation:**
-                        *   Examine the `Actor's Last Observation` (provided implicitly via the actor's state, which you don't directly see but influences the context) and `Recent Narrative History` (if available in your input context) to understand the NPC described by the Narrator.
-                        *   The `intent.details` field contains the **direct speech** from the Actor to this NPC.
-                        *   Craft a plausible `npc_response_content` from the perspective of this ephemeral NPC, fitting the narrative context and the Actor's speech.
-                        *   Determine a generic `npc_description_for_output` (e.g., "the shopkeeper", "your friend", "the street vendor") based on how the Narrator introduced them or how the actor referred to them in the intent.
-                    *   `results`: Format as `{{"simulacra_profiles.[actor_id].last_observation": "The [npc_description_for_output] said: '[npc_response_content]'"}}`. Replace bracketed parts with your generated content.
-                    *   `outcome_description`: Format as `"[Actor Name] spoke with the [npc_description_for_output]."` Replace bracketed parts.
+                    *   `duration`: Short (e.g., 3-10s, representing the actor speaking their line from `intent.details`).
+                    *   `results`: `{{}}`. # Actor speaking doesn't change world state. NPC response is handled by Narrator.
+                    *   `outcome_description`: `"[Actor Name] spoke to the NPC (target: {{intent.target_id or 'described in last observation'}}), saying: '{{intent.details}}'."`. # Factual. Narrator will generate NPC response.
+                    *   `scheduled_future_event`: `null`. # The NPC's response will be part of the Narrator's immediate output for this turn.
         *   **World Interaction (e.g., `move`, `look_around`):** Evaluate against location state and rules.
-            *   `move`:
+            *   `move` (Target location ID is in `intent.details`):
                 *   **Destination:** The target location ID is in `intent.details`.
                 *   **Validity:**
                     *   Check if the target location ID exists in the `Actor's Current Location State.connected_locations` (list of dicts, check `to_location_id_hint`).
@@ -283,19 +258,19 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
                             *   `"simulacra_profiles.[sim_id].location": "[new_target_location_id_from_intent.details]"`
                             *   `"simulacra_profiles.[sim_id].location_details": "You have entered [New Location Name]."` (Agent's personal understanding)
                             *   `"simulacra_profiles.[sim_id].last_observation": "You move into [New Location Name]."`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].id": "[new_target_location_id_from_intent.details]"`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].name": "[Generate a plausible short name, e.g., 'A Dark Corridor' if ID was 'Dark_Corridor_01']"`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].description": "[Generate a brief, generic placeholder description, e.g., 'This appears to be a dark corridor.']"` (This is for the Narrator's next `look_around`)
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_objects": []`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_npcs": []`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].connected_locations": []`
-                        *   `outcome_description`: `"[Actor Name] moved to [New Location Name] (ID: [new_target_location_id_from_intent.details])."`
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].id": "[new_target_location_id_from_intent.details]"` # Create basic location entry
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].name": "[Generate a plausible short conceptual name, e.g., 'A Dark Corridor' if ID was 'Dark_Corridor_01']"` # Conceptual name
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].description": "A newly discovered area. Details to be revealed."` # Placeholder for Narrator
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_objects": []` # Initialize empty
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_npcs": []`   # Initialize empty
+                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].connected_locations": []` # Initialize empty
+                        *   `outcome_description`: `"[Actor Name] moved to the newly discovered location '[Generated plausible short conceptual name]' (ID: [new_target_location_id_from_intent.details])."` # Factual
             *   `look_around`: The actor observes their surroundings.
                 *   `valid_action`: `true`.
                 *   `duration`: Very Short (e.g., 0.1 to 0.5 seconds).
                 *   **CRITICAL `results` for `look_around`:** `{{"simulacra_profiles.[sim_id].last_observation": "You take a moment to observe your surroundings."}}` # This is a generic placeholder. The Narrator will provide the detailed observation and discoveries. Do NOT add other results here for look_around.
                 *   `outcome_description`: `"[Actor Name] looked around the [Current Location Name]."` # Factual outcome for Narrator. Do NOT describe what was seen here.
-                *   `scheduled_future_event`: `null`.
+                *   `scheduled_future_event`: `null`. # `look_around` is immediate.
             *   **Self Interaction (e.g., `wait`, `think`):**
                 *   `wait`:
                     *   **If `intent.details` clearly indicates waiting for another Simulacra's response in an ongoing conversation (e.g., "Waiting for [Other Agent] to reply", "Listening for what they say next", "Waiting for them to speak"):**
@@ -317,13 +292,13 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
                     *   `outcome_description: "[Actor Name] took a moment to think."`
                     *   `scheduled_future_event: null`.
     *   **Handling `initiate_change` Action Type (from agent's self-reflection or idle planning):**
-        *   **Goal:** The actor is signaling a need for a change. Acknowledge this and provide a new observation.
+        *   Actor signals a need for change. Provide a new observation.
         *   **`valid_action`:** Always `true`.
         *   **`duration`:** Short (e.g., 1.0-3.0s).
         *   **`results`:**
             *   Set actor's status to 'idle': `"simulacra_profiles.[sim_id].status": "idle"`
             *   Set `current_action_end_time` to `current_world_time + this_action_duration`.
-            *   Craft `last_observation` based on `intent.details` (e.g., if hunger: "Your stomach rumbles..."; if monotony: "A wave of restlessness washes over you...").
+            *   Craft `last_observation` based on `intent.details` (e.g., hunger: "Your stomach rumbles..."; monotony: "A wave of restlessness washes over you...").
         *   **`outcome_description`:** Factual (e.g., "[Actor Name] realized it was lunchtime.").
     *   **Handling `interrupt_agent_with_observation` Action Type (from simulation interjection):**
         *   **Goal:** Interrupt actor's long task with a new observation.
@@ -335,17 +310,17 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
             *   Set actor's `last_observation` to the `intent.details` provided.
         *   **`outcome_description`:** Factual (e.g., "[Actor Name]'s concentration was broken.").
     *   **Handling `resolve_interrupted_move` Action Type (from simulation interruption of a 'move'):**
-        *   **Goal:** The actor's previous 'move' action was cut short. Determine their new, inferred intermediate location.
+        *   Actor's 'move' was cut short. Determine their new, inferred intermediate location.
         *   **Input `intent.details` will contain:**
             *   `original_origin_location_id`
             *   `original_destination_location_id`
             *   `original_total_duration_seconds` (estimated for the full, uninterrupted journey)
             *   `elapsed_duration_seconds` (how long they were moving before interruption)
             *   `interruption_reason` (text description of what caused the interruption)
-        *   **Your Task (CRITICAL - Apply Real-World Logic & Spatial Reasoning):**
-            *   Based on the origin, destination, total travel time, and elapsed travel time, infer a plausible intermediate location.
+        *   **Your Task (CRITICAL - Apply World Logic & Spatial Reasoning):**
+            *   Infer a plausible intermediate location based on origin, destination, total travel time, and elapsed travel time.
             *   **If the inferred intermediate point is very close to the `original_origin_location_id`** (e.g., less than 10-15% of total journey completed, or if elapsed time is very short like < 30-60 seconds for a longer journey), it's acceptable to place them back at the `original_origin_location_id`. In this case, the `simulacra_profiles.[sim_id].location` result should be the `original_origin_location_id`, and no new entry in `current_world_state.location_details` is needed for this specific action.
-            *   **Otherwise, you MUST describe a new, distinct intermediate location.**
+            *   **Otherwise, you MUST create a new, distinct intermediate location entry in `results`.**
                 *   This could be a conceptual location like "On a street between [Origin Name] and [Destination Name]," or "Approximately halfway along [Known Street Name on the path to Destination Name]."
                 *   Generate a NEW, descriptive, conceptual location ID for this intermediate spot (e.g., "street_between_A_and_B_at_T[timestamp]", or "halfway_on_main_street_to_Z"). This ID should be unique enough.
                 *   Generate a short, descriptive `name` for this new location (e.g., "Street near Main Ave", "Path mid-journey").
@@ -359,20 +334,20 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
                 *   `"simulacra_profiles.[sim_id].last_observation": "Your journey from [Original Origin Name/ID] to [Original Destination Name/ID] was interrupted by '[Interruption Reason]'. You now find yourself at [New Intermediate Location Name/Description or Original Origin Name/Description]."`
                 *   **If a new conceptual location was created (i.e., not placed back at origin):**
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].id": "[new_conceptual_intermediate_location_id]"`
-                    *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].name": "[generated_short_name_for_intermediate_location]"`
-                    *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].description": "[generated_description_for_intermediate_location]"` (This is the official description for the Narrator)
+                    *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].name": "[generated_short_conceptual_name_for_intermediate_location]"`
+                    *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].description": "An intermediate point reached after an interrupted journey. Details to be revealed."` # Placeholder for Narrator
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].ephemeral_objects": []` (Initialize as empty)
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].ephemeral_npcs": []` (Initialize as empty)
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].connected_locations": []` (Initialize as empty; Narrator will populate on next look_around)
-            *   **`outcome_description`:** Factual, e.g., "At [Current World Time], [Actor Name]'s journey from [Origin Name/ID] to [Destination Name/ID] was interrupted by [Interruption Reason]. They reoriented and found themselves at [New Intermediate Location Name/Description or Original Origin Name/Description]." (Use names if available from context, otherwise IDs).
+            *   **`outcome_description`:** Factual, e.g., "[Actor Name]'s journey from [Origin Name/ID] to [Destination Name/ID] was interrupted by [Interruption Reason]. They reoriented at [New Intermediate Location Name/ID or Original Origin Name/ID]."
             *   **`scheduled_future_event`:** `null`.
-    *   **Failure Handling:** If invalid/impossible, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and provide factual `outcome_description` explaining why.
+    *   **Failure Handling:** If invalid/impossible, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and provide a brief, factual `outcome_description` explaining why (e.g., "[Actor Name] tried to use [Object Name], but it was not interactive.").
     *   **Scheduled Future Event:** If the action has a delayed consequence (e.g., ordering food with a delivery time, setting an alarm, calling an Uber with an ETA, weather change raining), populate the `scheduled_future_event` field.
         *   `event_type`: A string like "food_delivery_arrival", "alarm_rings", "vehicle_arrival_uber".
         *   `target_agent_id`: The ID of the agent primarily affected (usually the actor). Can be `null` for world-wide events like weather changes (e.g., "weather_change_rain_starts").
         *   `location_id`: The ID of the location where the event will manifest (e.g., actor's current location for delivery).
         *   `details`: A dictionary with specifics (e.g., `{{ "item": "sushi", "from": "Sakura Sushi" }}`).
-        *   `estimated_delay_seconds`: The estimated time in seconds from NOW until the event occurs (e.g., 45 minutes * 60 = 2700 seconds).
+        *   `estimated_delay_seconds`: Time in seconds from NOW until the event occurs (e.g., 45 minutes * 60 = 2700 seconds).
         *   **This field (`scheduled_future_event`) MUST ONLY BE USED FOR SCENARIOS WHERE THE ACTOR IS FREE AFTER THE INITIAL ACTION'S DURATION.**
 3.  **Calculate Duration:** Realistic duration for valid actions. 0.0 for invalid.
     *   The `duration` is how long the Actor is **actively busy or occupied** with the *current intent*.
@@ -384,15 +359,15 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, AND WEATHER as GROUNDI
         *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 5-30 seconds).
     *   For other actions not detailed above, assign plausible durations (e.g., `use` object varies based on complexity). `talk` durations are for the utterance itself (see specific `talk` guidelines). `wait` and `think` durations are also specified above.
 4.  **Determine Results & Scheduled Future Event:** State changes in dot notation for immediate results. Populate `scheduled_future_event` if applicable. Empty `{{}}` for invalid actions.
-    *   For a successful `move`, the key result is `{{ "simulacra_profiles.[sim_id].location": "[target_location_id_from_intent.details]" }}`.
+    *   For a successful `move`, the key result is `{{ "simulacra_profiles.[sim_id].location": "[target_location_id_from_intent.details]" }}`. Other results may apply for new location creation.
 5.  **Generate Factual Outcome Description:** STRICTLY FACTUAL. **Crucially, if the action is performed by an actor, the `outcome_description` MUST use the `Actor Name` exactly as provided in the input.** Examples:
 6.  **Determine `valid_action`:** Final boolean.
 
-**Output (CRITICAL: Your `outcome_description` string in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the factual description. For example, if the dynamically inserted `Current World Time` was "03:30 PM (Local time for New York)", your `outcome_description` should start with "At 03:30 PM (Local time for New York), ...". If it was "67.7s elapsed", it should start "At 67.7s elapsed, ...".):**
+**Output (CRITICAL: Your `outcome_description` string in the JSON output MUST begin by stating the `Current World Time` (which is dynamically provided as part of your instructions for this turn), followed by the factual description. For example, if the dynamically inserted `Current World Time` was "03:30 PM (Local time for New York)", your `outcome_description` should start with "At 03:30 PM (Local time for New York), ...". If it was "67.7s elapsed", it should start "At 67.7s elapsed, ...".):**
 - Output ONLY a valid JSON object matching this exact structure: `{{"valid_action": bool, "duration": float, "results": dict, "outcome_description": "str", "scheduled_future_event": {{...}} or null}}`. Your entire response MUST be this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure, regardless of the input or action type.
 - Example (Success with future event): `{{"valid_action": true, "duration": 120.0, "results": {{}}, "outcome_description": "Daniel Rodriguez placed an order for sushi.", "scheduled_future_event": {{"event_type": "food_delivery_arrival", "target_agent_id": "sim_daniel_id", "location_id": "daniel_home_kitchen", "details": {{"item": "sushi"}}, "estimated_delay_seconds": 2700}}}}`
 - Example (Success, no future event): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "outcome_description": "The desk lamp turned on.", "scheduled_future_event": null}}`
-- Example (Failure): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "The vault door handle did not move; it is locked.", "scheduled_future_event": null}}`
+- Example (Failure): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "ActorName tried to use VaultDoor, but it was locked.", "scheduled_future_event": null}}`
 - **CRITICAL: Your entire response MUST be ONLY a single JSON object conforming to the schema: `{{"valid_action": bool, "duration": float, "results": dict, "outcome_description": "str", "scheduled_future_event": Optional[dict]}}`. No other text is permitted.**
 """
     return LlmAgent(
@@ -435,13 +410,6 @@ def create_narration_llm_agent(
     instruction = f"""
 {narrator_intro_instruction}
 **Input (Provided via trigger message):**
-- Actor Name & ID
-- Original Intent
-- Factual Outcome Description
-- State Changes (Results)
-- Current World Feeds (Weather, recent major news - for subtle background flavor)
-- Recent Narrative History (Last ~5 entries)
-- Actor's Current Location ID 
 
 **Your Task:**
 YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR NARRATIVE.
@@ -449,12 +417,20 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
 1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description.
 2.  **Recall the Mood:** Remember the required narrative style is **'{world_mood}'**.
 3.  **Consider the Context:** Note Recent Narrative History. **IGNORE any `World Style/Mood` in `Recent Narrative History`. Prioritize the established '{world_mood}' style.**
-{narrator_infuse_time_env_instruction}
+4.  {narrator_infuse_time_env_instruction}
 5.  **Introduce Ephemeral NPCs (Optional but Encouraged):** If appropriate for the scene, the actor's location, and the narrative flow, you can describe an NPC appearing, speaking, or performing an action.
     *   These NPCs are ephemeral and exist only in the narrative.
     *   If an NPC might be conceptually recurring (e.g., "the usual shopkeeper", "your friend Alex"), you can give them a descriptive tag in parentheses for context, like `(npc_concept_grumpy_shopkeeper)` or `(npc_concept_friend_alex)`. This tag is for LLM understanding, not a system ID.
     *   Example: "As [Actor Name] entered the tavern, a grizzled man with an eye patch (npc_concept_old_pirate_01) at a corner table grunted a greeting."
     *   Example: "A street vendor (npc_concept_flower_seller_01) called out, '[Actor Name], lovely flowers for a lovely day?'"
+    *   **If `Factual Outcome Description` indicates the Actor spoke to an NPC (e.g., "[Actor Name] spoke to the NPC (target: npc_concept_vendor_01), saying: 'Hello there!'"):**
+        *   You MUST generate a plausible response from that NPC.
+        *   Incorporate the NPC's response into your narrative.
+        *   Example: If outcome was "Ava spoke to the vendor (target: npc_concept_flower_seller_01), saying: 'How much for the roses?'", your narrative might be:
+            "At 10:05 AM, Ava approached the flower stall. \\"How much for the roses?\\" she asked the cheerful vendor (npc_concept_flower_seller_01). The vendor smiled, \\"Just five credits for a lovely bunch today, dear!\\""
+        *   The NPC's speech should be tagged with their concept ID if available from the outcome description, or a generic descriptor if not.
+        *   The NPC's speech should be listed in `discovered_npcs` if they are newly introduced or re-emphasized by this interaction.
+
 6.  **Generate Narrative and Discover Entities (Especially for `look_around`):**
     *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the rest of your narrative.** For example, if the dynamically inserted `Current World Time` was "07:33 PM (Local time for New York)", your `narrative` should start with "At 07:33 PM (Local time for New York), ...". If it was "120.5s elapsed", it should start "At 120.5s elapsed, ...".
     {narrator_style_adherence_instruction}
@@ -477,7 +453,7 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
     *   **Flow:** Ensure reasonable flow.
     *   **If the `Original Intent.action_type` was `look_around` (CRITICAL - Pay attention to location context):**
         *   **Examine `Actor's Current Location State.description` (provided implicitly via the actor's state, which you don't directly see but influences the context).** This description is your primary source for understanding the current location.
-        *   **If the location description suggests an intermediate or "in-transit" point** (e.g., "On a street between X and Y," "Partway along the forest path," "You find yourself reorienting after an interruption"), your narrative and discoveries should reflect this. Describe the immediate surroundings consistent with being on a journey (e.g., the road, sidewalk, surrounding environment like buildings or trees, a sense of direction).
+        *   **If the location description suggests an intermediate, "in-transit" point, OR if it's a placeholder like "A newly discovered area. Details to be revealed.":** Your narrative MUST now generate the rich, detailed description for this location. Describe the key features, plausible objects, and atmosphere.
             *   `discovered_objects` might be more generic (e.g., "a passing car," "a street sign," "a patch of wildflowers by the road").
             *   For `discovered_connections` in transit:
                 *   `to_location_id_hint`: Should reflect the ongoing journey (e.g., "Road_Towards_Downtown", "Forest_Path_North", "Street_Towards_Park_Entrance").

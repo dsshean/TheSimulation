@@ -434,6 +434,8 @@ Intent: {intent_json}
 Target Entity State ({target_id_we or 'N/A'}): {target_state_json}
 Location State: {location_state_json}
 World Rules: {world_rules_json}
+World Time: {time_for_world_engine_prompt} 
+Weather: {get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')} 
 
 Resolve this intent based on your instructions and the provided context.
 """
@@ -614,6 +616,12 @@ def _build_simulacra_prompt(
         ]
         audible_env_str = "\n".join(audible_events_text_parts) if audible_events_text_parts else "  The environment is quiet."
 
+        recently_departed_sim_text_parts = [
+            f"  - Recently Departed: {s.get('name', s.get('id'))} (ID: {s.get('id')}) went to location ID '{s.get('departed_to_location_id', 'Unknown')}'."
+            for s in fresh_percepts.get("recently_departed_simulacra", [])
+        ]
+        recently_departed_sim_str = "\n".join(recently_departed_sim_text_parts) if recently_departed_sim_text_parts else "  No one recently departed from this location."
+
         perceptual_summary_for_prompt = (
             f"Official Location Description: \"{loc_desc_from_percepts}\"\n"
             f"Visible Entities:\n{visible_sim_str}\n{visible_static_obj_str}\n{visible_eph_obj_str}\n{visible_eph_npc_str}"
@@ -636,6 +644,7 @@ def _build_simulacra_prompt(
         f"- Current Location ID: {agent_current_location_id or 'Unknown'}",
         f"- Your Personal Understanding of this Location: \"{agent_personal_location_details}\"",
         f"- Perceived Environment:\n{perceptual_summary_for_prompt}",
+        f"- Recently Departed from this Location:\n{recently_departed_sim_str}", # Added new percept
         f"- Status: {agent_state_data.get('status', 'idle')} ({status_message_for_prompt})",
         f"- Current Weather: {weather_summary}",
         f"- Recent News Snippet: {news_summary}",

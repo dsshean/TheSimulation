@@ -35,6 +35,7 @@ class PerceptionManager:
                 "visible_static_objects": [],
                 "visible_ephemeral_objects": [],
                 "visible_npcs": [],
+                "recently_departed_simulacra": [], # New field
                 "audible_events": [],
                 "error": "Perceiving simulacrum has no current location."
             }
@@ -46,16 +47,31 @@ class PerceptionManager:
             "visible_static_objects": [],
             "visible_ephemeral_objects": get_nested(self.state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_location_id, "ephemeral_objects", default=[]),
             "visible_npcs": get_nested(self.state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, current_location_id, "ephemeral_npcs", default=[]),
+            "recently_departed_simulacra": [], # New field
             "audible_events": [],
         }
 
         all_simulacra = get_nested(self.state, SIMULACRA_KEY, default={})
         for sim_id, sim_data in all_simulacra.items():
-            if sim_id != perceiving_sim_id and sim_data.get(CURRENT_LOCATION_KEY) == current_location_id:
+            if sim_id == perceiving_sim_id:
+                continue # Skip self
+
+            other_sim_current_loc = sim_data.get(CURRENT_LOCATION_KEY)
+            other_sim_previous_loc = sim_data.get("previous_location_id")
+
+            if other_sim_current_loc == current_location_id:
+                # This simulacrum is in the same location
                 percepts["visible_simulacra"].append({
                     "id": sim_id,
                     "name": get_nested(sim_data, "persona_details", "Name", default=sim_id),
                     "status": sim_data.get("status", "unknown")
+                })
+            elif other_sim_previous_loc == current_location_id and other_sim_current_loc != current_location_id:
+                # This simulacrum was here but has moved to a different location
+                percepts["recently_departed_simulacra"].append({
+                    "id": sim_id,
+                    "name": get_nested(sim_data, "persona_details", "Name", default=sim_id),
+                    "departed_to_location_id": other_sim_current_loc # Their new current location
                 })
 
         for obj_data in self.state.get("objects", []):
