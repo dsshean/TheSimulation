@@ -272,25 +272,54 @@ async def dynamic_interruption_task(
 
             if random.random() < interrupt_probability:
                 logger_instance.info(f"[DynamicInterruptionTask] Triggering dynamic interruption for {agent_name_to_check} (Prob: {interrupt_probability:.3f}, RemDur: {remaining_duration:.1f}s).")
-                interruption_text = f"A minor unexpected event occurs, breaking {agent_name_to_check}'s concentration."
+                
+                agent_action_desc_dit = agent_state_to_check.get("current_action_description", "their current activity")
+                interruption_context_for_llm_prompt: str
+
+                is_listening_action = (
+                    "listening to" in agent_action_desc_dit.lower() or
+                    ("waiting for" in agent_action_desc_dit.lower() and "to speak" in agent_action_desc_dit.lower()) or
+                    ("paying attention to" in agent_action_desc_dit.lower() and "as they speak" in agent_action_desc_dit.lower()) or
+                    "listened attentively to" in agent_action_desc_dit.lower() # From WE outcome
+                )
+
+                if is_listening_action:
+                    interruption_context_for_llm_prompt = f"""Agent {agent_name_to_check} is currently listening to someone speak.
+Their stated activity is: "{agent_action_desc_dit}".
+The general world mood is: "{world_mood}".
+They suddenly have a thought or an urge to interject or respond before the speaker finishes.
+Describe this internal realization or the minor event that triggers their desire to speak, from {agent_name_to_check}'s perspective.
+Example: "While listening, an important counter-point flashes into your mind, and you feel a sudden need to voice it."
+Example: "As the speaker pauses for a micro-second, you see an opening and decide to jump in."
+Output ONLY the narrative sentence(s) describing this urge/trigger for you ({agent_name_to_check}) to speak."""
+                else:
+                    interruption_context_for_llm_prompt = f"""Agent {agent_name_to_check} is currently busy with: "{agent_action_desc_dit}".
+The general world mood is: "{world_mood}".
+An unexpected minor interruption occurs, breaking {agent_name_to_check}'s concentration or prompting a change of thought.
+Describe this interruption in one or two engaging narrative sentences from an observational perspective, suitable for {agent_name_to_check} to perceive.
+Example: "Suddenly, a loud crash from the kitchen shatters the quiet, making you jump."
+Output ONLY the narrative sentence(s)."""
+
+                interruption_text = f"A minor unexpected event occurs, breaking your concentration." # Default
                 try:
                     interrupt_llm = genai.GenerativeModel(MODEL_NAME) # Assumes genai is configured
-                    narrative_prompt = f"""Agent {agent_name_to_check} is currently busy with: "{agent_state_to_check.get("current_action_description", "their current activity")}".
-The general world mood is: "{world_mood}".
-An unexpected minor interruption occurs. Describe this interruption in one or two engaging narrative sentences from an observational perspective, suitable for {agent_name_to_check} to perceive.
-Example: "Suddenly, a loud crash from the kitchen shatters the quiet, making {agent_name_to_check} jump."
-Output ONLY the narrative sentence(s)."""
-                    response = await interrupt_llm.generate_content_async(narrative_prompt)
+                    response = await interrupt_llm.generate_content_async(interruption_context_for_llm_prompt)
                     if response.text: interruption_text = response.text.strip()
                 except Exception as e_interrupt_text:
                     logger_instance.error(f"[DynamicInterruptionTask] Failed to generate LLM text for interruption, using default. Error: {e_interrupt_text}")
 
                 logger_instance.info(f"[DynamicInterruptionTask] Interrupting {agent_name_to_check} with: {interruption_text}")
+                
+                action_desc_after_interrupt = "Interrupted by a dynamic event."
+                if is_listening_action and \
+                   ("interject" in interruption_text.lower() or "speak" in interruption_text.lower() or "respond" in interruption_text.lower() or "voice it" in interruption_text.lower() or "jump in" in interruption_text.lower()):
+                    action_desc_after_interrupt = "Had a thought while listening; decided to interject."
+
                 _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.status", "idle", logger_instance)
                 _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.last_observation", interruption_text, logger_instance)
                 _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.pending_results", {}, logger_instance)
                 _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_action_end_time", current_sim_time_dit, logger_instance)
-                _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_action_description", "Interrupted by a dynamic event.", logger_instance)
+                _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_action_description", action_desc_after_interrupt, logger_instance)
                 _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.last_interjection_sim_time", current_sim_time_dit, logger_instance)
                 _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_interrupt_probability", None, logger_instance)
                 _log_event(current_sim_time_dit, "DynamicInterruptionTask", "agent_interrupted", {"agent_id": agent_id_to_check, "interruption_text": interruption_text}, logger_instance, event_logger_instance)

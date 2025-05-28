@@ -103,6 +103,27 @@ class SimulacraIntentResponse(BaseModel):
     target_id: Optional[str] = None
     details: str = ""
 
+# --- World Generator Output Models ---
+class GeneratedLocationConnection(BaseModel):
+    to_location_id_hint: str
+    description: str # e.g., "A sturdy oak door leading to the kitchen."
+    # travel_time_estimate_seconds: Optional[int] = None # Can be added if generator provides it
+
+class GeneratedLocationDetail(BaseModel):
+    id: str # The ID of the location being defined/detailed
+    name: str # Generated descriptive name
+    description: str # Generated rich description of this location
+    ambient_sound_description: Optional[str] = "The typical sounds of such a place."
+    ephemeral_objects: List["DiscoveredObject"] = Field(default_factory=list) # Objects within this location
+    ephemeral_npcs: List["DiscoveredNPC"] = Field(default_factory=list) # NPCs within this location
+    connected_locations: List[GeneratedLocationConnection] = Field(default_factory=list) # Connections *from* this location
+    # You can add a 'type_hint' if the generator should specify (e.g., "kitchen", "living_room")
+    # type_hint: Optional[str] = None
+
+class WorldGeneratorOutput(BaseModel):
+    defined_location: GeneratedLocationDetail # The primary location that was requested to be defined/detailed
+    additional_related_locations: List[GeneratedLocationDetail] = Field(default_factory=list) # E.g., other rooms generated alongside the primary one
+    connection_update_for_origin: Optional[Dict[str, Any]] = None # If an origin location needs its connections updated to point to defined_location
 # --- Narrator Output Models (Added for Pydantic Validation) ---
 class DiscoveredObject(BaseModel):
     id: str

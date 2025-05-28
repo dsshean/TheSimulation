@@ -130,7 +130,7 @@ TheSimulation operates through a series of asynchronous components, orchestrated
 
     - An asynchronous task that consumes intents from the `intent_queue`.
     - **LLM-Powered Resolution:** It utilizes an LLM (the "World Engine Agent") to interpret the agent's intended action. This interpretation considers the current world `state`, including object properties, location rules, and the acting agent's capabilities.
-    - **Determines Outcomes:** The World Engine LLM decides if the action is valid, calculates its duration in simulation time, determines the direct consequences (e.g., changes to object states, agent location), and generates a factual, objective description of the outcome.
+    - **Determines Outcomes & Triggers World Generation:** The World Engine LLM decides if the action is valid, calculates its duration in simulation time, determines the direct consequences (e.g., changes to object states, agent location), and generates a factual, objective description of the outcome. If an agent attempts to move to an undefined location, the World Engine task will invoke the `WorldGeneratorLLMAgent` to define the new location before resolving the move.
     - The World Engine's structured output is then passed to the `narration_queue`.
 
 6.  **Narrator (`narration_task`):**
@@ -142,16 +142,23 @@ TheSimulation operates through a series of asynchronous components, orchestrated
 
 7.  **Supporting System Tasks:**
 
-    - `interaction_dispatcher_task`: A pre-processing step that classifies agent intents before they reach the World Engine.
     - `dynamic_interruption_task`: Periodically checks for agents engaged in long actions and probabilistically introduces minor, unexpected events to interrupt them, adding dynamism.
     - `world_info_gatherer_task`: Periodically updates global world feeds (e.g., simulated weather, news headlines) using LLMs. For "realtime" simulations, it can use a dedicated "Search Agent" (also LLM-powered) to fetch and summarize real-world information.
-    - `narrative_image_generation_task`: If enabled, this task periodically selects recent narrative segments and uses an image generation model to create visual representations, saving them to `data/images/` (or `data/narrative_images/`).
+    - `narrative_image_generation_task` (Optional): If `ENABLE_NARRATIVE_IMAGE_GENERATION` is true, this task periodically selects recent narrative segments, uses an image generation model to create visual representations (saving to `data/narrative_images/`), and can also post these to Bluesky if `ENABLE_BLUESKY_POSTING` is true.
+    - `socket_server_task`: Runs a socket server allowing external clients (like `client.py`) to connect, inject narratives or events, and query simulation state.
 
-8.  **Google ADK Integration:**
+8.  **World Generator (`WorldGeneratorLLMAgent`):**
+
+    - An LLM-powered agent invoked by the World Engine task when a Simulacrum attempts to move to a location ID that does not yet exist in the simulation state.
+    - **LLM-Powered Definition:** It uses an LLM to generate the details for the new location, including its description, potential objects, NPCs, and connections to other locations (including the origin location).
+    - The generated location data is then added to the central `state` dictionary, allowing the World Engine to proceed with the agent's move.
+
+9.  **Google ADK Integration:**
     - The project primarily uses the Google Agent Development Kit (ADK) for its `LlmAgent` class, which provides a convenient abstraction for interacting with LLMs (like Gemini models).
     - ADK's `SessionService` is used for managing the lifecycle of these LLM agent interactions.
     - The `InMemoryMemoryService` from ADK is used for basic memory functions, such as storing the initial persona details for agents.
     - ADK's tool-calling capabilities are leveraged, for example, by the Search Agent to use a `google_search` tool.
+    - Each core LLM agent (Simulacra, World Engine, Narrator, World Generator, Search Agent) is initialized with its own dedicated ADK `Runner` and `Session` to maintain separate conversation contexts and manage state isolation.
 
 ## Getting Started
 
@@ -224,20 +231,20 @@ GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
 
 # --- Model Selection (Optional - Defaults are in config.py) ---
 # Primary LLM for agent reasoning, world engine, etc.
-# MODEL_GEMINI_PRO="gemini-2.0-flash"
+# MODEL_GEMINI_PRO="gemini-2.0-flash"  # Default in config.py
 # LLM for search agent and potentially other lighter tasks
-# SEARCH_AGENT_MODEL_NAME="gemini-2.0-flash"
+# SEARCH_AGENT_MODEL_NAME="gemini-2.0-flash"  # Default in config.py
 # LLM for image generation
-# IMAGE_GENERATION_MODEL_NAME="gemini-2.0-flash" # Or your preferred image model
+# IMAGE_GENERATION_MODEL_NAME="imagen-3.0-generate-002" # Default in config.py
 
 # --- Simulation Speed & Duration (Optional) ---
 # SIMULATION_SPEED_FACTOR=1.0 # Multiplier for simulation time progression (e.g., 2.0 is twice as fast)
 # UPDATE_INTERVAL=0.1         # Real-time seconds between simulation state updates and display refresh
-# MAX_SIMULATION_TIME=7200.0  # Maximum simulation time in seconds (e.g., 7200s = 2 sim hours)
+# MAX_SIMULATION_TIME=9996000.0  # Maximum simulation time in seconds (Default in config.py)
 
 # --- Agent Behavior (Optional) ---
 # AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS=120.0 # How often (sim seconds) agents consider self-reflection
-# LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS=300.0  # Min sim-duration of an action for self-reflection to be considered
+# LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS=300.0    # Min sim-duration of an action for self-reflection to be considered
 # INTERJECTION_COOLDOWN_SIM_SECONDS=450.0           # Cooldown (sim seconds) before an agent can be interjected again (self-reflection or dynamic)
 # PROB_INTERJECT_AS_SELF_REFLECTION=0.60            # Probability an agent will self-reflect if conditions are met
 
@@ -245,7 +252,7 @@ GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
 # DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS=5.0       # How often (real seconds) the system checks to dynamically interrupt busy agents
 # DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS=600.0 # Sim-duration of an action at which the target interruption probability is met
 # DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION=0.05 # Target probability (e.g., 0.05 = 5%) for interruption at the target duration
-# DYNAMIC_INTERRUPTION_MIN_PROB=0.005               # Minimum probability for any eligible action to be interrupted
+# DYNAMIC_INTERRUPTION_MIN_PROB=0.005                 # Minimum probability for any eligible action to be interrupted
 # DYNAMIC_INTERRUPTION_MAX_PROB_CAP=0.15            # Absolute maximum probability cap for an interruption check
 # MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK=60.0  # Actions shorter than this (sim seconds) won't be dynamically interrupted
 
@@ -259,6 +266,21 @@ GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
 
 # --- Miscellaneous (Optional) ---
 # RANDOM_SEED_VALUE=42 # Integer value for reproducible randomness, or leave unset for random behavior
+
+# --- Social Media Posting (Optional) ---
+# ENABLE_BLUESKY_POSTING=false # Set to "true" to enable Bluesky posts
+# BLUESKY_HANDLE="yourhandle.bsky.social"
+# BLUESKY_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" # App-specific password for Bluesky
+
+# ENABLE_TWITTER_POSTING=false # Set to "true" to enable Twitter (X) posts
+# TWITTER_CONSUMER_KEY="YOUR_TWITTER_CONSUMER_KEY"
+# TWITTER_CONSUMER_SECRET="YOUR_TWITTER_CONSUMER_SECRET"
+# TWITTER_ACCESS_TOKEN="YOUR_TWITTER_ACCESS_TOKEN"
+# TWITTER_ACCESS_TOKEN_SECRET="YOUR_TWITTER_ACCESS_TOKEN_SECRET"
+# TWITTER_BEARER_TOKEN="YOUR_TWITTER_BEARER_TOKEN" # For v2 client actions
+
+# SOCIAL_POST_HASHTAGS="#TheSimulation #AI" # Hashtags for social media posts
+# SOCIAL_POST_TEXT_LIMIT=200 # Character limit for the text part of social posts (excluding image/hashtags)
 ```
 
 ### Key Configuration Parameters in `src/config.py`:
@@ -268,45 +290,60 @@ Below is a description of the main parameters defined in src/config.py. Many can
 ### Core API and Model Configuration:
 
 - API_KEY (Env: GOOGLE_API_KEY): Essential. Your Google API key for accessing Gemini models.
-- MODEL_NAME (Env: MODEL_GEMINI_PRO, Default: gemini-1.5-flash-latest or similar): The primary Gemini model used for complex reasoning tasks by Simulacra agents, the World Engine, and other core LLM interactions.
-- SEARCH_AGENT_MODEL_NAME (Env: SEARCH_AGENT_MODEL_NAME, Default: gemini-1.5-flash-latest or similar): The Gemini model used by the dedicated search agent.
-- IMAGE_GENERATION_MODEL_NAME (Env, Default: gemini-1.0-pro-vision-001 or similar): The model for narrative image generation. Ensure you use a model capable of image generation.
+- MODEL_NAME (Env: `MODEL_GEMINI_PRO`, Default: `gemini-2.0-flash`): The primary Gemini model used for complex reasoning tasks by Simulacra agents, the World Engine, and other core LLM interactions.
+- SEARCH_AGENT_MODEL_NAME (Env: `SEARCH_AGENT_MODEL_NAME`, Default: `gemini-2.0-flash`): The Gemini model used by the dedicated search agent.
+- IMAGE_GENERATION_MODEL_NAME (Env: `IMAGE_GENERATION_MODEL_NAME`, Default: `imagen-3.0-generate-002`): The model for narrative image generation.
 
 ### Simulation Parameters:
 
 - SIMULATION_SPEED_FACTOR (Env, Default: 1.0): Multiplier for simulation time progression relative to real time.
 - UPDATE_INTERVAL (Env, Default: 0.1): Real-world seconds between main simulation loop updates and display refreshes.
-- MAX_SIMULATION_TIME (Env, Default: 96000.0): Maximum simulation time in simulation seconds before the simulation automatically stops.
+- MAX_SIMULATION_TIME (Env, Default: `9996000.0`): Maximum simulation time in simulation seconds before the simulation automatically stops.
 - MEMORY_LOG_CONTEXT_LENGTH (Default: 10): Number of recent narrative entries provided to Simulacra agents as part of their immediate context.
-  Agent Self-Reflection & Dynamic Interruption Parameters: These control how agents might pause long tasks for self-reflection or be interrupted by minor dynamic events.
+- MAX_MEMORY_LOG_ENTRIES (Default: 500): Maximum number of entries to keep in an agent's individual memory log.
 
-- AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS (Env, Default: 120.0)
-- LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS (Env, Default: 300.0)
-- INTERJECTION_COOLDOWN_SIM_SECONDS (Env, Default: 450.0)
-- PROB_INTERJECT_AS_SELF_REFLECTION (Env, Default: 0.60)
-- DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS (Env, Default: 5.0)
-- DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS (Env, Default: 600.0)
-- DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION (Env, Default: 0.35)
-- MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK (Env, Default: 60.0)
+### Agent Self-Reflection & Behavior Parameters:
+
+- AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS (Env, Default: 120.0): How often (sim seconds) agents consider self-reflection during long tasks.
+- LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS (Env, Default: 300.0): Minimum simulation duration of an action for self-reflection to be considered.
+- INTERJECTION_COOLDOWN_SIM_SECONDS (Env, Default: 450.0): Cooldown (sim seconds) before an agent can be interjected again (either self-reflection or dynamic interruption).
+- PROB_INTERJECT_AS_SELF_REFLECTION (Env, Default: 0.60): Probability that an eligible interjection will be a self-reflection.
+- AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS (Env, Default: 0.5): How often (real seconds) agent tasks check their status and the simulation state.
+
+### Dynamic Interruption Task Parameters:
+
+- DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS (Env, Default: 5.0): How often (real seconds) the system checks to dynamically interrupt busy agents.
+- DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS (Env, Default: 600.0): Simulation duration of an action at which the target interruption probability is met.
+- DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION (Env, Default: `0.35`): Target probability for interruption at the target duration.
+- DYNAMIC_INTERRUPTION_MIN_PROB (Env, Default: `0.005`): Minimum probability for any eligible action to be interrupted.
+- DYNAMIC_INTERRUPTION_MAX_PROB_CAP (Env, Default: `0.25`): Absolute maximum probability cap for an interruption check.
+- MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK (Env, Default: 60.0): Actions shorter than this (sim seconds) won't be dynamically interrupted by this task.
 
 ### World Information Gatherer:
 
 - WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS (Env, Default: 3600.0): How often (in simulation seconds) world feeds (e.g., weather, news) are updated.
 - MAX_WORLD_FEED_ITEMS (Env, Default: 5): Maximum number of items to retain for each feed category.
 
-### Narrative Image Generation:
+### Narrative Image Generation & Social Posting:
 
-- ENABLE_NARRATIVE_IMAGE_GENERATION (Env, Default: False): Set to "true" to enable image generation.
+- ENABLE_NARRATIVE_IMAGE_GENERATION (Env, Default: `False`): Set to "true" to enable image generation.
 - IMAGE_GENERATION_INTERVAL_REAL_SECONDS (Env, Default: 1800.0): Frequency (in real-world seconds) of image generation attempts.
+- ENABLE_BLUESKY_POSTING (Env, Default: `False`): Set to "true" to enable posting generated images and narratives to Bluesky.
+- BLUESKY_HANDLE (Env): Your Bluesky handle (e.g., `yourname.bsky.social`). Required if `ENABLE_BLUESKY_POSTING` is true.
+- BLUESKY_APP_PASSWORD (Env): An app-specific password for Bluesky. Required if `ENABLE_BLUESKY_POSTING` is true.
+- ENABLE_TWITTER_POSTING (Env, Default: `False`): Set to "true" to enable posting to Twitter (X).
+- TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET, TWITTER_BEARER_TOKEN (Env): Twitter API credentials. Required if `ENABLE_TWITTER_POSTING` is true.
+- SOCIAL_POST_HASHTAGS (Env, Default: `"#TheSimulation #AI #DigitalTwin #ProceduralStorytelling"`): Hashtags for social media posts.
+- SOCIAL_POST_TEXT_LIMIT (Env, Default: `200`): Character limit for the text part of social posts (excluding image/hashtags).
 
 ### Random Seed:
 
-- RANDOM_SEED (Env: RANDOM_SEED_VALUE, Default: None): If set to an integer, this seed is used for random number generation, allowing for reproducible runs (for aspects dependent on random). If None, randomness will vary.
+- RANDOM_SEED (Env: `RANDOM_SEED_VALUE`, Default: `None`): If set to an integer, this seed is used for random number generation, allowing for reproducible runs (for aspects dependent on `random`). If `None`, randomness will vary.
 
 ### Paths & Keys:
 
-- BASE_DIR, STATE_DIR, LIFE_SUMMARY_DIR, IMAGE_GENERATION_OUTPUT_DIR (or NARRATIVE_IMAGE_OUTPUT_DIR): These define the directory structure for storing data, state files, agent profiles, and generated images. They are typically derived from the project's root.
-- Various \_KEY constants (e.g., SIMULACRA_KEY, WORLD_STATE_KEY): Internal string constants used to consistently access parts of the main simulation state dictionary. They are generally not meant for direct user configuration via .env but are central to the codebase's state management.
+- BASE_DIR, STATE_DIR, LIFE_SUMMARY_DIR, WORLD_CONFIG_DIR, IMAGE_GENERATION_OUTPUT_DIR: These define the directory structure for storing data, state files, agent profiles, world configurations, and generated images. They are typically derived from the project's root.
+- Various `_KEY` constants (e.g., `SIMULACRA_KEY`, `WORLD_STATE_KEY`, `LOCATION_DETAILS_KEY`): Internal string constants used to consistently access parts of the main simulation state dictionary. They are generally not meant for direct user configuration via `.env` but are central to the codebase's state management.
 
 Refer to src/config.py for the full list of parameters, their default values, and more specific comments.
 
@@ -328,8 +365,6 @@ The `data/` directory is the primary location for all persistent files related t
   - These images visually represent scenes or moments from the simulation's narrative.
 
 **Important**
-Ugly hack for now - might be limitations for Google ADK, but there seems to be issues with context passing. Out of the box ADK does not supposed async bus implementation unless you use A2A. To keep things simple a simple hack was created for various event buses so all the agents can interact asynchronusly.
-
 The setup_simulation.py will create the initial world state and simulacras located in data\life_summaries. Two files are needed for the simulation to run:
 world_config_uuid.json
 life_summary_name_uuid.json

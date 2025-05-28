@@ -32,7 +32,7 @@ from .core_tasks import dynamic_interruption_task, narrative_image_generation_ta
 
 from .agents import create_narration_llm_agent  # Agent creation functions
 from .agents import (create_search_llm_agent, create_simulacra_llm_agent,
-                     create_world_engine_llm_agent)
+                     create_world_engine_llm_agent, create_world_generator_llm_agent) # Added WorldGenerator
 # Import from our new/refactored modules
 from .config import (  # For run_simulation; For self-reflection; New constants for dynamic_interruption_task; PROB_INTERJECT_AS_NARRATIVE removed; from this import list; Import Bluesky and social post config; Import SIMULACRA_KEY
     ACTIVE_SIMULACRA_IDS_KEY, AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS,
@@ -56,7 +56,7 @@ from .loop_utils import (get_nested, load_json_file,
                          load_or_initialize_simulation, parse_json_output_last,
                          save_json_file)
 from .perception_manager import PerceptionManager # Import the moved PerceptionManager
-from .models import NarratorOutput  # Pydantic models for tasks in this file
+from .models import NarratorOutput, WorldGeneratorOutput, GeneratedLocationDetail  # Pydantic models for tasks in this file
 from .models import SimulacraIntentResponse, WorldEngineResponse
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
     _update_state_value, generate_table, get_time_string_for_prompt, get_target_entity_state, # Re-added get_time_string_for_prompt, added get_target_entity_state
@@ -91,6 +91,10 @@ simulacra_session_ids_map: Dict[str, str] = {}
 search_llm_agent_instance: Optional[LlmAgent] = None # Renamed
 search_agent_runner_instance: Optional[Runner] = None # Renamed
 search_agent_session_id_val: Optional[str] = None # Renamed
+
+world_generator_agent: Optional[LlmAgent] = None
+world_generator_runner: Optional[Runner] = None
+world_generator_session_id: Optional[str] = None
 
 world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home."
 live_display_object: Optional[Live] = None
@@ -373,13 +377,20 @@ Generate the narrative paragraph based on these details and your instructions (r
 
                             # --- Phase 2: Process newly_instantiated_locations ---
                             if newly_instantiated_locations_from_narrator:
-                                for loc_placeholder in newly_instantiated_locations_from_narrator:
-                                    new_loc_id = loc_placeholder.id
+                                for loc_placeholder_item in newly_instantiated_locations_from_narrator:
+                                    # Convert to dict first to handle Pydantic models, SimpleNamespace, or dicts uniformly
+                                    loc_data_dict = _to_dict(loc_placeholder_item)
+                                    
+                                    new_loc_id = loc_data_dict.get('id')
+                                    if not new_loc_id:
+                                        logger.warning(f"[NarrationTask] Skipping newly instantiated location because 'id' is missing: {loc_data_dict}")
+                                        continue
+
                                     # Ensure the path exists before trying to set a value under it.
+                                    # _update_state_value also handles path creation, so this setdefault is more for clarity/safety.
                                     state.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
-                                    new_loc_data_dict = _to_dict(loc_placeholder) # loc_placeholder could be Pydantic or dict
-                                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{new_loc_id}", new_loc_data_dict, logger)
-                                    logger.info(f"[NarrationTask] Narrator instantiated new location placeholder: '{new_loc_id}' ({getattr(loc_placeholder, 'name', new_loc_id)})")
+                                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{new_loc_id}", loc_data_dict, logger)
+                                    logger.info(f"[NarrationTask] Narrator instantiated new location placeholder: '{new_loc_id}' ({loc_data_dict.get('name', new_loc_id)})")
 
                     # --- Log Narration Event ---
                     _log_event(
@@ -438,6 +449,11 @@ async def world_engine_task_llm():
             actor_id = get_nested(request_event, "actor_id")
             
             # Check if agent is in interaction mode
+            # Ensure actor_id is valid before trying to access its state
+            if not actor_id or actor_id not in get_nested(state, SIMULACRA_KEY, default={}):
+                logger.warning(f"[WorldEngineLLM] Received event with invalid or missing actor_id: {request_event}")
+                event_bus.task_done()
+                continue
             in_interaction_mode = get_nested(state, SIMULACRA_KEY, actor_id, "interaction_mode", default=False)
             if in_interaction_mode:
                 logger.info(f"[WorldEngineLLM] Ignoring action request from {actor_id} as they are in interaction mode")
@@ -478,6 +494,72 @@ async def world_engine_task_llm():
             actor_location_id = get_nested(actor_state_we, "location")
             location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={})
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
+            
+            # --- World Generation Check for MOVE action ---
+            target_location_id_from_intent = intent.get("details") if action_type == "move" else None
+
+            if action_type == "move" and target_location_id_from_intent:
+                is_target_defined = target_location_id_from_intent in get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={})
+                
+                if not is_target_defined:
+                    logger.info(f"[WorldEngineLLM] Target location '{target_location_id_from_intent}' for move by {actor_name} is undefined. Triggering WorldGenerator.")
+                    if not world_generator_agent or not world_generator_runner or not world_generator_session_id:
+                        logger.error("[WorldEngineLLM] WorldGenerator ADK components not initialized. Cannot generate new location.")
+                        # Action will likely fail or be handled as invalid by standard WorldEngine logic
+                    else:
+                        # Call WorldGeneratorAgent
+                        # Infer location_type_hint (this could be more sophisticated)
+                        type_hint_wg = "generic_room" # Default
+                        if "home" in target_location_id_from_intent.lower(): type_hint_wg = "home_generic_room"
+                        if "kitchen" in target_location_id_from_intent.lower(): type_hint_wg = "home_kitchen"
+                        if "living" in target_location_id_from_intent.lower(): type_hint_wg = "home_living_room"
+                        if "bathroom" in target_location_id_from_intent.lower(): type_hint_wg = "home_bathroom"
+                        if "bedroom" in target_location_id_from_intent.lower(): type_hint_wg = "home_bedroom"
+                        if "street" in target_location_id_from_intent.lower(): type_hint_wg = "street_segment"
+                        if "shop" in target_location_id_from_intent.lower() or "store" in target_location_id_from_intent.lower(): type_hint_wg = "shop_interior_generic"
+
+                        wg_trigger_text = f"""
+Location ID to Define: {target_location_id_from_intent}
+Location Type Hint: {type_hint_wg}
+Origin Location ID: {actor_location_id}
+Origin Location Description: {get_nested(location_state_data, "description", "Unknown origin location.")}
+World Details: Current Time: {get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)}, Weather: {get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')}, Mood: {world_mood_global}
+
+Generate the location details.
+"""
+                        wg_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=wg_trigger_text)])
+                        
+                        # Original instruction for WorldGenerator is static for now, no dynamic replacements needed in this call
+                        generated_world_data_ns = await _call_adk_agent_and_parse(
+                            world_generator_runner, world_generator_agent, world_generator_session_id, USER_ID,
+                            wg_trigger_content, WorldGeneratorOutput, f"WorldGenerator_{actor_name}", logger
+                        )
+
+                        if generated_world_data_ns:
+                            generated_world_data = _to_dict(generated_world_data_ns) # Convert SimpleNamespace to dict
+                            defined_loc = generated_world_data.get("defined_location")
+                            additional_locs = generated_world_data.get("additional_related_locations", [])
+                            origin_conn_update = generated_world_data.get("connection_update_for_origin")
+
+                            if defined_loc and defined_loc.get("id") == target_location_id_from_intent:
+                                _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{defined_loc['id']}", defined_loc, logger)
+                                logger.info(f"[WorldEngineLLM] WorldGenerator defined new location: {defined_loc['id']} ({defined_loc.get('name')})")
+                                for add_loc in additional_locs:
+                                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{add_loc['id']}", add_loc, logger)
+                                    logger.info(f"[WorldEngineLLM] WorldGenerator added related location: {add_loc['id']} ({add_loc.get('name')})")
+                                
+                                if origin_conn_update and origin_conn_update.get("origin_id") == actor_location_id:
+                                    conn_to_add = origin_conn_update.get("connection_to_add")
+                                    if conn_to_add:
+                                        current_origin_conns = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, "connected_locations", default=[])
+                                        current_origin_conns.append(conn_to_add)
+                                        _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.connected_locations", current_origin_conns, logger)
+                                        logger.info(f"[WorldEngineLLM] WorldGenerator updated connections for origin {actor_location_id} to include {conn_to_add.get('to_location_id_hint')}")
+                                # The target location is now defined, WorldEngine can proceed with the move.
+                                is_target_defined = True # Update flag
+                            else:
+                                logger.error(f"[WorldEngineLLM] WorldGenerator failed to define the target location '{target_location_id_from_intent}' correctly.")
+            # --- End World Generation Check ---
             location_state_data["objects_present"] = location_state_data.get("ephemeral_objects", [])
             time_for_world_engine_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time) # type: ignore
             # Use the new helper function to get target_state_data
@@ -524,7 +606,11 @@ Resolve this intent based on your instructions and the provided context.
             # Handle case where validated_data is still None after loop (e.g. LLM error or no response text)
             if 'validated_data' not in locals() or not validated_data:
                 if not outcome_description.startswith("Action failed due to LLM error"): 
-                    outcome_description = "Action failed: No response from World Engine LLM."
+                    # If world generation was attempted and failed, reflect that
+                    if action_type == "move" and target_location_id_from_intent and not is_target_defined:
+                        outcome_description = f"{actor_name} attempted to move to '{target_location_id_from_intent}', but the way could not be materialized."
+                    else:
+                        outcome_description = "Action failed: No response from World Engine LLM."
             elif getattr(validated_data, 'valid_action', False):
                 completion_time = current_sim_time + getattr(validated_data, 'duration', 0.0)
                 # --- BEGIN ADDITION: Handle scheduled_future_event ---
@@ -534,10 +620,10 @@ Resolve this intent based on your instructions and the provided context.
                     event_trigger_time = completion_time + getattr(sfe, 'estimated_delay_seconds', 0.0)
 
                     event_to_schedule = {
-                        "event_type": getattr(sfe, 'event_type', 'unknown_event'),
-                        "target_agent_id": getattr(sfe, 'target_agent_id', None),
-                        "location_id": getattr(sfe, 'location_id', 'unknown_location'), 
-                        "details": getattr(sfe, 'details', {}), # details is already a dict
+                        "event_type": sfe.get('event_type', 'unknown_event'),
+                        "target_agent_id": sfe.get('target_agent_id'), # Defaults to None if key missing
+                        "location_id": sfe.get('location_id', 'unknown_location'),
+                        "details": sfe.get('details', {}), # details is already a dict
                         "trigger_sim_time": event_trigger_time, # Absolute simulation time for the event
                         "source_actor_id": actor_id # The one whose action generated this event
                     }
@@ -554,13 +640,20 @@ Resolve this intent based on your instructions and the provided context.
                 # --- END ADDITION ---
                 narration_event = {
                     "type": "action_complete", "actor_id": actor_id, "action": intent,
-                    "results": getattr(validated_data, 'results', {}), 
+                    "results": getattr(validated_data, 'results', {}),
                     "outcome_description": getattr(validated_data, 'outcome_description', ""),
                     "completion_time": completion_time,
                     "current_action_description": f"Action: {intent.get('action_type', 'unknown')} - Details: {intent.get('details', 'N/A')[:100]}",
                     "actor_current_location_id": actor_location_id, 
                     "world_mood": world_mood_global, 
                 }
+                # If the move was to a newly generated location, adjust outcome description slightly for narration
+                if action_type == "move" and target_location_id_from_intent and \
+                   (target_location_id_from_intent not in get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={}) # Should not happen if WG worked
+                    or get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default="").startswith("Newly Defined")): # Check if WG named it generically
+                    loc_name_for_narration = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default=target_location_id_from_intent)
+                    narration_event["outcome_description"] = f"{actor_name} moved into the newly revealed area: {loc_name_for_narration} (ID: {target_location_id_from_intent})."
+
                 # --- Phase 3: Update location_details on successful move ---
                 current_results_obj = getattr(validated_data, 'results', {}) # This is a dict
                 if action_type == "move" and current_results_obj.get(f"{SIMULACRA_KEY}.{actor_id}.location"):
@@ -575,7 +668,13 @@ Resolve this intent based on your instructions and the provided context.
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", current_results_obj, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", narration_event["current_action_description"], logger)
+                    
+                    # Refine action description for listening
+                    action_desc_for_state = narration_event["current_action_description"]
+                    if action_type == "wait" and "listened attentively to" in outcome_description:
+                        action_desc_for_state = outcome_description # Use the more specific "listened attentively to..."
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", action_desc_for_state, logger)
+                    
                     await narration_queue.put(narration_event)
                     logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Stored results, set end time {completion_time:.1f}s. Outcome: {outcome_description}")
                 else:
@@ -894,7 +993,8 @@ async def run_simulation(
     global adk_session_service, adk_memory_service
     global world_engine_agent, world_engine_runner, world_engine_session_id
     global narration_agent_instance, narration_runner, narration_session_id
-    global simulacra_agents_map, simulacra_runners_map, simulacra_session_ids_map
+    global world_generator_agent, world_generator_runner, world_generator_session_id # Added WorldGenerator globals
+    global simulacra_agents_map, simulacra_runners_map, simulacra_session_ids_map # Keep this line
     global state, live_display_object
     global world_mood_global, search_llm_agent_instance, search_agent_runner_instance, search_agent_session_id_val, perception_manager_global
     global event_logger_global # Ensure we can assign to the global
@@ -1004,6 +1104,16 @@ async def run_simulation(
     await adk_session_service.create_session(app_name=narration_runner.app_name, user_id=USER_ID, session_id=narration_session_id, state={})
     logger.info(f"Narration Runner and Session ({narration_session_id}) initialized.")
 
+    # --- Initialize WorldGenerator Agent, Runner, and Session ---
+    world_generator_agent = create_world_generator_llm_agent(
+        world_mood=world_mood_global, world_type=current_world_type, sub_genre=current_sub_genre
+    )
+    world_generator_runner = Runner(agent=world_generator_agent, app_name=APP_NAME + "_WorldGenerator", session_service=adk_session_service)
+    world_generator_session_id = f"world_generator_session_{world_instance_uuid}"
+    await adk_session_service.create_session(app_name=world_generator_runner.app_name, user_id=USER_ID, session_id=world_generator_session_id, state={})
+    logger.info(f"WorldGenerator Runner and Session ({world_generator_session_id}) initialized.")
+
+
     # --- Initialize Search Agent, Runner, and Session (already mostly dedicated) ---
     search_llm_agent_instance = create_search_llm_agent()
     search_agent_runner_instance = Runner(
@@ -1039,6 +1149,7 @@ async def run_simulation(
     # Register system agents to prevent "unknown agent" errors
     simulacra_agents_map["WorldEngineLLMAgent"] = world_engine_agent
     simulacra_agents_map["NarrationLLMAgent"] = narration_agent_instance  # Note: Changed from NarrationAgent to NarrationLLMAgent
+    simulacra_agents_map["WorldGeneratorLLMAgent"] = world_generator_agent # Register WorldGenerator
     if search_llm_agent_instance:
         simulacra_agents_map["SearchAgent"] = search_llm_agent_instance
         simulacra_agents_map["SearchLLMAgent"] = search_llm_agent_instance  # Add alternative name

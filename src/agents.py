@@ -9,7 +9,7 @@ import logging
 
 # Import constants from the config module
 from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME, MEMORY_LOG_CONTEXT_LENGTH
-from .models import SimulacraIntentResponse, WorldEngineResponse, NarratorOutput # Import Pydantic models
+from .models import SimulacraIntentResponse, WorldEngineResponse, NarratorOutput, WorldGeneratorOutput # Import Pydantic models
 
 async def always_clear_llm_contents_callback(
     callback_context: CallbackContext,
@@ -118,6 +118,8 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
 3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
+        *   **Responding to Speech:** If your `last_observation` is someone speaking to you (e.g., "[Speaker Name] said to you: ..."), a common and polite response is to `wait` to listen. For the `wait` action, set `details` to something like 'Listening to [Speaker Name]' or 'Paying attention to what [Speaker Name] is saying'. You might also choose to respond immediately with a `talk` action if appropriate for your persona and the urgency of the situation.
+        *   **Consistency Check:** Before choosing an action, quickly review your `last_observation` and the most recent entries in `Recent Narrative History`. Ensure your chosen action does NOT contradict your immediate physical state, possessions, or recent activities as described in these inputs (e.g., if the narrative just said you are holding a cup, don't try to pick up a cup; if it said you just ate, don't immediately decide you are hungry).
     *   **Conversational Flow:** Pay close attention to the `Recent History` and `Last Observation/Event`. If you've just asked a question and received an answer, or if the other agent has made a clear statement, acknowledge it in your internal monologue and try to progress the conversation. Avoid re-asking questions that have just been answered or getting stuck in repetitive conversational loops. If a decision has been made (e.g., what to eat), move towards acting on that decision.
     *   **Entity Interactions:** `use [object_id]`, `talk [agent_id]`.
             *   **Talking to Ephemeral NPCs (introduced by Narrator):**
@@ -127,11 +129,17 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
             *   If you use a `target_id` like `npc_concept_friend_alex`, the `details` field should still be your direct speech, e.g., `details: "Hey Alex, fancy meeting you here!"`.
     *   **World Interactions:** `look_around`, `move` (Specify `details` like target location ID or name), `world_action` (Specify `details` for generic world interactions not covered by other types).
     *   **Passive Actions:** `wait`, `think`.
-    *   **Complex Movement (e.g., "go to work," "visit the library across town"):**
+    *   **Movement (`move` action):**
+        *   To move to a new location, you MUST use the `move` action.
+        *   The `details` field for a `move` action **MUST BE THE EXACT `to_location_id_hint` STRING** (e.g., "Hallway_Apartment_01", "Street_Outside_Building_Main_Exit", "Bathroom_Apartment_01") that was provided to you in the `Exits/Connections` list for your current location. This list is usually populated after you perform a `look_around` action.
+        *   **CRITICAL: DO NOT** use descriptive phrases like "the bathroom door," "the hallway," or "A standard bedroom door..." in the `details` field for a `move` action. You MUST use the specific `to_location_id_hint` string.
+        *   **Example:** If `Exits/Connections` shows `{{"to_location_id_hint": "Bathroom_Main_01", "description": "A white door leading to the main bathroom."}}`, to move there, your action MUST be `{{"action_type": "move", "details": "Bathroom_Main_01"}}`.
+        *   If you are unsure of the `to_location_id_hint` for your desired destination, or if `Exits/Connections` is empty or doesn't list your target, you MUST use `look_around` first to discover available exits and their `to_location_id_hint` values.
+    *   **Complex Journeys (e.g., "go to work," "visit the library across town"):**
         *   You CANNOT directly `move` to a distant location if it's not listed in your current location's `Exits/Connections`.
         *   To reach such destinations, you MUST plan a sequence of actions:
             1. Use `look_around` if you're unsure of immediate exits or how to start your journey.
-            2. `move` to directly connected intermediate locations (e.g., "Apartment_Lobby", "Street_Outside_Apartment", "Subway_Station_Entrance").
+            2. `move` to directly connected intermediate locations using their **exact `to_location_id_hint`** in the `details` field (e.g., "Apartment_Lobby", "Street_Outside_Apartment", "Subway_Station_Entrance").
             3. `use` objects that facilitate travel (e.g., `use door_to_hallway`, `use elevator_button_down`, `use subway_turnstile`, `use train_door`).
             4. Continue this chain of `move` and `use` actions until you reach your final destination. Your "internal knowledge of how to get there" means figuring out these intermediate steps.
     *   **Self-Initiated Change (when 'idle' and planning your next turn):** If your current situation feels stagnant, or if an internal need arises (e.g., hunger, boredom, social need), you can use the `initiate_change` action.
@@ -261,16 +269,19 @@ YOU MUST USE the dynamically provided Current World Time, Day of the Week, Seaso
                 *   `outcome_description`: `"[Actor Name] looked around the [Current Location Name]."` # Factual outcome for Narrator. Do NOT describe what was seen here.
                 *   `scheduled_future_event`: `null`. # `look_around` is immediate.
             *   **Self Interaction (e.g., `wait`, `think`):**
-                *   `wait`:
-                    *   **If `intent.details` clearly indicates waiting for another Simulacra's response in an ongoing conversation (e.g., "Waiting for [Other Agent] to reply", "Listening for what they say next", "Waiting for them to speak"):**
+                *   `wait`: # This action type is for both general waiting and active listening.
+                    *   **If `intent.details` clearly indicates active listening to a specific Simulacra who is currently speaking (e.g., "Listening to [Speaker_Name]", "Paying attention to [Speaker_Name] as they speak", "Hearing out [Speaker_Name]") AND `Target Entity State ([Speaker_Name]).status` is 'busy' AND `Target Entity State ([Speaker_Name]).current_action_description` indicates they are speaking:**
                         *   `valid_action: true`.
-                        *   `duration`: Very short, representing a brief pause to cede the conversational floor (e.g., 0.1 - 0.5 seconds). The agent will become 'idle' almost immediately and await an interrupt from the other agent's speech.
+                        *   `duration`: A moderate duration representing attentive listening (e.g., 10-20 seconds). This allows the listener to be 'busy' and thus eligible for dynamic interruption if they decide to speak.
                         *   `results: {{}}`.
-                        *   `outcome_description: "[Actor Name] paused, waiting for a response."`
+                        *   `outcome_description: "[Actor Name] listened attentively to [Speaker_Name mentioned in intent.details]."`.
                         *   `scheduled_future_event: null`.
-                    *   **Else (for timed waits or general pauses not tied to immediate conversation):**
+                    *   **Else (for general timed waits, brief conversational pauses, or if `intent.details` is vague like "wait for a moment"):**
                         *   `valid_action: true`.
-                        *   `duration`: As implied by `intent.details` if a specific time is mentioned (e.g., "wait for 5 minutes"), otherwise a generic short duration (e.g., 3-10 seconds) if details are vague like "wait for a bit" or "wait patiently".
+                        *   `duration`:
+                            *   If `intent.details` implies ceding the floor in a conversation (e.g., "Waiting for [Other Agent] to reply", "Waiting for them to speak"): Very short (e.g., 0.1-0.5s).
+                            *   If `intent.details` implies a timed wait (e.g., "wait for 5 minutes"): Use that duration.
+                            *   Otherwise (e.g., "wait for a bit", "wait patiently"): A generic short duration (e.g., 3-10 seconds).
                         *   `results: {{}}`.
                         *   `outcome_description: "[Actor Name] waited."` (or more specific if details allow, e.g., "[Actor Name] waited for 5 minutes.")
                         *   `scheduled_future_event: null`.
@@ -550,6 +561,76 @@ Output ONLY a valid JSON object matching this exact structure:
         output_key="narrator_output_package", # Added output_key
         # output_schema=NarratorOutput, # Specify the output schema
         description=f"LLM Narrator: Generates '{world_mood}' narrative based on factual outcomes.",
+        disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
+        before_model_callback=always_clear_llm_contents_callback,
+    )
+
+def create_world_generator_llm_agent(world_mood: str, world_type: str, sub_genre: str) -> LlmAgent:
+    """Creates the LLM agent responsible for generating new location details."""
+    agent_name = "WorldGeneratorLLMAgent"
+
+    world_context_desc = f"The simulation is a '{world_type}' world with a '{sub_genre}' sub-genre, and the overall mood is '{world_mood}'."
+
+    instruction = f"""You are the World Generator for TheSimulation. Your primary role is to define the details of new locations when an agent attempts to move to an undefined area, or to flesh out existing placeholder locations.
+{world_context_desc}
+
+**Input (Provided via trigger message):**
+- `location_id_to_define`: The unique ID for the location you need to create or detail.
+- `location_type_hint`: A hint about the kind of place this is (e.g., "home_entrance", "home_living_room", "street_segment", "shop_interior_general_store", "forest_path"). This is crucial for your generation.
+- `origin_location_id` (optional): The ID of the location from which an agent is trying to reach `location_id_to_define`.
+- `origin_location_description` (optional): The description of the `origin_location_id`.
+- `world_details`: General information about the world (time, weather, mood).
+
+**Your Task:**
+1.  **Understand the Request:** Based on `location_id_to_define` and `location_type_hint`, determine the nature of the location.
+2.  **Generate `defined_location`:**
+    *   `id`: Must be exactly `location_id_to_define`.
+    *   `name`: A descriptive, concise name (e.g., "Cozy Living Room", "Sunken Alleyway", "General Store Interior").
+    *   `description`: A rich, evocative paragraph describing the location's appearance, atmosphere, key features, and notable characteristics. This description should align with the `location_type_hint` and the overall `{world_context_desc}`.
+    *   `ambient_sound_description`: Plausible ambient sounds for this location.
+    *   `ephemeral_objects`: A list of 2-5 distinct, interactive objects plausible for this location. Each object needs an `id` (e.g., "sofa_living_room_01"), `name`, `description`, `is_interactive: true`, and `properties` (e.g., `{{"can_sit": true}}`).
+    *   `ephemeral_npcs`: (Optional) 0-1 simple, ephemeral NPCs plausible for this location (e.g., "a sleeping cat", "a quiet shopkeeper").
+    *   `connected_locations`: A list of 1-3 plausible connections leading *from* this `defined_location` to other conceptual areas.
+        *   Each connection needs a `to_location_id_hint` (a new unique ID, e.g., "Kitchen_Home_01_Connect", "Street_Exit_Alley_01") and a `description` (e.g., "An open doorway leading to a kitchen area.", "A narrow passage back to the main street.").
+        *   **CRITICAL:** If `origin_location_id` was provided, one of these connections MUST lead back to `origin_location_id`.
+3.  **Generate `additional_related_locations` (Conditional):**
+    *   **If `location_type_hint` implies a complex space that naturally contains other distinct areas (e.g., "home_entrance" implies living room, kitchen; "shop_interior" implies stockroom, office):**
+        *   Generate 1-2 such related locations as full `GeneratedLocationDetail` objects in the `additional_related_locations` list.
+        *   These additional locations should also have connections defined in their `connected_locations` list, including connections to the `defined_location` and potentially to each other.
+    *   Otherwise, `additional_related_locations` can be an empty list `[]`.
+4.  **Generate `connection_update_for_origin` (Conditional):**
+    *   If `origin_location_id` was provided, this field should describe how the `origin_location_id` connects to your `defined_location`.
+    *   `{{ "origin_id": "[origin_location_id_value]", "connection_to_add": {{ "to_location_id_hint": "[location_id_to_define_value]", "description": "A newly revealed path/doorway to [defined_location.name]." }} }}`
+
+**Output (CRITICAL JSON FORMAT):**
+Your entire response MUST be a single JSON object conforming to the `WorldGeneratorOutput` schema:
+`{{
+  "defined_location": {{
+    "id": "str", "name": "str", "description": "str", "ambient_sound_description": "str",
+    "ephemeral_objects": [{{ "id": "...", "name": "...", "description": "...", "is_interactive": bool, "properties": {{}} }}],
+    "ephemeral_npcs": [{{ "id": "...", "name": "...", "description": "...", "is_interactive": bool }}],
+    "connected_locations": [{{ "to_location_id_hint": "...", "description": "..." }}]
+  }},
+  "additional_related_locations": [ /* list of GeneratedLocationDetail objects */ ],
+  "connection_update_for_origin": {{ "origin_id": "str", "connection_to_add": {{ "to_location_id_hint": "str", "description": "str" }} }} /* or null */
+}}`
+
+**Example Scenario:**
+If `location_id_to_define` is "LivingRoom_Home_XYZ", `location_type_hint` is "home_living_room", and `origin_location_id` is "EntranceHall_Home_XYZ".
+- `defined_location` would be the details for "LivingRoom_Home_XYZ" (sofa, TV, window, connection to kitchen, connection back to entrance hall).
+- `additional_related_locations` might include a "Kitchen_Home_XYZ" if your internal logic for "home_living_room" often implies an adjacent kitchen.
+- `connection_update_for_origin` would describe the connection from "EntranceHall_Home_XYZ" to "LivingRoom_Home_XYZ".
+
+Ensure all generated IDs are unique and descriptive (e.g., append the main location ID like `_Home_XYZ`).
+Adhere to the `{world_context_desc}` when deciding on features, objects, and atmosphere.
+"""
+    return LlmAgent(
+        name=agent_name,
+        model=MODEL_NAME, # Use a capable model for generation
+        instruction=instruction,
+        output_key="world_generator_output_package",
+        # output_schema=WorldGeneratorOutput, # Enable if ADK handles complex nested Pydantic well
+        description="LLM World Generator: Creates detailed definitions for new or placeholder locations.",
         disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
         before_model_callback=always_clear_llm_contents_callback,
     )
