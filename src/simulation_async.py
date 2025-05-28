@@ -542,9 +542,27 @@ Generate the location details.
                             origin_conn_update = generated_world_data.get("connection_update_for_origin")
 
                             if defined_loc and defined_loc.get("id") == target_location_id_from_intent:
+                                # Ensure the new location connects back to the origin
+                                origin_id_for_check = actor_location_id # The location the actor is coming FROM
+                                connection_back_to_origin_exists = False
+                                if origin_id_for_check and defined_loc.get("connected_locations"):
+                                    for conn in defined_loc["connected_locations"]:
+                                        if conn.get("to_location_id_hint") == origin_id_for_check:
+                                            connection_back_to_origin_exists = True
+                                            break
+                                if origin_id_for_check and not connection_back_to_origin_exists:
+                                    origin_loc_name_for_desc = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, origin_id_for_check, "name", default=origin_id_for_check)
+                                    connection_to_origin = {
+                                        "to_location_id_hint": origin_id_for_check,
+                                        "description": f"The way back to {origin_loc_name_for_desc}."
+                                    }
+                                    defined_loc.setdefault("connected_locations", []).append(connection_to_origin)
+                                    logger.info(f"[WorldEngineLLM] WorldGenerator: Added missing connection from new location '{defined_loc['id']}' back to origin '{origin_id_for_check}'.")
+
                                 _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{defined_loc['id']}", defined_loc, logger)
                                 logger.info(f"[WorldEngineLLM] WorldGenerator defined new location: {defined_loc['id']} ({defined_loc.get('name')})")
                                 for add_loc in additional_locs:
+                                    # Similar check for additional_locs if they should connect back to defined_loc could be added here if needed
                                     _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{add_loc['id']}", add_loc, logger)
                                     logger.info(f"[WorldEngineLLM] WorldGenerator added related location: {add_loc['id']} ({add_loc.get('name')})")
                                 
@@ -816,7 +834,8 @@ def _build_simulacra_prompt(
         f"- Audible Environment:\n{audible_env_str}",
         f"- Recent Narrative History:\n{history_str if history_str else 'None.'}",
         f"- Exits/Connections from this location: {json.dumps(connected_locations) if connected_locations else 'None observed.'}",
-        "\nFollow your thinking process and provide your response ONLY in the specified JSON format."
+        "\n**General Instructions:**"
+        "Follow your thinking process (Recall/React -> Analyze Goal -> Identify Options -> Prioritize/Choose) and provide your response ONLY in the specified JSON format."
     ]
     return "\n".join(prompt_text_parts)
 

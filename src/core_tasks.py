@@ -244,7 +244,9 @@ async def dynamic_interruption_task(
         for agent_id_to_check in active_sim_ids_dit:
             agent_state_to_check = get_nested(current_state, SIMULACRA_KEY, agent_id_to_check, default={})
             if not agent_state_to_check or agent_state_to_check.get("status") != "busy":
-                if agent_state_to_check.get("status") == "busy": # Only clear if it was busy but now not eligible
+                # If agent is not busy, their interrupt probability should be None.
+                # Only update if it's not already None to avoid redundant state updates.
+                if get_nested(agent_state_to_check, "current_interrupt_probability") is not None:
                     _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id_to_check}.current_interrupt_probability", None, logger_instance)
                 continue
 

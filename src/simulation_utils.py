@@ -174,6 +174,29 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
             npc_id = npc_data.get("id", "N/A") 
             npc_desc = npc_data.get('description', '')
             table2.add_row(f"    {npc_name} ({npc_id})", npc_desc[:35] + ("..." if len(npc_desc) > 35 else ""))
+    
+    # --- Connected Locations from Primary Actor's Location ---
+    table2.add_row(Text(f"--- Exits from {location_name_display} ---", style="bold blue_violet"), Text("---", style="bold blue_violet"))
+    connected_locs_list: List[Dict[str, Any]] = []
+    if primary_actor_location_id:
+        connected_locs_list = get_nested(
+            current_state,
+            WORLD_STATE_KEY,
+            LOCATION_DETAILS_KEY,
+            primary_actor_location_id,
+            "connected_locations",
+            default=[]
+        )
+    table2.add_row(f"  (Connections)", f"({len(connected_locs_list)} total)")
+    if connected_locs_list:
+        conn_display_limit = 5
+        for i, conn_data in enumerate(connected_locs_list):
+            if i >= conn_display_limit:
+                table2.add_row(f"    ... ({len(connected_locs_list) - conn_display_limit} more)", "")
+                break
+            conn_to_id = conn_data.get("to_location_id_hint", "Unknown Destination")
+            conn_desc = conn_data.get("description", "An undescribed exit.")
+            table2.add_row(f"    To: {conn_to_id}", conn_desc[:35] + ("..." if len(conn_desc) > 35 else ""))
 
     narrative_log_entries = get_nested(current_state, 'narrative_log', default=[])[-6:]
     truncated_log_entries = []
