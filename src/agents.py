@@ -245,26 +245,15 @@ YOU MUST USE the dynamically provided Current World Time, Day of the Week, Seaso
                 *   **Destination:** The target location ID is in `intent.details`.
                 *   **Validity:**
                     *   Check if the target location ID exists in the `Actor's Current Location State.connected_locations` (list of dicts, check `to_location_id_hint`).
-                    *   If not directly connected, consider if it's a known global location ID based on `World Context`.
+                    *   **Crucially, the target location ID specified in `intent.details` MUST exist as a key in `World State.location_details` (i.e., it's a known, defined location, even if just a placeholder created by the Narrator).** If the `intent.details` ID is not found in `World State.location_details`, the action is `valid_action: false`.
+                    *   If not directly connected via `Actor's Current Location State.connected_locations` but the target ID *does* exist in `World State.location_details`, the move might still be valid if it's a known global location accessible by other means (e.g., a "teleport" if allowed by rules, or if the agent is expected to know how to get there through a sequence of non-explicitly connected moves, though this latter case should ideally be broken down by the agent into smaller steps).
                     *   If `World Rules.allow_teleportation` is true, and intent implies it, this might be valid.
                 *   **Duration Calculation (see step 3):** This is critical for `move`.
-                *   **Scheduled Future Event:** Typically `null` for `move`, unless the move itself triggers something (e.g., arriving at a timed appointment).
+                *   **Scheduled Future Event:** Typically `null` for `move`.
                 *   **Results:** If valid, `simulacra_profiles.[sim_id].location` should be updated to the target location ID from `intent.details`.
-                *   **Handling NEW Location IDs from Narrator's `to_location_id_hint`:**
-                    *   If the `intent.details` (target location ID for a `move`) refers to a location ID that was previously a `to_location_id_hint` from a Narrator's `look_around` discovery and this ID is NOT yet present in `Actor's Current Location State.connected_locations` or as a fully defined location in the broader world state (i.e., it's a newly discovered conceptual path):
-                        *   The move is generally valid if the actor is attempting to follow a recently discovered connection.
-                        *   **You MUST create a basic entry for this new location ID in your `results`.**
-                        *   `results` should include:
-                            *   `"simulacra_profiles.[sim_id].location": "[new_target_location_id_from_intent.details]"`
-                            *   `"simulacra_profiles.[sim_id].location_details": "You have entered [New Location Name]."` (Agent's personal understanding)
-                            *   `"simulacra_profiles.[sim_id].last_observation": "You move into [New Location Name]."`
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].id": "[new_target_location_id_from_intent.details]"` # Create basic location entry
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].name": "[Generate a plausible short conceptual name, e.g., 'A Dark Corridor' if ID was 'Dark_Corridor_01']"` # Conceptual name
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].description": "A newly discovered area. Details to be revealed."` # Placeholder for Narrator
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_objects": []` # Initialize empty
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].ephemeral_npcs": []`   # Initialize empty
-                            *   `"current_world_state.location_details.[new_target_location_id_from_intent.details].connected_locations": []` # Initialize empty
-                        *   `outcome_description`: `"[Actor Name] moved to the newly discovered location '[Generated plausible short conceptual name]' (ID: [new_target_location_id_from_intent.details])."` # Factual
+                *   **Outcome Description:** If valid, `"[Actor Name] moved to [Name of target_location_id from World State.location_details] (ID: [target_location_id_from_intent.details])."`
+                    *   If invalid because target ID doesn't exist in `World State.location_details`: `"[Actor Name] attempted to move to '[target_location_id_from_intent.details]', but this location is unknown."`
+                    *   If invalid for other reasons (e.g., not connected, rules forbid): `"[Actor Name] attempted to move to [Name of target_location_id] (ID: [target_location_id_from_intent.details]), but could not."` (Add specific reason if clear).
             *   `look_around`: The actor observes their surroundings.
                 *   `valid_action`: `true`.
                 *   `duration`: Very Short (e.g., 0.1 to 0.5 seconds).
@@ -424,6 +413,16 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
     *   Example: "As [Actor Name] entered the tavern, a grizzled man with an eye patch (npc_concept_old_pirate_01) at a corner table grunted a greeting."
     *   Example: "A street vendor (npc_concept_flower_seller_01) called out, '[Actor Name], lovely flowers for a lovely day?'"
     *   **If `Factual Outcome Description` indicates the Actor spoke to an NPC (e.g., "[Actor Name] spoke to the NPC (target: npc_concept_vendor_01), saying: 'Hello there!'"):**
+            *   **If this NPC was introduced in a previous `look_around` and is listed in `discovered_npcs` in your output for that turn:** You should still generate a plausible response from that NPC.
+            *   **If this NPC is being introduced for the first time through this interaction (i.e., not previously discovered via `look_around`):**
+                *   You MUST generate a plausible response from this NPC.
+                *   You MUST also create an entry for this newly introduced NPC in the `discovered_npcs` list in your JSON output.
+                    *   `id`: Use the `intent.target_id` if available (e.g., "npc_concept_vendor_01"), or generate a new conceptual ID (e.g., "npc_concept_mysterious_stranger_01").
+                    *   `name`: A descriptive name (e.g., "Mysterious Stranger", "Street Vendor").
+                    *   `description`: A brief description of the NPC.
+                    *   `is_interactive`: `true`.
+                *   Example: If outcome was "Ava spoke to a shadowy figure (target: npc_concept_shadow_figure_01), saying: 'Who are you?'", and this NPC is new:
+                    Your `discovered_npcs` would include: `{{"id": "npc_concept_shadow_figure_01", "name": "Shadowy Figure", "description": "A figure lurking in the alley.", "is_interactive": true}}`.
         *   You MUST generate a plausible response from that NPC.
         *   Incorporate the NPC's response into your narrative.
         *   Example: If outcome was "Ava spoke to the vendor (target: npc_concept_flower_seller_01), saying: 'How much for the roses?'", your narrative might be:
@@ -475,6 +474,16 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
                     *   Examples for a "fantasy tavern": `Tavern_Kitchen_Door`, `Stairs_To_Inn_Rooms`, `Back_Alley_Exit_Tavern`.
                 *   The hint should be specific enough for the World Engine to potentially create a new location entry if it doesn't exist.
             *   `description`: How this connection appears (e.g., "A narrow, overgrown path leading north into the woods.").
+            *   **CRITICAL: If this `to_location_id_hint` represents a path to a conceptually new area that you are revealing for the first time (i.e., it's not an existing, known location ID that the actor is re-discovering a path to):**
+                *   You MUST ALSO create a basic placeholder definition for this new location.
+                *   Include this definition in the `newly_instantiated_locations` list in your JSON output.
+                *   This placeholder MUST include:
+                    *   `id`: The same string as your `to_location_id_hint`.
+                    *   `name`: A short, plausible, conceptual name you generate for this new area (e.g., if hint is 'Dark_Cave_Entrance_01', name could be 'Dark Cave Entrance').
+                    *   `description`: A generic placeholder like 'A newly discovered area. Further details will be revealed upon closer observation.'
+                    *   `ephemeral_objects`: `[]` (empty list)
+                    *   `ephemeral_npcs`: `[]` (empty list)
+                    *   `connected_locations`: `[]` (empty list)
             *   `travel_time_estimate_seconds` (optional): A rough estimate if discernible.
         *   **Regardless of location type, your `narrative` MUST use the `Actor's Current Location State.description` as the foundation for what the actor perceives.**
     *   **Example of `discovered_connections` for a bedroom in an apartment:**
@@ -499,6 +508,9 @@ Output ONLY a valid JSON object matching this exact structure:
   "discovered_connections": [
     {{"to_location_id_hint": "str", "description": "str", "travel_time_estimate_seconds": int (optional)}}
   ],
+  "newly_instantiated_locations": [
+    {{"id": "str", "name": "str", "description": "str", "ephemeral_objects": [], "ephemeral_npcs": [], "connected_locations": []}}
+  ], // Added newly_instantiated_locations to the schema example
   "discovered_npcs": [
     {{"id": "str (e.g., npc_concept_descriptor_instance)", "name": "str", "description": "str"}}
   ]
@@ -506,7 +518,7 @@ Output ONLY a valid JSON object matching this exact structure:
 *   If no objects or NPCs are discovered/relevant (e.g., for actions other than `look_around`, or if `look_around` reveals an empty space), `discovered_objects` and `discovered_npcs` can be empty arrays `[]`.
 *   Example for `look_around` in a bedroom:
     `{{ // Example includes discovered_connections
-      "narrative": "At 08:15 AM (Local time for Springfield), glances around sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. Her unmade **bed (bed_bedroom_01)** is to her right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door (door_to_hallway_01)** is set in the east wall, likely leading to a hallway.",
+      "narrative": "At 08:15 AM (Local time for Springfield), Daniel glances around his sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. His unmade **bed (bed_bedroom_01)** is to his right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door** is set in the east wall, likely leading to a hallway.",
       "discovered_objects": [
         {{"id": "closet_bedroom_01", "name": "Oak Closet", "description": "A large oak closet.", "is_interactive": true, "properties": {{"is_container": true, "is_openable": true, "is_open": false}}}},
         {{"id": "bed_bedroom_01", "name": "Unmade Bed", "description": "Her unmade bed.", "is_interactive": true, "properties": {{}}}},
@@ -515,11 +527,21 @@ Output ONLY a valid JSON object matching this exact structure:
       "discovered_connections": [
         {{"to_location_id_hint": "Hallway_01", "description": "A sturdy wooden door in the east wall, likely leading to a hallway.", "travel_time_estimate_seconds": 5}}
       ],
+      "newly_instantiated_locations": [ // Example of newly_instantiated_locations
+        {{
+          "id": "Hallway_Apartment_Main_01", // Matches to_location_id_hint
+          "name": "Main Apartment Hallway",
+          "description": "A newly discovered area. Further details will be revealed upon closer observation.",
+          "ephemeral_objects": [],
+          "ephemeral_npcs": [],
+          "connected_locations": []
+        }}
+      ],
       "discovered_npcs": [
         {{"id": "npc_cat_01", "name": "Fluffy Cat", "description": "A fluffy cat curled up on the nightstand."}}
       ]
     }}`
-*   Your entire response MUST be ONLY this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure. The schema is: `{{"narrative": "str", "discovered_objects": list, "discovered_connections": list, "discovered_npcs": list}}`.
+*   Your entire response MUST be ONLY this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure. The schema is: `{{"narrative": "str", "discovered_objects": list, "discovered_connections": list, "newly_instantiated_locations": list, "discovered_npcs": list}}`.
 """
     return LlmAgent(
         name=agent_name,

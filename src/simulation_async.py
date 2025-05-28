@@ -7,8 +7,7 @@ import os
 import random  # Keep for interjection logic in simulacra_agent_task_llm
 import re
 import sys
-import uuid # Added for temporary session IDs
-
+from types import SimpleNamespace 
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai  # For direct API config
@@ -99,6 +98,36 @@ live_display_object: Optional[Live] = None
 def get_current_sim_time():
     return state.get("world_time", 0.0)
 
+# --- Helper function to convert Pydantic models or SimpleNamespace to dict ---
+def _to_dict(obj: Any, exclude: Optional[set[str]] = None) -> Dict[str, Any]:
+    """Converts Pydantic models or SimpleNamespace objects to dictionaries."""
+    if obj is None:
+        return {}
+    if hasattr(obj, 'model_dump'): # Pydantic model
+        return obj.model_dump(exclude=exclude) if exclude else obj.model_dump()
+    if isinstance(obj, SimpleNamespace):
+        data = vars(obj)
+        if exclude:
+            return {k: v for k, v in data.items() if k not in exclude}
+        return data
+    if isinstance(obj, dict): # If it's already a dict
+        if exclude:
+            return {k: v for k, v in obj.items() if k not in exclude}
+        return obj
+    logger.warning(f"Unsupported type for _to_dict: {type(obj)}. Returning empty dict.")
+    return {}
+
+def _list_to_dicts_if_needed(list_of_items: List[Any]) -> List[Dict[str, Any]]:
+    """Converts a list of items (Pydantic models, SimpleNamespace, or dicts) to a list of dicts."""
+    if not isinstance(list_of_items, list): # Handle cases where it might not be a list due to LLM error
+        return []
+    return [
+        _to_dict(item) for item in list_of_items
+        # No need to check item type here, _to_dict handles Pydantic, SimpleNamespace, and dict
+        # It will return {} for unsupported types within the list.
+    ]
+
+
 # --- Helper for Dynamic Instruction Context ---
 def _prepare_dynamic_instruction_context(
     current_state_dict: Dict[str, Any],
@@ -172,26 +201,36 @@ async def _call_adk_agent_and_parse(
                 if isinstance(event_llm.content, expected_pydantic_model):
                     llm_response_data = event_llm.content
                     logger_instance.debug(f"[{agent_name_for_logging}] ADK successfully parsed {expected_pydantic_model.__name__} schema.")
+                    break 
                 elif event_llm.content.parts:
                     raw_text_from_llm = event_llm.content.parts[0].text.strip()
                     logger_instance.debug(f"[{agent_name_for_logging}] LLM Final Raw Content: {raw_text_from_llm[:200]}...")
                     
-                    # Assuming parse_json_output_last is defined
-                    parsed_dict_from_llm = parse_json_output_last(raw_text_from_llm)
-                    if parsed_dict_from_llm:
-                        try:
-                            llm_response_data = expected_pydantic_model.model_validate(parsed_dict_from_llm)
-                        except ValidationError as ve:
-                            logger_instance.error(f"[{agent_name_for_logging}] Pydantic validation failed for manual parse: {ve}. Raw: {raw_text_from_llm}")
-                            llm_response_data = None
+                    # Attempt to parse the raw text using the robust parser first.
+                    # parse_json_output_last handles markdown fences and attempts json.loads.
+                    parsed_dict_from_robust_parser = parse_json_output_last(raw_text_from_llm)
+                    
+                    if parsed_dict_from_robust_parser:
+                        logger_instance.info(f"[{agent_name_for_logging}] Successfully parsed with robust parser into a dictionary.")
+                        llm_response_data = parsed_dict_from_robust_parser
+                        # try:
+                        #     llm_response_data = expected_pydantic_model.model_validate(parsed_dict_from_robust_parser)
+                        #     logger_instance.debug(f"[{agent_name_for_logging}] Successfully validated robust parse with Pydantic.")
+                        #     # Successfully parsed and validated
+                        # except ValidationError as ve:
+                        #     logger_instance.error(f"[{agent_name_for_logging}] Pydantic validation failed for robust parse: {ve}. Raw: {raw_text_from_llm}")
+                        #     llm_response_data = None # Ensure it's None if validation fails
                     else:
-                        logger_instance.error(f"[{agent_name_for_logging}] Failed to parse JSON (manual fallback). Raw: {raw_text_from_llm}")
-                        # Assuming NarratorOutput is defined
-                        if expected_pydantic_model == NarratorOutput:
-                            llm_response_data = NarratorOutput(narrative=raw_text_from_llm)
-                        else:
-                            llm_response_data = None
-                break # Exit loop after processing final response
+                        logger_instance.error(f"[{agent_name_for_logging}] Robust parser (parse_json_output_last) failed to extract JSON. Raw: {raw_text_from_llm}")
+                        # llm_response_data remains None (its initial value from the top of the try block)
+                        llm_response_data = None
+
+                    # If all parsing attempts (ADK, robust, etc.) fail, llm_response_data will remain None.
+                    if llm_response_data: # If any method succeeded
+                        break # Exit loop after processing final response
+
+                else:
+                    print(f"[{agent_name_for_logging}] No content in final response, skipping.")
     finally:
         # Restore original instruction if it was modified
         if modified_instruction and original_instruction:
@@ -200,6 +239,14 @@ async def _call_adk_agent_and_parse(
         # Restore original include_contents setting
         agent_instance.include_contents = original_include_contents
 
+    # If llm_response_data is a dictionary (from robust parsing), convert it to SimpleNamespace.
+    # If it's already a Pydantic model instance (from ADK direct parse) or None, it will be returned as is.
+    if isinstance(llm_response_data, dict):
+        try:
+            return SimpleNamespace(**llm_response_data)
+        except TypeError as e: # Handles cases like non-string keys if they somehow occur
+            logger_instance.error(f"[{agent_name_for_logging}] Failed to convert dict to SimpleNamespace: {e}. Returning dict. Dict: {llm_response_data}")
+            # Fallback to returning the dictionary itself if SimpleNamespace conversion fails
     return llm_response_data
 
 # --- ADK-Dependent Tasks (Remain in this file for global context access) ---
@@ -268,12 +315,16 @@ Generate the narrative paragraph based on these details and your instructions (r
 
             if 'validated_narrator_output' in locals() and validated_narrator_output:
                 try:
-                    logger.debug(f"[NarrationTask] Narrator output validated successfully: {validated_narrator_output.model_dump_json(indent=2, exclude_none=True)}")
+                    # validated_narrator_output can be Pydantic model or SimpleNamespace
+                    logger.debug(f"[NarrationTask] Narrator output received: {json.dumps(_to_dict(validated_narrator_output), indent=2, default=str)}")
 
-                    actual_narrative_paragraph = validated_narrator_output.narrative
-                    discovered_objects = validated_narrator_output.discovered_objects
-                    discovered_connections = validated_narrator_output.discovered_connections
-                    discovered_npcs = validated_narrator_output.discovered_npcs
+                    actual_narrative_paragraph = getattr(validated_narrator_output, 'narrative', "Narration error.")
+                    # These will be lists of Pydantic models if validated_narrator_output is Pydantic,
+                    # or lists of dicts if it's SimpleNamespace (SimpleNamespace doesn't recurse)
+                    discovered_objects = getattr(validated_narrator_output, 'discovered_objects', [])
+                    discovered_connections = getattr(validated_narrator_output, 'discovered_connections', [])
+                    discovered_npcs = getattr(validated_narrator_output, 'discovered_npcs', [])
+                    newly_instantiated_locations_from_narrator = getattr(validated_narrator_output, 'newly_instantiated_locations', [])
 
                     cleaned_narrative_text = actual_narrative_paragraph
                     internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
@@ -297,19 +348,19 @@ Generate the narrative paragraph based on these details and your instructions (r
                     if actor_location_at_action_time:
                         original_intent_from_event = get_nested(action_event, "action", default={})
                         if original_intent_from_event.get("action_type") == "look_around":
-                            if validated_narrator_output.discovered_objects: # Use validated data
+                            if discovered_objects:
                                 location_path_for_ephemeral_obj = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_objects"
-                                _update_state_value(state, location_path_for_ephemeral_obj, [obj.model_dump() for obj in validated_narrator_output.discovered_objects], logger)
-                                logger.info(f"[NarrationTask] Updated/Set {len(validated_narrator_output.discovered_objects)} ephemeral objects for location {actor_location_at_action_time} from look_around.")
+                                _update_state_value(state, location_path_for_ephemeral_obj, _list_to_dicts_if_needed(discovered_objects), logger)
+                                logger.info(f"[NarrationTask] Updated/Set {len(discovered_objects)} ephemeral objects for location {actor_location_at_action_time} from look_around.")
                             else: 
                                 location_path_for_ephemeral_obj = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_objects"
                                 _update_state_value(state, location_path_for_ephemeral_obj, [], logger)
                                 logger.info(f"[NarrationTask] Cleared ephemeral objects for location {actor_location_at_action_time} as none were discovered by look_around.")
                             
-                            if validated_narrator_output.discovered_npcs: # Use validated data
+                            if discovered_npcs:
                                 location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
-                                _update_state_value(state, location_path_for_ephemeral_npc, [npc.model_dump() for npc in validated_narrator_output.discovered_npcs], logger)
-                                logger.info(f"[NarrationTask] Updated/Set {len(validated_narrator_output.discovered_npcs)} ephemeral NPCs for location {actor_location_at_action_time} from look_around.")
+                                _update_state_value(state, location_path_for_ephemeral_npc, _list_to_dicts_if_needed(discovered_npcs), logger)
+                                logger.info(f"[NarrationTask] Updated/Set {len(discovered_npcs)} ephemeral NPCs for location {actor_location_at_action_time} from look_around.")
                             else: 
                                 location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
                                 _update_state_value(state, location_path_for_ephemeral_npc, [], logger)
@@ -317,22 +368,32 @@ Generate the narrative paragraph based on these details and your instructions (r
                             
                             # Phase 4: Store discovered connections
                             location_path_for_connections = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.connected_locations"
-                            _update_state_value(state, location_path_for_connections, [conn.model_dump() for conn in validated_narrator_output.discovered_connections], logger)
-                            logger.info(f"[NarrationTask] Updated/Set {len(validated_narrator_output.discovered_connections)} connected_locations for {actor_location_at_action_time} from look_around.")
+                            _update_state_value(state, location_path_for_connections, _list_to_dicts_if_needed(discovered_connections), logger)
+                            logger.info(f"[NarrationTask] Updated/Set {len(discovered_connections)} connected_locations for {actor_location_at_action_time} from look_around.")
+
+                            # --- Phase 2: Process newly_instantiated_locations ---
+                            if newly_instantiated_locations_from_narrator:
+                                for loc_placeholder in newly_instantiated_locations_from_narrator:
+                                    new_loc_id = loc_placeholder.id
+                                    # Ensure the path exists before trying to set a value under it.
+                                    state.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
+                                    new_loc_data_dict = _to_dict(loc_placeholder) # loc_placeholder could be Pydantic or dict
+                                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{new_loc_id}", new_loc_data_dict, logger)
+                                    logger.info(f"[NarrationTask] Narrator instantiated new location placeholder: '{new_loc_id}' ({getattr(loc_placeholder, 'name', new_loc_id)})")
 
                     # --- Log Narration Event ---
                     _log_event(
                         sim_time=completion_time,
                         agent_id="Narrator",
                         event_type="narration",
-                        data=validated_narrator_output.model_dump(), # Log the full parsed and validated output
+                        data=_to_dict(validated_narrator_output), 
                         logger_instance=logger, event_logger_global=event_logger_global
                     )
 
                 except ValidationError as e_val:
                     # This case should be less common if ADK parsing works or parse_json_output_last is robust
-                    logger.error(f"[NarrationTask] Narrator output failed Pydantic validation (after potential ADK parse/fallback): {e_val}. Raw text: {getattr(validated_narrator_output, 'narrative', 'Unknown')}. Using raw text as narrative.")
-                    cleaned_narrative_text = getattr(validated_narrator_output, 'narrative', "Error in narration processing.")
+                    logger.error(f"[NarrationTask] Narrator output failed Pydantic validation (this should not be hit if validation is skipped in parser): {e_val}. Object: {validated_narrator_output}. Using raw text as narrative.")
+                    cleaned_narrative_text = getattr(validated_narrator_output, 'narrative', "Error in narration processing.") # Fallback if it was an object
                     if cleaned_narrative_text and live_display_object:
                         live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
@@ -450,33 +511,33 @@ Resolve this intent based on your instructions and the provided context.
                 original_instruction=original_world_engine_instruction, instruction_replacements=instruction_replacements_we
             )
 
-            parsed_resolution = validated_data.model_dump() if validated_data else None
+            # validated_data can be Pydantic model, SimpleNamespace, or None
+            parsed_resolution = _to_dict(validated_data) if validated_data else None
             if validated_data:
-                outcome_description = validated_data.outcome_description
+                outcome_description = getattr(validated_data, 'outcome_description', "Outcome not described.")
                 if live_display_object and parsed_resolution:
                     live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
                     try: live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
                     except TypeError: live_display_object.console.print(str(parsed_resolution))
-                _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=parsed_resolution or {}, logger_instance=logger, event_logger_global=event_logger_global)
+                _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=_to_dict(validated_data) or {}, logger_instance=logger, event_logger_global=event_logger_global)
 
             # Handle case where validated_data is still None after loop (e.g. LLM error or no response text)
             if 'validated_data' not in locals() or not validated_data:
                 if not outcome_description.startswith("Action failed due to LLM error"): 
                     outcome_description = "Action failed: No response from World Engine LLM."
-
-            if validated_data and validated_data.valid_action:
-                completion_time = current_sim_time + validated_data.duration
+            elif getattr(validated_data, 'valid_action', False):
+                completion_time = current_sim_time + getattr(validated_data, 'duration', 0.0)
                 # --- BEGIN ADDITION: Handle scheduled_future_event ---
-                if validated_data.scheduled_future_event:
-                    sfe = validated_data.scheduled_future_event
+                sfe = getattr(validated_data, 'scheduled_future_event', None)
+                if sfe: # sfe can be Pydantic model or SimpleNamespace
                     # The event should trigger relative to when the actor's action (speaking) completes.
-                    event_trigger_time = completion_time + sfe.estimated_delay_seconds
+                    event_trigger_time = completion_time + getattr(sfe, 'estimated_delay_seconds', 0.0)
 
                     event_to_schedule = {
-                        "event_type": sfe.event_type,
-                        "target_agent_id": sfe.target_agent_id,
-                        "location_id": sfe.location_id, # From World Engine prompt
-                        "details": sfe.details,
+                        "event_type": getattr(sfe, 'event_type', 'unknown_event'),
+                        "target_agent_id": getattr(sfe, 'target_agent_id', None),
+                        "location_id": getattr(sfe, 'location_id', 'unknown_location'), 
+                        "details": getattr(sfe, 'details', {}), # details is already a dict
                         "trigger_sim_time": event_trigger_time, # Absolute simulation time for the event
                         "source_actor_id": actor_id # The one whose action generated this event
                     }
@@ -493,24 +554,26 @@ Resolve this intent based on your instructions and the provided context.
                 # --- END ADDITION ---
                 narration_event = {
                     "type": "action_complete", "actor_id": actor_id, "action": intent,
-                    "results": validated_data.results, "outcome_description": validated_data.outcome_description,
+                    "results": getattr(validated_data, 'results', {}), 
+                    "outcome_description": getattr(validated_data, 'outcome_description', ""),
                     "completion_time": completion_time,
                     "current_action_description": f"Action: {intent.get('action_type', 'unknown')} - Details: {intent.get('details', 'N/A')[:100]}",
                     "actor_current_location_id": actor_location_id, 
                     "world_mood": world_mood_global, 
                 }
                 # --- Phase 3: Update location_details on successful move ---
-                if action_type == "move" and validated_data.results.get(f"{SIMULACRA_KEY}.{actor_id}.location"):
-                    new_location_id = validated_data.results[f"{SIMULACRA_KEY}.{actor_id}.location"]
+                current_results_obj = getattr(validated_data, 'results', {}) # This is a dict
+                if action_type == "move" and current_results_obj.get(f"{SIMULACRA_KEY}.{actor_id}.location"):
+                    new_location_id = current_results_obj[f"{SIMULACRA_KEY}.{actor_id}.location"]
                     new_location_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
                     new_location_details_text = f"You have arrived in {new_location_name}."
                     # Add this to the results that TimeManager will apply
-                    validated_data.results[f"{SIMULACRA_KEY}.{actor_id}.location_details"] = new_location_details_text
+                    current_results_obj[f"{SIMULACRA_KEY}.{actor_id}.location_details"] = new_location_details_text
                     logger.info(f"[WorldEngineLLM] Queuing update for {actor_id}'s location_details to: '{new_location_details_text}'")
                 # --- End Phase 3 Change ---
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", validated_data.results, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", current_results_obj, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", narration_event["current_action_description"], logger)
                     await narration_queue.put(narration_event)
@@ -518,7 +581,7 @@ Resolve this intent based on your instructions and the provided context.
                 else:
                     logger.error(f"[WorldEngineLLM] Actor {actor_id} not found in state after valid action resolution.")
             else: 
-                final_outcome_desc = validated_data.outcome_description if validated_data else outcome_description
+                final_outcome_desc = getattr(validated_data, 'outcome_description', outcome_description) if validated_data else outcome_description
                 logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_outcome_desc}")
                 # --- Log World Engine Resolution Event (Failure) ---
                 _log_event(
@@ -574,10 +637,10 @@ def _build_simulacra_prompt(
     """Builds the detailed prompt for the Simulacra agent."""
     # --- Perception Gathering ---
     fresh_percepts = perception_manager_instance.get_percepts_for_simulacrum(agent_id)
-    _log_event(
-        sim_time=current_sim_time, agent_id=agent_id, event_type="agent_perception_generated",
-        data=fresh_percepts, logger_instance=logger, event_logger_global=event_logger_global
-    )
+    # _log_event(
+    #     sim_time=current_sim_time, agent_id=agent_id, event_type="agent_perception_generated",
+    #     data=fresh_percepts, logger_instance=logger, event_logger_global=event_logger_global
+    # )
     logger.debug(f"[{agent_name}] Built percepts for prompt: {json.dumps(fresh_percepts, sort_keys=True)[:250]}...")
 
     # --- Format Percepts for LLM Prompt ---
@@ -708,13 +771,15 @@ async def simulacra_agent_task_llm(agent_id: str):
             
             if validated_intent:
                 if live_display_object:
-                    live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
+                    # validated_intent can be Pydantic or SimpleNamespace
+                    monologue_text = getattr(validated_intent, 'internal_monologue', "No monologue.")
+                    live_display_object.console.print(Panel(monologue_text, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
                     live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
-                    live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
-                await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                    live_display_object.console.print(json.dumps(_to_dict(validated_intent, exclude={'internal_monologue'}), indent=2))
+                await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": _to_dict(validated_intent, exclude={'internal_monologue'})})
                 _log_event(
                     sim_time=current_world_time_init, agent_id=agent_id, event_type="intent",
-                    data=validated_intent.model_dump(exclude={'internal_monologue'}), 
+                    data=_to_dict(validated_intent, exclude={'internal_monologue'}), 
                     logger_instance=logger, event_logger_global=event_logger_global
                 )
                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
@@ -750,13 +815,14 @@ async def simulacra_agent_task_llm(agent_id: str):
 
                 if validated_intent:
                     if live_display_object:
-                        live_display_object.console.print(Panel(validated_intent.internal_monologue, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
+                        monologue_text_loop = getattr(validated_intent, 'internal_monologue', "No monologue.")
+                        live_display_object.console.print(Panel(monologue_text_loop, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
                         live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
-                        live_display_object.console.print(json.dumps(validated_intent.model_dump(exclude={'internal_monologue'}), indent=2))
-                    await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": validated_intent.model_dump(exclude={'internal_monologue'})})
+                        live_display_object.console.print(json.dumps(_to_dict(validated_intent, exclude={'internal_monologue'}), indent=2))
+                    await event_bus.put({"type": "intent_declared", "actor_id": agent_id, "intent": _to_dict(validated_intent, exclude={'internal_monologue'})})
                     _log_event(
                         sim_time=current_sim_time_busy_loop, agent_id=agent_id, event_type="intent",
-                        data=validated_intent.model_dump(exclude={'internal_monologue'}),
+                        data=_to_dict(validated_intent, exclude={'internal_monologue'}),
                         logger_instance=logger, event_logger_global=event_logger_global
                     )
                     _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
@@ -796,12 +862,14 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                         )
 
                         if validated_reflection_intent:
-                            if validated_reflection_intent.action_type == "continue_current_task":
-                                logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
+                            action_type_reflect = getattr(validated_reflection_intent, 'action_type', 'unknown')
+                            monologue_reflect = getattr(validated_reflection_intent, 'internal_monologue', '')
+                            if action_type_reflect == "continue_current_task":
+                                logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {monologue_reflect[:50]}...")
                                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
                             else:
-                                logger.info(f"[{agent_name}] Reflection: Chose to '{validated_reflection_intent.action_type}'. Monologue: {validated_reflection_intent.internal_monologue[:50]}...")
-                                await event_bus.put({ "type": "intent_declared", "actor_id": agent_id, "intent": validated_reflection_intent.model_dump(exclude={'internal_monologue'}) })
+                                logger.info(f"[{agent_name}] Reflection: Chose to '{action_type_reflect}'. Monologue: {monologue_reflect[:50]}...")
+                                await event_bus.put({ "type": "intent_declared", "actor_id": agent_id, "intent": _to_dict(validated_reflection_intent, exclude={'internal_monologue'}) })
                                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
                                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
                         else: # Parsing failed or LLM error
