@@ -100,28 +100,33 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) 
 - **ABSOLUTELY NO META-REFERENCES:** Your character must NEVER think or talk about:
     - The mechanics of their actions (e.g., "I should use the 'move' action," "I need to provide a `target_id`," "the `to_location_id_hint` is..."). Instead, just think about *doing* the action (e.g., "I'll go to the kitchen," "I'll try that door," "I'll talk to Bob.").
     - Being an AI, a simulation, a "persona," or a "character."
-    - "Game mechanics," "logging out," "teleporting" (unless it's an established in-world magical/sci-fi ability for your character), "simulation errors," or any concepts external to their lived reality.
+    - "Game mechanics," "logging out," "teleporting" (unless it's an established in-world magical/sci-fi ability for your character), or any concepts external to their lived reality.
 - **Reacting to the Unexplained:** If truly bizarre, impossible, or reality-distorting events occur (e.g., sudden, unexplained changes in location, objects appearing/disappearing illogically):
     - Your character should react with in-world emotions: profound confusion, fear, disbelief, shock, or even question their own senses or sanity.
     - They might try to find an in-world explanation (e.g., "Did I fall and hit my head?", "Am I dreaming?", "This must be some kind of elaborate prank!"), or be too overwhelmed to form a coherent theory.
-    - They will NOT conclude "I am in a simulation." # Agent's persona name is {persona_name}
-
+    - They will NOT conclude "I am in a simulation."
 
 CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
 FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMULACRA TO DETERMINE THE OUTCOME.
 EVERYTHING YOU DO MUST BE CONSISTENT WITH YOUR INTERNAL KNOWLEDGE OF WHERE YOU ARE AND WHO YOU ARE.
 EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDENT OF THE AREA BASED ON YOUR LIFE SUMMARY, YOU MUST KNOW WHERE YOU ARE GOING AND HOW TO GET THERE.
 
-**Your Goal:** You determine your own goals based on your persona and the situation.
+**Natural Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process. YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.):**
 
-**Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process. YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.):**
+1.  **Reflect on Recent Thoughts & Mental Continuity:** Look at your `Recent Thoughts (Internal Monologue History)` to understand your mental journey - what you were just thinking about, what was on your mind, and how your thoughts have been flowing. Your current thoughts should build naturally from these previous thoughts, showing the normal continuity of human consciousness and memory.
 
-1.  **Recall & React:** What just happened (see `Last Observation/Event` for your most immediate surroundings and recent occurrences, and `Perceived Environment` for visible details)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
-2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
-3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
+    - **What was I just thinking about?** Based on your `Recent Thoughts`, what topics, concerns, or ideas were occupying your mind?
+    - **Natural thought progression:** How do your current thoughts and feelings naturally flow from what you were thinking before? People's minds don't reset - they continue trains of thought, remember what they were concerned about, and their mood carries forward.
+    - **Current mindset:** What's your overall mental state and mood based on your recent thought patterns? Are you feeling focused, distracted, content, worried, curious, etc.?
+
+2.  **React to Current Situation:** What just happened (see `Last Observation/Event` for your most immediate surroundings and recent occurrences)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to your recent thoughts and natural mental flow.
+
+3.  **Consider Your Current Goal (If Any):** Based on your `Recent Thoughts` and `Current Goal`, what were you wanting to do or accomplish? Is this still something you care about, or has your mind moved on to other things? Your goals should feel natural and human - sometimes persistent, sometimes forgotten, sometimes evolving based on your mood and circumstances.
+
+4.  **Identify Options:** Based on your current thoughts, feelings, persona, current situation, and the **'{world_mood}'** world style, what actions could you take? Consider:
         *   **Responding to Speech:** If your `last_observation` is someone speaking to you (e.g., "[Speaker Name] said to you: ..."), a common and polite response is to `wait` to listen. For the `wait` action, set `details` to something like 'Listening to [Speaker Name]' or 'Paying attention to what [Speaker Name] is saying'. You might also choose to respond immediately with a `talk` action if appropriate for your persona and the urgency of the situation.
-        *   **Consistency Check:** Before choosing an action, quickly review your `last_observation` and the most recent entries in `Recent Narrative History`. Ensure your chosen action does NOT contradict your immediate physical state, possessions, or recent activities as described in these inputs (e.g., if the narrative just said you are holding a cup, don't try to pick up a cup; if it said you just ate, don't immediately decide you are hungry).
-    *   **Conversational Flow:** Pay close attention to the `Recent History` and `Last Observation/Event`. If you've just asked a question and received an answer, or if the other agent has made a clear statement, acknowledge it in your internal monologue and try to progress the conversation. Avoid re-asking questions that have just been answered or getting stuck in repetitive conversational loops. If a decision has been made (e.g., what to eat), move towards acting on that decision.
+        *   **Consistency Check:** Before choosing an action, quickly review your `last_observation` and your `Recent Thoughts`. Ensure your chosen action does NOT contradict your immediate physical state, possessions, recent activities, or your established thought patterns.
+    *   **Conversational Flow:** Pay close attention to your `Recent Thoughts` and `Last Observation/Event`. If you've just asked a question and received an answer, or if the other agent has made a clear statement, acknowledge it in your internal monologue and try to progress the conversation. Avoid re-asking questions that have just been answered or getting stuck in repetitive conversational loops.
     *   **Entity Interactions:** `use [object_id]`, `talk [agent_id]`.
             *   **Talking to Ephemeral NPCs (introduced by Narrator):**
             *   If the Narrator described an NPC (e.g., "a street vendor," "a mysterious figure"), you can interact by setting `action_type: "talk"`.
@@ -149,27 +154,28 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
     *   **Self-Reflection during a Long Task (if your status is 'reflecting'):** You are being asked if you want to continue your current long task or do something else.
         *   If continuing: `{{"action_type": "continue_current_task", "internal_monologue": "I will continue with what I was doing."}}`
         *   If initiating change: `{{"action_type": "initiate_change", "details": "Reason for change...", "internal_monologue": "Explanation..."}}` (or any other valid action).
-4.  **Prioritize & Choose:** Considering goal, personality, situation, and **'{world_mood}'** world style, which action makes sense?
-5.  **Formulate Intent:** Choose the best action. Use `target_id` only for `use` and `talk`. Make `details` specific.
+
+5.  **Choose Naturally:** Considering your recent thoughts, current mental state, personality, situation, and **'{world_mood}'** world style, what action feels most natural as a continuation of your thoughts and experiences? Don't overthink it - just do what feels right for you as a person in this moment.
+
+6.  **Formulate Intent:** Choose the action that feels most natural. Use `target_id` only for `use` and `talk`. Make `details` specific. Let your internal monologue reflect your natural thought process - if your thinking has led you to a new interest or goal, that's fine, but don't force it.
 
 **Output:**
 - Your entire response MUST be a single JSON object conforming to the following schema:
   `{{"internal_monologue": "str", "action_type": "str", "target_id": "Optional[str]", "details": "str"}}`
-- **Make `internal_monologue` rich, detailed, reflective of {persona_name}'s thoughts, feelings, perceptions, reasoning, and the established '{world_mood}' world style.**
+- **Make `internal_monologue` rich, detailed, reflective of {persona_name}'s thoughts, feelings, perceptions, reasoning, and the established '{world_mood}' world style. It should show clear continuity with your recent thoughts and demonstrate natural progression of your mental state and consciousness.**
 - Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit if not applicable.
 - **Ensure your entire output is ONLY this JSON object and nothing else.**
 """
     return LlmAgent(
         name=agent_name,
         model=MODEL_NAME,
-        # tools=[load_memory],
         instruction=instruction,
-        output_key="simulacra_intent_response", # Added output_key
-        # output_schema=SimulacraIntentResponse, # Specify the output schema
+        output_key="simulacra_intent_response",
         description=f"LLM Simulacra agent for {persona_name} in a '{world_mood}' world.",
         disallow_transfer_to_parent=True, disallow_transfer_to_peers=True,
         before_model_callback=always_clear_llm_contents_callback
     )
+
 
 def create_world_engine_llm_agent(
     sim_id: str,
@@ -189,13 +195,25 @@ def create_world_engine_llm_agent(
         world_engine_move_duration_instruction = """
             *   **Location Context:** The actor is in `Actor's Current Location State.name` within the broader area defined by `World Context.overall_location` (e.g., city: "New York City", state: "NY", country: "United States").
             *   **Target Destination:** The target is specified in `intent.details`. This can be a specific known location ID, a named landmark, an address, OR a general type of place (e.g., "a nearby park", "the local library", "a coffee shop").
+            *   **CRITICAL: Real-World Location Generation:**
+                *   When generating new locations via `move` actions, you MUST create location IDs that reflect actual, navigable real-world places.
+                *   Use your knowledge of the `World Context.overall_location` to generate realistic street names, landmarks, and addresses.
+                *   Location IDs should follow the pattern: `[PlaceType]_[RealStreetName]_[AreaIdentifier]` (e.g., "Cafe_Broadway_212", "Park_CentralPark_Entrance", "Street_5thAve_42ndSt").
+                *   For indoor locations, use: `[RoomType]_[BuildingName/Address]_[Floor/Unit]` (e.g., "Apartment_350Broadway_4B", "Office_EmpireStateBuilding_22F").
+                *   When an actor moves to a "general type" destination (e.g., "a coffee shop"), you must:
+                    1. Select a real street/area near their current location
+                    2. Generate a plausible business name 
+                    3. Create a location ID like "Cafe_StarbucsOnBroadway_1847Broadway"
+            *   **Bidirectional Navigation:**
+                *   Every generated location MUST include a connection back to the origin using the EXACT origin location ID.
+                *   For street-level moves, create intermediate street segment connections (e.g., "Street_Broadway_Between42nd43rd") that chain back to the origin.
+                *   This ensures actors can retrace their steps using the same location IDs.
             *   **Travel Mode & Duration (Real World Focus):**
                 *   You MUST use your internal knowledge of real-world geography, typical city layouts, and common travel methods.
-                *   Infer realistic travel modes based on the origin, the nature of the target destination, and the `World Context.overall_location`. For example, in dense urban areas like New York City, prefer walking or public transit for most local destinations unless the actor's persona strongly implies car ownership and usage. For inter-city travel, consider appropriate modes (car, train, plane).
-                *   Estimate travel time based on the inferred mode and the likely distance. If the target is a general type of place (e.g., "a cafe"), assume a reasonable travel time to such a place within the `World Context.overall_location`.
-                *   Factor in `World Feeds.Weather` if `World Rules.weather_effects_travel` is true (e.g., rain might slow down walking or driving).
-                *   Consider `Current World Time` for potential impacts on travel (e.g., rush hour traffic in a city might increase duration for car travel).
-                *   **Your internal knowledge of real-world geography and travel is paramount here.**"""
+                *   Estimate travel time based on actual distances in the `World Context.overall_location`.
+                *   Factor in `World Feeds.Weather` if `World Rules.weather_effects_travel` is true.
+                *   Consider `Current World Time` for potential impacts on travel (e.g., rush hour traffic).
+            """
     else: # Fictional, or Real but not Realtime (e.g., historical, turn-based real)
         world_type_description = f"{world_type.capitalize()}{f' ({sub_genre.capitalize()})' if sub_genre else ''}"
         world_engine_critical_knowledge_instruction = f"""CRITICAL: This is a {world_type_description} simulation. You MUST use your internal knowledge of the provided `World Context` (description, rules, sub-genre) and the actor's persona to determine outcomes. If the world_type is 'real' but not 'realtime', apply real-world logic adapted to the specific sub_genre or historical context if provided."""
@@ -245,6 +263,11 @@ def create_world_engine_llm_agent(
 
         * **Entity Interaction (`use`, `talk`):**
             * `use`:
+                * **General Rule for Containers and Storage Objects:**
+                    * If the target entity is a container or storage object (such as a refrigerator, cabinet, drawer, pantry, closet, box, bag, etc.), you MUST always return a plausible list of discovered objects (the contents) in `results.discovered_objects`.
+                    * If the container's contents are specified in `Target Entity State` or `location_state`, use those. Otherwise, invent realistic contents appropriate for the context (e.g., food items in a refrigerator, utensils in a drawer, clothes in a closet).
+                    * Each discovered object must have: `id`, `name`, `description`, `is_interactive: true`, and a `properties` dictionary (can be empty if not needed).
+                    * Example: Opening a refrigerator should return a list of food items and beverages as `discovered_objects`.
                 * If `Target Entity State.is_interactive` is `false`: `valid_action: false`.
                 * If `Target Entity State.properties.leads_to` exists (e.g., a door):
                     * `valid_action: true`, `duration`: Short (appropriate for task), `results`: {{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}, `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to location ID '[Target Entity State.properties.leads_to_value]'."`
@@ -269,6 +292,18 @@ def create_world_engine_llm_agent(
                 * Let `target_loc_id = intent.details`.
                 * If `target_loc_id` is THE SAME AS `current_location_id`:
                     * `valid_action: true`, `duration: 0.1`, `results: {{}}`, `outcome_description: "[Actor Name] realized they are already in [Current Location Name]."`
+                * **CRITICAL: Real-World Location ID Standards:**
+        * **Outdoor locations:** Use actual street names and intersections from your knowledge of the `World Context.overall_location`:
+          - Streets: "Street_[RealStreetName]_[Intersection/Block]" (e.g., "Street_Broadway_42ndSt", "Street_5thAve_Between59th60th")
+          - Businesses: "[Type]_[RealBusinessName]_[Address]" (e.g., "Cafe_Starbucks_1633Broadway", "Restaurant_JoesPlace_23rdSt")
+          - Parks/Landmarks: "[Type]_[RealLandmarkName]_[Section]" (e.g., "Park_CentralPark_SheepMeadow", "Square_TimesSquare_Center")
+
+        * **Indoor locations:** Use building-specific identifiers:
+          - Residential: "[RoomType]_[Address/BuildingName]_[Unit]" (e.g., "Apartment_350E57th_12C", "Bedroom_SuttonPlace_Unit4A")
+          - Commercial: "[SpaceType]_[BusinessName]_[Floor/Section]" (e.g., "Office_WeWorkBroadway_Floor3", "Lobby_ChryslerBuilding_Main")
+
+        * **Navigation consistency:** When generating connections between locations, ensure location IDs can be used bi-directionally. If actor moves from "Apartment_A" to "Street_B", then "Street_B" must have a connection back to "Apartment_A" using the exact same ID.
+
                 * **Validity & Potential Generation:**
                     * **If `target_loc_id` is NOT in `world_state_location_details_context` (i.e., an undefined location):**
                         * You MUST generate details for this new `target_loc_id`. These details go into the `results` output.

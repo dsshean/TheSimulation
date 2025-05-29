@@ -20,7 +20,7 @@
     "Bedroom_01": {
       "id": "Bedroom_01",
       "name": "Bedroom",
-      "description": "A cozy bedroom with a large window overlooking the city. The room is filled with plants and personal items, creating a warm and inviting atmosphere.",
+      "description": "Your address is: 2632 Jackson Ave, Long Island City, NY 11101 you have an apartment. A cozy bedroom with a large window overlooking the city. The room is filled with plants and personal items, creating a warm and inviting atmosphere.",
       "ephemeral_objects": [],
       "ephemeral_npcs": [],
       "connected_locations": []

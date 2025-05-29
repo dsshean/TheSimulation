@@ -32,7 +32,7 @@ from .core_tasks import dynamic_interruption_task, narrative_image_generation_ta
 
 from .agents import create_narration_llm_agent  # Agent creation functions
 from .agents import (create_search_llm_agent, create_simulacra_llm_agent,
-                     create_world_engine_llm_agent, create_world_generator_llm_agent) # Added WorldGenerator
+                     create_world_engine_llm_agent) # Removed WorldGenerator
 # Import from our new/refactored modules
 from .config import (  # For run_simulation; For self-reflection; New constants for dynamic_interruption_task; PROB_INTERJECT_AS_NARRATIVE removed; from this import list; Import Bluesky and social post config; Import SIMULACRA_KEY
     ACTIVE_SIMULACRA_IDS_KEY, AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS,
@@ -56,7 +56,7 @@ from .loop_utils import (get_nested, load_json_file,
                          load_or_initialize_simulation, parse_json_output_last,
                          save_json_file)
 from .perception_manager import PerceptionManager # Import the moved PerceptionManager
-from .models import NarratorOutput, WorldGeneratorOutput, GeneratedLocationDetail  # Pydantic models for tasks in this file
+from .models import NarratorOutput, GeneratedLocationDetail  # Removed WorldGeneratorOutput
 from .models import SimulacraIntentResponse, WorldEngineResponse
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
     _update_state_value, generate_table, get_time_string_for_prompt, get_target_entity_state, # Re-added get_time_string_for_prompt, added get_target_entity_state
@@ -92,9 +92,10 @@ search_llm_agent_instance: Optional[LlmAgent] = None # Renamed
 search_agent_runner_instance: Optional[Runner] = None # Renamed
 search_agent_session_id_val: Optional[str] = None # Renamed
 
-world_generator_agent: Optional[LlmAgent] = None
-world_generator_runner: Optional[Runner] = None
-world_generator_session_id: Optional[str] = None
+# Remove world_generator globals
+# world_generator_agent: Optional[LlmAgent] = None
+# world_generator_runner: Optional[Runner] = None
+# world_generator_session_id: Optional[str] = None
 
 world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home."
 live_display_object: Optional[Live] = None
@@ -159,6 +160,84 @@ async def queue_health_monitor():
 
 def get_current_sim_time():
     return state.get("world_time", 0.0)
+
+# ENHANCED CONNECTION MERGING FOR ALL ACTIONS
+def merge_connections_safely(existing_connections, new_connections, location_id, logger):
+    """Safely merge connections, preserving existing ones and adding new unique ones."""
+    if not isinstance(existing_connections, list):
+        existing_connections = []
+    if not isinstance(new_connections, list):
+        new_connections = []
+    
+    # Create a map of existing connections by target ID
+    existing_map = {}
+    for conn in existing_connections:
+        if isinstance(conn, dict) and conn.get("to_location_id_hint"):
+            target_id = conn["to_location_id_hint"]
+            existing_map[target_id] = conn
+    
+    # Merge connections
+    merged = list(existing_connections)
+    added_count = 0
+    
+    for new_conn in new_connections:
+        if isinstance(new_conn, dict) and new_conn.get("to_location_id_hint"):
+            target_id = new_conn["to_location_id_hint"]
+            if target_id not in existing_map:
+                merged.append(new_conn)
+                added_count += 1
+                logger.debug(f"Added new connection from {location_id}: {target_id}")
+            else:
+                # Update description if new one is more detailed
+                existing_desc = existing_map[target_id].get("description", "")
+                new_desc = new_conn.get("description", "")
+                if len(new_desc) > len(existing_desc):
+                    existing_map[target_id]["description"] = new_desc
+                    logger.debug(f"Updated connection description for {location_id} -> {target_id}")
+    
+    logger.info(f"Connection merge for {location_id}: {len(existing_connections)} existing + {added_count} new = {len(merged)} total")
+    return merged
+
+# Add after the existing merge_connections_safely function
+def ensure_bidirectional_connections(state, location_id, logger):
+    """Ensure all connections from a location have corresponding back-connections."""
+    location_connections = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, location_id, "connected_locations", default=[])
+    
+    for conn in location_connections:
+        target_id = conn.get("to_location_id_hint")
+        if target_id and target_id in get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={}):
+            # Check if target has connection back to this location
+            target_connections = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_id, "connected_locations", default=[])
+            
+            has_back_connection = any(
+                back_conn.get("to_location_id_hint") == location_id 
+                for back_conn in target_connections
+            )
+            
+            if not has_back_connection:
+                location_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, location_id, "name", default=location_id)
+                back_connection = {
+                    "to_location_id_hint": location_id,
+                    "description": f"Back to {location_name}."
+                }
+                target_connections.append(back_connection)
+                _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{target_id}.connected_locations", target_connections, logger)
+                logger.info(f"Added missing bidirectional connection: {target_id} -> {location_id}")
+
+def update_location_connections(state, location_id, new_connections, logger):
+    """Centralized function to update location connections with deduplication and bidirectional linking."""
+    existing_connections = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, location_id, "connected_locations", default=[])
+    
+    # Merge connections safely
+    merged_connections = merge_connections_safely(existing_connections, new_connections, location_id, logger)
+    
+    # Update state
+    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{location_id}.connected_locations", merged_connections, logger)
+    
+    # Ensure bidirectional connections
+    ensure_bidirectional_connections(state, location_id, logger)
+    
+    return merged_connections
 
 # --- Helper function to convert Pydantic models or SimpleNamespace to dict ---
 def _to_dict(obj: Any, exclude: Optional[set[str]] = None) -> Dict[str, Any]:
@@ -290,8 +369,19 @@ async def narration_task():
 
             actor_id = get_nested(action_event, "actor_id")
             intent = get_nested(action_event, "action")
-            results = get_nested(action_event, "results", default={})
+            results = get_nested(action_event, "results_for_narration_context", default={})
             outcome_desc = get_nested(action_event, "outcome_description", default="Something happened.")
+            
+            # Validate required fields
+            if not actor_id:
+                logger.warning(f"[NarrationTask] Received narration event without actor_id: {action_event}")
+                narration_queue.task_done()
+                continue
+
+            if not intent:
+                logger.warning(f"[NarrationTask] Received narration event without action for {actor_id}: {action_event}")
+                narration_queue.task_done()
+                continue
             
             # Discovery details are passed for narrative context only - state is already updated
             discovered_objects_for_narration_ctx = action_event.get("discovered_objects_for_narration", [])
@@ -300,11 +390,6 @@ async def narration_task():
 
             completion_time = get_nested(action_event, "completion_time", default=state.get("world_time", 0.0))
             actor_location_at_action_time = get_nested(action_event, "actor_current_location_id")
-
-            if not actor_id:
-                logger.warning(f"[NarrationTask] Received narration event without actor_id: {action_event}")
-                narration_queue.task_done()
-                continue
 
             actor_name = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
             logger.debug(f"[NarrationTask] Using global world mood: '{world_mood_global}' for actor {actor_name}")
@@ -386,14 +471,23 @@ async def narration_task():
                         logger_instance=logger, event_logger_global=event_logger_global
                     )
 
-                except ValidationError as e_val:
-                    logger.error(f"[NarrationTask] Narrator output validation error: {e_val}")
-                    cleaned_narrative_text = getattr(validated_narrator_output, 'narrative', "Error in narration processing.")
-                    if cleaned_narrative_text and live_display_object:
-                        live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
+                except Exception as e_processing:
+                    logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
+                    fallback_narrative = f"{actor_name} completed an action, but the narrative could not be generated."
+                    if live_display_object:
+                        live_display_object.console.print(Panel(fallback_narrative, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", fallback_narrative, logger)
+            else:
+                # Handle case where LLM call failed
+                logger.error(f"[NarrationTask] Failed to get narrator output for {actor_name}")
+                fallback_narrative = f"{actor_name} completed an action: {outcome_desc}"
+                if live_display_object:
+                    live_display_object.console.print(Panel(fallback_narrative, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="red", expand=False))
+                if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", fallback_narrative, logger)
 
+            # Always call task_done() after successful processing
             narration_queue.task_done()
 
         except asyncio.CancelledError:
@@ -487,90 +581,8 @@ async def world_engine_task_llm():
             location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={})
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
             
-            # --- World Generation Check for MOVE action ---
-            target_location_id_from_intent = intent.get("details") if action_type == "move" else None
-
-            if action_type == "move" and target_location_id_from_intent:
-                is_target_defined = target_location_id_from_intent in get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={})
-                
-                if not is_target_defined:
-                    logger.info(f"[WorldEngineLLM] Target location '{target_location_id_from_intent}' for move by {actor_name} is undefined. Triggering WorldGenerator.")
-                    if not world_generator_agent or not world_generator_runner or not world_generator_session_id:
-                        logger.error("[WorldEngineLLM] WorldGenerator ADK components not initialized. Cannot generate new location.")
-                        # Action will likely fail or be handled as invalid by standard WorldEngine logic
-                    else:
-                        # Get world context from state
-                        world_template_details = state.get(WORLD_TEMPLATE_DETAILS_KEY, {})
-                        current_world_type = world_template_details.get("world_type", "unknown")
-                        current_sub_genre = world_template_details.get("sub_genre", "unknown")
-                        trigger_data_wg = {
-                            "location_id_to_define": target_location_id_from_intent,
-                            "origin_location_id_context": actor_location_id,
-                            "origin_location_description_context": get_nested(location_state_data, "description", "Unknown origin location."),
-                            "world_details_context": {
-                                "current_time": get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time),
-                                "weather": get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.'),
-                                "mood": world_mood_global,
-                                "world_type": current_world_type,
-                                "sub_genre": current_sub_genre
-                            },
-                            "instruction": "Generate the location details based on your agent instructions and the provided JSON context. Infer the appropriate location type from the location ID, origin context, and world details."
-                        }
-                        wg_trigger_text = json.dumps(trigger_data_wg)
-                        wg_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=wg_trigger_text)])
-                        
-                        # Original instruction for WorldGenerator is static for now, no dynamic replacements needed in this call
-                        generated_world_data_ns = await _call_adk_agent_and_parse(
-                            world_generator_runner, world_generator_agent, world_generator_session_id, USER_ID,
-                            wg_trigger_content, WorldGeneratorOutput, f"WorldGenerator_{actor_name}", logger
-                        )
-
-                        if generated_world_data_ns:
-                            generated_world_data = _to_dict(generated_world_data_ns) # Convert SimpleNamespace to dict
-                            defined_loc = generated_world_data.get("defined_location")
-                            additional_locs = generated_world_data.get("additional_related_locations", [])
-                            origin_conn_update = generated_world_data.get("connection_update_for_origin")
-
-                            if defined_loc and defined_loc.get("id") == target_location_id_from_intent:
-                                # Ensure the new location connects back to the origin
-                                origin_id_for_check = actor_location_id # The location the actor is coming FROM
-                                connection_back_to_origin_exists = False
-                                if origin_id_for_check and defined_loc.get("connected_locations"):
-                                    for conn in defined_loc["connected_locations"]:
-                                        if conn.get("to_location_id_hint") == origin_id_for_check:
-                                            connection_back_to_origin_exists = True
-                                            break
-                                if origin_id_for_check and not connection_back_to_origin_exists:
-                                    origin_loc_name_for_desc = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, origin_id_for_check, "name", default=origin_id_for_check)
-                                    connection_to_origin = {
-                                        "to_location_id_hint": origin_id_for_check,
-                                        "description": f"The way back to {origin_loc_name_for_desc}."
-                                    }
-                                    defined_loc.setdefault("connected_locations", []).append(connection_to_origin)
-                                    logger.info(f"[WorldEngineLLM] WorldGenerator: Added missing connection from new location '{defined_loc['id']}' back to origin '{origin_id_for_check}'.")
-
-                                _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{defined_loc['id']}", defined_loc, logger)
-                                logger.info(f"[WorldEngineLLM] WorldGenerator defined new location: {defined_loc['id']} ({defined_loc.get('name')})")
-                                for add_loc in additional_locs:
-                                    # Similar check for additional_locs if they should connect back to defined_loc could be added here if needed
-                                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{add_loc['id']}", add_loc, logger)
-                                    logger.info(f"[WorldEngineLLM] WorldGenerator added related location: {add_loc['id']} ({add_loc.get('name')})")
-                                
-                                if origin_conn_update and origin_conn_update.get("origin_id") == actor_location_id:
-                                    conn_to_add = origin_conn_update.get("connection_to_add")
-                                    if conn_to_add:
-                                        current_origin_conns = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, "connected_locations", default=[])
-                                        current_origin_conns.append(conn_to_add)
-                                        _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.connected_locations", current_origin_conns, logger)
-                                        logger.info(f"[WorldEngineLLM] WorldGenerator updated connections for origin {actor_location_id} to include {conn_to_add.get('to_location_id_hint')}")
-                                # The target location is now defined, WorldEngine can proceed with the move.
-                                is_target_defined = True # Update flag
-                            else:
-                                logger.error(f"[WorldEngineLLM] WorldGenerator failed to define the target location '{target_location_id_from_intent}' correctly.")
-            # --- End World Generation Check ---
             location_state_data["objects_present"] = location_state_data.get("ephemeral_objects", [])
-            time_for_world_engine_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time) # type: ignore
-            # Use the new helper function to get target_state_data
+            time_for_world_engine_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)
             target_id_we = get_nested(intent, "target_id")
             target_state_data = get_target_entity_state(state, target_id_we, actor_location_id) or {}
 
@@ -578,16 +590,15 @@ async def world_engine_task_llm():
             trigger_data_we = {
                 "actor_name_and_id": f"{actor_name} ({actor_id})",
                 "current_location_id": actor_location_id,
-                "intent": intent, # intent is already a dict
-                "target_entity_state": target_state_data, # target_state_data is already a dict
+                "intent": intent,
+                "target_entity_state": target_state_data,
                 "target_entity_id_hint": target_id_we or 'N/A',
-                "location_state": location_state_data, # location_state_data is already a dict
-                "world_rules": world_rules, # world_rules is already a dict
+                "location_state": location_state_data,
+                "world_rules": world_rules,
                 "world_time_context": time_for_world_engine_prompt,
                 "weather_context": get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.'),
                 "instruction": "Resolve this intent based on your agent instructions and the provided JSON context."
             }
-            # Convert the dictionary to a compact JSON string
             trigger_text_we = json.dumps(trigger_data_we)
 
             logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")
@@ -600,52 +611,50 @@ async def world_engine_task_llm():
             )
 
             # validated_data can be Pydantic model, SimpleNamespace, or None
-            parsed_resolution = _to_dict(validated_data) if validated_data else None
             if validated_data:
                 outcome_description = getattr(validated_data, 'outcome_description', "Outcome not described.")
+                parsed_resolution = _to_dict(validated_data)
                 if live_display_object and parsed_resolution:
                     live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
-                    try: live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
-                    except TypeError: live_display_object.console.print(str(parsed_resolution))
-                _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=_to_dict(validated_data) or {}, logger_instance=logger, event_logger_global=event_logger_global)
+                    try: 
+                        live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
+                    except TypeError: 
+                        live_display_object.console.print(str(parsed_resolution))
+                _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=parsed_resolution, logger_instance=logger, event_logger_global=event_logger_global)
 
-            # Handle case where validated_data is still None after loop (e.g. LLM error or no response text)
-            if 'validated_data' not in locals() or not validated_data:
-                if action_type == "move" and target_location_id_from_intent and not is_target_defined:
-                    outcome_description = f"{actor_name} attempted to move to '{target_location_id_from_intent}', but the way could not be materialized."
-                else:
-                    outcome_description = "Action failed: No response from World Engine LLM."
+            # Handle case where validated_data is None
+            if not validated_data:
+                outcome_description = "Action failed: No response from World Engine LLM."
             elif getattr(validated_data, 'valid_action', False):
                 completion_time = current_sim_time + getattr(validated_data, 'duration', 0.0)
-                # --- BEGIN ADDITION: Handle scheduled_future_event ---
-                sfe_dict = _to_dict(getattr(validated_data, 'scheduled_future_event', None)) # Convert to dict for consistent access
+                
+                # --- Handle scheduled_future_event ---
+                sfe_dict = _to_dict(getattr(validated_data, 'scheduled_future_event', None))
                 if sfe_dict:
-                    # The event should trigger relative to when the actor's action (speaking) completes.
                     event_trigger_time = completion_time + sfe_dict.get('estimated_delay_seconds', 0.0)
-
                     event_to_schedule = {
                         "event_type": sfe_dict.get('event_type', 'unknown_event'),
                         "target_agent_id": sfe_dict.get('target_agent_id'), 
                         "location_id": sfe_dict.get('location_id', 'unknown_location'),
                         "details": sfe_dict.get('details', {}), 
-                        "trigger_sim_time": event_trigger_time, # Absolute simulation time for the event
-                        "source_actor_id": actor_id # The one whose action generated this event
+                        "trigger_sim_time": event_trigger_time,
+                        "source_actor_id": actor_id
                     }
                     state.setdefault("pending_simulation_events", []).append(event_to_schedule)
                     state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
-                    logger.info(
-                        f"[WorldEngineLLM] Scheduled future event '{event_to_schedule.get('event_type')}' "
-                        f"for agent {event_to_schedule.get('target_agent_id')} at sim_time {event_trigger_time:.2f} "
-                        f"triggered by {actor_id}."
-                    )
+                    logger.info(f"[WorldEngineLLM] Scheduled future event '{event_to_schedule.get('event_type')}' for agent {event_to_schedule.get('target_agent_id')} at sim_time {event_trigger_time:.2f} triggered by {actor_id}.")
 
-                # --- CONSOLIDATE RESULTS FOR TIME MANAGER ---
-                # Get base results from World Engine
+                # --- Get results and extract discoveries from INSIDE results ---
                 pending_results_dict = _to_dict(getattr(validated_data, 'results', {}))
                 action_completion_results_dict = {}
 
+                # Extract discoveries from INSIDE the results
+                discovered_objects_list = pending_results_dict.get('discovered_objects', [])
+                discovered_npcs_list = pending_results_dict.get('discovered_npcs', [])
+                discovered_connections_list = pending_results_dict.get('discovered_connections', [])
+
                 # Determine effective location for discoveries
-                effective_location_id_for_discoveries = actor_location_id  # Default to current location
+                effective_location_id_for_discoveries = actor_location_id
 
                 if action_type == "move":
                     # For move actions, discoveries apply to the DESTINATION
@@ -653,9 +662,6 @@ async def world_engine_task_llm():
                     if destination_location_id:
                         effective_location_id_for_discoveries = destination_location_id
                         logger.info(f"[WorldEngineLLM] Move action: discoveries will apply to destination {destination_location_id}")
-                        
-                        # ENSURE BIDIRECTIONAL CONNECTION: Add connection back to origin location
-                        discovered_connections_list = _list_to_dicts_if_needed(getattr(validated_data, 'discovered_connections', []))
                         
                         # Check if connection back to origin already exists
                         origin_connection_exists = any(
@@ -672,10 +678,6 @@ async def world_engine_task_llm():
                             }
                             discovered_connections_list.append(back_connection)
                             logger.info(f"[WorldEngineLLM] Added bidirectional connection from {destination_location_id} back to {actor_location_id}")
-                        
-                        # Update the validated_data with the enhanced connections
-                        if hasattr(validated_data, 'discovered_connections'):
-                            validated_data.discovered_connections = discovered_connections_list
                     
                     # Defer location change to completion if action has duration
                     if getattr(validated_data, 'duration', 0.0) > 0.1:
@@ -690,102 +692,42 @@ async def world_engine_task_llm():
                             logger.info(f"[WorldEngineLLM] Deferred location change for {actor_id} to action completion")
 
                 # --- IMMEDIATE DISCOVERY UPDATES TO STATE ---
-                results_dict = _to_dict(getattr(validated_data, 'results', {}))
-                discovered_objects_list = _list_to_dicts_if_needed(results_dict.get('discovered_objects', []))
-                # discovered_npcs_list = _list_to_dicts_if_needed(results_dict.get('discovered_npcs', []))
-                discovered_connections_list = _list_to_dicts_if_needed(results_dict.get('discovered_connections', []))
-                
-                # IMMEDIATE APPLICATION FOR CURRENT LOCATION DISCOVERIES
-                if action_type == "look_around" and effective_location_id_for_discoveries == actor_location_id:
-                    # Apply discoveries immediately to state for look_around actions
-                    if discovered_objects_list or True:  # Always update for look_around to potentially clear state
-                        _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.ephemeral_objects", discovered_objects_list, logger)
-                        logger.info(f"[WorldEngineLLM] IMMEDIATELY applied ephemeral_objects at {effective_location_id_for_discoveries}: {len(discovered_objects_list)} items.")
-
-                    # if discovered_npcs_list or True:  # Always update for look_around
-                    #     _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.ephemeral_npcs", discovered_npcs_list, logger)
-                    #     logger.info(f"[WorldEngineLLM] IMMEDIATELY applied ephemeral_npcs at {effective_location_id_for_discoveries}: {len(discovered_npcs_list)} items.")
-
-                    # **FIX: For look_around, MERGE discovered connections with existing ones**
-                    if discovered_connections_list or True:  # Always update for look_around
-                        # Get existing connections
-                        existing_connections = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, effective_location_id_for_discoveries, "connected_locations", default=[])
-                        
-                        # Create a map of existing connections by target ID to avoid duplicates
-                        existing_connection_targets = {
-                            conn.get("to_location_id_hint"): conn 
-                            for conn in existing_connections 
-                            if isinstance(conn, dict) and conn.get("to_location_id_hint")
-                        }
-                        
-                        # Merge discovered connections, keeping existing ones and adding new ones
-                        merged_connections = list(existing_connections)
-                        for new_conn in discovered_connections_list:
-                            if isinstance(new_conn, dict) and new_conn.get("to_location_id_hint"):
-                                target_id = new_conn["to_location_id_hint"]
-                                if target_id not in existing_connection_targets:
-                                    merged_connections.append(new_conn)
-                                    logger.info(f"[WorldEngineLLM] Added new connection: {target_id} - {new_conn.get('description', 'No description')}")
-                                else:
-                                    # Optionally update description if new one is more detailed
-                                    existing_desc = existing_connection_targets[target_id].get("description", "")
-                                    new_desc = new_conn.get("description", "")
-                                    if len(new_desc) > len(existing_desc):
-                                        existing_connection_targets[target_id]["description"] = new_desc
-                                        logger.info(f"[WorldEngineLLM] Updated connection description for {target_id}")
-                        
-                        _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.connected_locations", merged_connections, logger)
-                        logger.info(f"[WorldEngineLLM] IMMEDIATELY applied merged connected_locations at {effective_location_id_for_discoveries}: {len(merged_connections)} total connections.")
-                else:
-                    # For moves or other actions, defer to pending_results as before
-                    if discovered_objects_list or intent.get("action_type") == "look_around":
-                        obj_path = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.ephemeral_objects"
-                        pending_results_dict[obj_path] = discovered_objects_list
-                        logger.info(f"[WorldEngineLLM] Queuing update for ephemeral_objects at {effective_location_id_for_discoveries}: {len(discovered_objects_list)} items.")
-
-                    # if discovered_npcs_list or intent.get("action_type") == "look_around":
-                    #     npc_path = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.ephemeral_npcs"
-                    #     pending_results_dict[npc_path] = discovered_npcs_list
-                    #     logger.info(f"[WorldEngineLLM] Queuing update for ephemeral_npcs at {effective_location_id_for_discoveries}: {len(discovered_npcs_list)} items.")
-
-                    if discovered_connections_list or intent.get("action_type") == "look_around":
-                        conn_path = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.connected_locations"
-                        pending_results_dict[conn_path] = discovered_connections_list
-                        logger.info(f"[WorldEngineLLM] Queuing update for connected_locations at {effective_location_id_for_discoveries}: {len(discovered_connections_list)} items.")
-                # --- END IMMEDIATE DISCOVERY UPDATES ---
+                # Always apply connection merging for any action that might discover connections
+                if discovered_connections_list or action_type in ["look_around", "move", "explore", "examine"]:
+                    update_location_connections(state, effective_location_id_for_discoveries, discovered_connections_list, logger)
+                    logger.debug(f"[WorldEngineLLM] Applied connection merging for {action_type} action at location {effective_location_id_for_discoveries}")
 
                 narration_event = {
-                    "type": "action_complete", "actor_id": actor_id, "action": intent,
-                    "results_for_narration_context": pending_results_dict, # Pass the consolidated results
+                    "type": "action_complete", 
+                    "actor_id": actor_id, 
+                    "action": intent,
+                    "results_for_narration_context": pending_results_dict,
                     "outcome_description": getattr(validated_data, 'outcome_description', ""),
                     "completion_time": completion_time,
                     "current_action_description": f"Action: {intent.get('action_type', 'unknown')} - Details: {intent.get('details', 'N/A')[:100]}",
                     "actor_current_location_id": actor_location_id, 
                     "world_mood": world_mood_global, 
-                    # Pass discovery lists explicitly from WorldEngine's validated_data for narration context
-                    "discovered_objects_for_narration": _list_to_dicts_if_needed(getattr(validated_data, 'discovered_objects', [])),
-                    "discovered_npcs_for_narration": _list_to_dicts_if_needed(getattr(validated_data, 'discovered_npcs', [])),
-                    "discovered_connections_for_narration": _list_to_dicts_if_needed(getattr(validated_data, 'discovered_connections', [])),
+                    "discovered_objects_for_narration": discovered_objects_list,
+                    "discovered_npcs_for_narration": discovered_npcs_list,
+                    "discovered_connections_for_narration": discovered_connections_list,
                 }
-                # If the move was to a newly generated location, adjust outcome description slightly for narration
-                if action_type == "move" and target_location_id_from_intent and \
-                   (target_location_id_from_intent not in get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={}) # Should not happen if WG worked
-                    or get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default="").startswith("Newly Defined")): # Check if WG named it generically
-                    loc_name_for_narration = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default=target_location_id_from_intent)
-                    narration_event["outcome_description"] = f"{actor_name} moved into the newly revealed area: {loc_name_for_narration} (ID: {target_location_id_from_intent})."
 
-                # The logic for updating actor's location_details on move is now part of building pending_results_dict above.
+                # Special handling for newly generated locations
+                # REMOVE THIS ENTIRE BLOCK - it references undefined variables from WorldGenerator
+                # if action_type == "move" and target_location_id_from_intent and not is_target_defined:
+                #     loc_name_for_narration = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default=target_location_id_from_intent)
+                #     narration_event["outcome_description"] = f"{actor_name} moved into the newly revealed area: {loc_name_for_narration} (ID: {target_location_id_from_intent})."
 
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", pending_results_dict, logger)
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_completion_results", action_completion_results_dict, logger) # Store completion results
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_completion_results", action_completion_results_dict, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
                     
                     # Refine action description for listening
                     action_desc_for_state = narration_event["current_action_description"]
                     if action_type == "wait" and "listened attentively to" in outcome_description:
-                        action_desc_for_state = outcome_description # Use the more specific "listened attentively to..."
+                        action_desc_for_state = outcome_description
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", action_desc_for_state, logger)
                     
                     narration_success = await safe_queue_put(narration_queue, narration_event, timeout=5.0, task_name=f"WorldEngineLLM_{actor_id}")
@@ -800,7 +742,7 @@ async def world_engine_task_llm():
             else: 
                 final_outcome_desc = getattr(validated_data, 'outcome_description', outcome_description) if validated_data else outcome_description
                 logger.info(f"[WorldEngineLLM] Action INVALID for {actor_id}. Reason: {final_outcome_desc}")
-                # --- Log World Engine Resolution Event (Failure) ---
+                
                 _log_event(
                     sim_time=current_sim_time,
                     agent_id="WorldEngine",
@@ -808,15 +750,21 @@ async def world_engine_task_llm():
                     data={"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc},
                     logger_instance=logger, event_logger_global=event_logger_global
                 )
+                
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", final_outcome_desc, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                
                 actor_name_for_log = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
                 resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc}
+                
                 if live_display_object: 
                     live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
-                    try: live_display_object.console.print(json.dumps(resolution_details, indent=2))
-                    except TypeError: live_display_object.console.print(str(resolution_details))
+                    try: 
+                        live_display_object.console.print(json.dumps(resolution_details, indent=2))
+                    except TypeError: 
+                        live_display_object.console.print(str(resolution_details))
+                
                 state.setdefault("narrative_log", []).append(f"[T{current_sim_time:.1f}] {actor_name_for_log}'s action failed: {final_outcome_desc}")
 
         except asyncio.CancelledError:
@@ -847,7 +795,6 @@ async def world_engine_task_llm():
                     logger.warning("[WorldEngineLLM] task_done() called too many times in finally.")
                 except Exception as td_e: 
                     logger.error(f"[WorldEngineLLM] Error calling task_done() in finally: {td_e}")
-
 
 def _build_simulacra_prompt(
     agent_id: str,
@@ -898,6 +845,7 @@ def _build_simulacra_prompt(
 
         audible_events_text_parts = [
             f"  - Sound ({s.get('type', 'general')} from {s.get('source_id', 'unknown')}): {s.get('description', 'An indistinct sound.')}"
+
             for s in fresh_percepts.get("audible_events", [])
         ]
         audible_env_str = "\n".join(audible_events_text_parts) if audible_events_text_parts else "  The environment is quiet."
@@ -934,10 +882,15 @@ def _build_simulacra_prompt(
                         unique_connections_map[hint] = conn
     connected_locations = list(unique_connections_map.values())
 
-    # Build rest of prompt from state
-    raw_recent_narrative = global_state_ref.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
+    # Build monologue history instead of narrative history
+    raw_recent_monologues = agent_state_data.get("monologue_history", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
+    monologue_history_str = "\n".join(raw_recent_monologues) if raw_recent_monologues else "None."
+    
+    # Get recent narrative for context (reduced length)
+    raw_recent_narrative = global_state_ref.get("narrative_log", [])[-3:]  # Only last 3 entries
     cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
-    history_str = "\n".join(cleaned_recent_narrative)
+    recent_narrative_context = "\n".join(cleaned_recent_narrative) if cleaned_recent_narrative else "None."
+    
     weather_summary = get_nested(global_state_ref, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
     latest_news_headlines = [item.get('headline', '') for item in get_nested(global_state_ref, 'world_feeds', 'news_updates', default=[])[:2]]
     news_summary = " ".join(h for h in latest_news_headlines if h) or "No major news."
@@ -954,16 +907,17 @@ def _build_simulacra_prompt(
         f"- Current Weather: {weather_summary}",
         f"- Recent News Snippet: {news_summary}",
         f"- Current Goal: {agent_state_data.get('goal', 'Determine goal.')}",
+
         f"- Current Time: {get_time_string_for_prompt(global_state_ref, sim_elapsed_time_seconds=current_sim_time)}",
         f"- Last Observation/Event: {agent_state_data.get('last_observation', 'None.')}",
         f"- Audible Environment:\n{audible_env_str}",
-        f"- Recent Narrative History:\n{history_str if history_str else 'None.'}",
+        f"- Your Recent Thoughts (Internal Monologue History):\n{monologue_history_str}",
+        f"- Recent Activity Context (What happened recently):\n{recent_narrative_context}",
         f"- Exits/Connections from this location: {json.dumps(connected_locations) if connected_locations else 'None observed.'}",
         "\n**General Instructions:**"
         "Follow your thinking process and provide your response ONLY in the specified JSON format."
     ]
     return "\n".join(prompt_text_parts)
-
 
 async def simulacra_agent_task_llm(agent_id: str):
     """Asynchronous task for managing a single Simulacra LLM agent."""
@@ -979,17 +933,26 @@ async def simulacra_agent_task_llm(agent_id: str):
         logger.error(f"[{agent_name}] ADK components (runner, session_id, or agent) not found for this simulacrum. Task cannot proceed.")
         return
 
-    # Store the original instruction here, at the beginning of the function
-    original_simulacra_agent_instruction = sim_agent.instruction
+    # Circuit breaker variables
+    consecutive_failures = 0
+    max_consecutive_failures = 5
+    failure_backoff_time = 5.0
     
     try:
+        # Validate and initialize required state fields
         sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
+        if not sim_state_init:
+            logger.error(f"[{agent_name}] Agent state not found in global state. Cannot proceed.")
+            return
+            
         if "last_interjection_sim_time" not in sim_state_init:
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_interjection_sim_time", 0.0, logger)
-        if "current_interrupt_probability" not in sim_state_init: # Initialize if not present
+        if "current_interrupt_probability" not in sim_state_init:
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
-        # next_simple_timer_interjection_sim_time is no longer managed by this task
+        if "monologue_history" not in sim_state_init:
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", [], logger)
         
+        # Handle initial action if agent is idle
         if get_nested(state, SIMULACRA_KEY, agent_id, "status") == "idle":
             current_sim_state_init = get_nested(state, SIMULACRA_KEY, agent_id, default={})
             current_world_time_init = state.get("world_time", 0.0)
@@ -1000,7 +963,6 @@ async def simulacra_agent_task_llm(agent_id: str):
             )
             logger.debug(f"[{agent_name}] Sending initial context prompt as agent is idle.")
             
-
             initial_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=initial_trigger_text)])
             
             validated_intent = await _call_adk_agent_and_parse(
@@ -1009,29 +971,64 @@ async def simulacra_agent_task_llm(agent_id: str):
             )
             
             if validated_intent:
+                # Store the monologue and update goal if needed
+                monologue_text = getattr(validated_intent, 'internal_monologue', "")
+                if monologue_text:
+                    monologue_entry = f"[T{current_world_time_init:.1f}] {monologue_text}"
+                    current_monologue_history = get_nested(state, SIMULACRA_KEY, agent_id, "monologue_history", default=[])
+                    current_monologue_history.append(monologue_entry)
+                    # Keep only recent monologues
+                    if len(current_monologue_history) > MEMORY_LOG_CONTEXT_LENGTH:
+                        current_monologue_history = current_monologue_history[-MEMORY_LOG_CONTEXT_LENGTH:]
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", current_monologue_history, logger)
+                
+                # Extract and update goal from monologue if it contains goal-setting language
+                if monologue_text and any(keyword in monologue_text.lower() for keyword in ["goal", "want to", "need to", "plan to", "going to", "should"]):
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.goal", monologue_text[:100] + "..." if len(monologue_text) > 100 else monologue_text, logger)
+                
                 if live_display_object:
-                    # validated_intent can be Pydantic or SimpleNamespace
-                    monologue_text = getattr(validated_intent, 'internal_monologue', "No monologue.")
                     live_display_object.console.print(Panel(monologue_text, title=f"{agent_name} Monologue @ {current_world_time_init:.1f}s", border_style="yellow", expand=False))
                     live_display_object.console.print(f"\n[{agent_name} Intent @ {current_world_time_init:.1f}s]")
                     live_display_object.console.print(json.dumps(_to_dict(validated_intent, exclude={'internal_monologue'}), indent=2))
+                
                 success = await safe_queue_put(
                     event_bus, 
                     {"type": "intent_declared", "actor_id": agent_id, "intent": _to_dict(validated_intent, exclude={'internal_monologue'})},
                     timeout=5.0,
-                    task_name=f"Simulacra_{agent_name}_Subsequent"
+                    task_name=f"Simulacra_{agent_name}_Initial"
                 )
-                if not success:
-                    logger.error(f"[{agent_name}] Failed to queue subsequent intent")
-
-                # Only update status if queue operation succeeded
-                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                
+                if success:
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                    consecutive_failures = 0
+                else:
+                    logger.error(f"[{agent_name}] Failed to queue initial intent")
+                    consecutive_failures += 1
+            else:
+                logger.error(f"[{agent_name}] Failed to get initial intent from LLM")
+                consecutive_failures += 1
 
         next_interjection_check_sim_time = state.get("world_time", 0.0) + AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS
-        while True:
+        iteration_count = 0
+        max_iterations = 10000  # Circuit breaker for infinite loops
+        
+        while iteration_count < max_iterations:
+            iteration_count += 1
+            
+            # Apply failure backoff if needed
+            if consecutive_failures >= max_consecutive_failures:
+                logger.warning(f"[{agent_name}] Too many consecutive failures ({consecutive_failures}). Backing off for {failure_backoff_time}s")
+                await asyncio.sleep(failure_backoff_time)
+                consecutive_failures = 0  # Reset after backoff
+                
             await asyncio.sleep(AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS)
             current_sim_time_busy_loop = state.get("world_time", 0.0)
             agent_state_busy_loop = get_nested(state, SIMULACRA_KEY, agent_id, default={})
+            
+            if not agent_state_busy_loop:
+                logger.error(f"[{agent_name}] Agent state disappeared from global state. Stopping task.")
+                break
+                
             current_status_busy_loop = agent_state_busy_loop.get("status")
 
             if current_status_busy_loop == "idle":
@@ -1043,7 +1040,6 @@ async def simulacra_agent_task_llm(agent_id: str):
                 )
                 logger.debug(f"[{agent_name}] Sending subsequent prompt.")
                 
-
                 trigger_content_loop = genai_types.UserContent(parts=[genai_types.Part(text=prompt_text)])
 
                 validated_intent = await _call_adk_agent_and_parse(
@@ -1052,8 +1048,22 @@ async def simulacra_agent_task_llm(agent_id: str):
                 )
 
                 if validated_intent:
+                    # Store the monologue and update goal if needed
+                    monologue_text_loop = getattr(validated_intent, 'internal_monologue', "")
+                    if monologue_text_loop:
+                        monologue_entry_loop = f"[T{current_sim_time_busy_loop:.1f}] {monologue_text_loop}"
+                        current_monologue_history_loop = get_nested(state, SIMULACRA_KEY, agent_id, "monologue_history", default=[])
+                        current_monologue_history_loop.append(monologue_entry_loop)
+                        # Keep only recent monologues
+                        if len(current_monologue_history_loop) > MEMORY_LOG_CONTEXT_LENGTH:
+                            current_monologue_history_loop = current_monologue_history_loop[-MEMORY_LOG_CONTEXT_LENGTH:]
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", current_monologue_history_loop, logger)
+                    
+                    # Extract and update goal from monologue if it contains goal-setting language
+                    if monologue_text_loop and any(keyword in monologue_text_loop.lower() for keyword in ["goal", "want to", "need to", "plan to", "going to", "should"]):
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.goal", monologue_text_loop[:100] + "..." if len(monologue_text_loop) > 100 else monologue_text_loop, logger)
+                    
                     if live_display_object:
-                        monologue_text_loop = getattr(validated_intent, 'internal_monologue', "No monologue.")
                         live_display_object.console.print(Panel(monologue_text_loop, title=f"{agent_name} Monologue @ {current_sim_time_busy_loop:.1f}s", border_style="yellow", expand=False))
                         live_display_object.console.print(f"\n[{agent_name} Intent @ {current_sim_time_busy_loop:.1f}s]")
                         live_display_object.console.print(json.dumps(_to_dict(validated_intent, exclude={'internal_monologue'}), indent=2))
@@ -1064,15 +1074,23 @@ async def simulacra_agent_task_llm(agent_id: str):
                         timeout=5.0,
                         task_name=f"Simulacra_{agent_name}_Subsequent"
                     )
-                    if not success:
-                        logger.error(f"[{agent_name}] Failed to queue subsequent intent")
                     
-                    _log_event(
-                        sim_time=current_sim_time_busy_loop, agent_id=agent_id, event_type="intent",
-                        data=_to_dict(validated_intent, exclude={'internal_monologue'}),
-                        logger_instance=logger, event_logger_global=event_logger_global
-                    )
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                    if success:
+                        _log_event(
+                            sim_time=current_sim_time_busy_loop, agent_id=agent_id, event_type="intent",
+                            data=_to_dict(validated_intent, exclude={'internal_monologue'}),
+                            logger_instance=logger, event_logger_global=event_logger_global
+                        )
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                        consecutive_failures = 0
+                    else:
+                        logger.error(f"[{agent_name}] Failed to queue subsequent intent")
+                        consecutive_failures += 1
+                        # Keep status as idle so agent can retry
+                else:
+                    logger.error(f"[{agent_name}] Failed to get subsequent intent from LLM")
+                    consecutive_failures += 1
+                    
                 continue 
 
             # Busy Action Interjection Logic - RETAINED FOR SELF-REFLECTION ONLY
@@ -1090,30 +1108,49 @@ async def simulacra_agent_task_llm(agent_id: str):
                         original_status_before_reflection = agent_state_busy_loop.get("status")
                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "reflecting", logger)
                         current_action_desc_for_prompt = agent_state_busy_loop.get("current_action_description", "your current task")
+                        
+                        # Include recent thoughts in reflection prompt
+                        recent_monologues = agent_state_busy_loop.get("monologue_history", [])[-3:]
+                        recent_thoughts_context = "\n".join(recent_monologues) if recent_monologues else "None."
+                        
                         reflection_prompt_text = f"""You are {agent_name}. You are currently busy with: "{current_action_desc_for_prompt}".
 This task is scheduled to continue for a while (until simulation time {agent_state_busy_loop.get("current_action_end_time", 0.0):.1f}).
+
+Your recent thoughts:
+{recent_thoughts_context}
+
 It's time for a brief self-reflection. Your status is 'reflecting'.
 Do you:
 1. Wish to `continue_current_task` without interruption?
 2. Feel the need to `initiate_change`? (e.g., take a break, address hunger, switch focus, react to boredom/monotony).
-Your `internal_monologue` should explain your reasoning.
+Your `internal_monologue` should explain your reasoning and connect to your recent thoughts and current goal.
 If you choose to continue, your `action_type` must be `continue_current_task`.
 If you choose to `initiate_change`, provide the `action_type` and `details` for that change as usual.
 Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "target_id": "...", "details": "..."}}`"""
                         reflection_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=reflection_prompt_text)])
-                        # For reflection, instruction replacements are not typically needed as the prompt is self-contained.
+                        
                         validated_reflection_intent = await _call_adk_agent_and_parse(
                             sim_runner, sim_agent, sim_session_id, USER_ID,
                             reflection_trigger_content, SimulacraIntentResponse, f"Simulacra_{agent_name}_Reflection", logger
-                            # No original_instruction/replacements needed here as reflection prompt is specific
                         )
 
                         if validated_reflection_intent:
                             action_type_reflect = getattr(validated_reflection_intent, 'action_type', 'unknown')
                             monologue_reflect = getattr(validated_reflection_intent, 'internal_monologue', '')
+                            
+                            # Store reflection monologue
+                            if monologue_reflect:
+                                monologue_entry_reflect = f"[T{current_sim_time_busy_loop:.1f}] {monologue_reflect}"
+                                current_monologue_history_reflect = get_nested(state, SIMULACRA_KEY, agent_id, "monologue_history", default=[])
+                                current_monologue_history_reflect.append(monologue_entry_reflect)
+                                if len(current_monologue_history_reflect) > MEMORY_LOG_CONTEXT_LENGTH:
+                                    current_monologue_history_reflect = current_monologue_history_reflect[-MEMORY_LOG_CONTEXT_LENGTH:]
+                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", current_monologue_history_reflect, logger)
+                            
                             if action_type_reflect == "continue_current_task":
                                 logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {monologue_reflect[:50]}...")
                                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
+                                consecutive_failures = 0
                             else:
                                 logger.info(f"[{agent_name}] Reflection: Chose to '{action_type_reflect}'. Monologue: {monologue_reflect[:50]}...")
                                 success = await safe_queue_put(
@@ -1122,14 +1159,22 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                                     timeout=5.0,
                                     task_name=f"Simulacra_{agent_name}_Reflection"
                                 )
-                                if not success:
-                                    logger.error(f"[{agent_name}] Failed to queue reflection intent")
                                 
-                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
-                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
-                        else: # Parsing failed or LLM error
+                                if success:
+                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger)
+                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                                    consecutive_failures = 0
+                                else:
+                                    logger.error(f"[{agent_name}] Failed to queue reflection intent")
+                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
+                                    consecutive_failures += 1
+                        else:
                             logger.error(f"[{agent_name}] Error processing reflection response. Staying busy.")
                             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
+                            consecutive_failures += 1
+
+        if iteration_count >= max_iterations:
+            logger.warning(f"[{agent_name}] Hit maximum iterations ({max_iterations}). Stopping to prevent infinite loop.")
 
     except asyncio.CancelledError:
         logger.info(f"[{agent_name}] Task cancelled.")
@@ -1149,7 +1194,6 @@ async def run_simulation(
     global adk_session_service, adk_memory_service
     global world_engine_agent, world_engine_runner, world_engine_session_id
     global narration_agent_instance, narration_runner, narration_session_id
-    global world_generator_agent, world_generator_runner, world_generator_session_id # Added WorldGenerator globals
     global simulacra_agents_map, simulacra_runners_map, simulacra_session_ids_map # Keep this line
     global state, live_display_object
     global world_mood_global, search_llm_agent_instance, search_agent_runner_instance, search_agent_session_id_val, perception_manager_global
@@ -1261,16 +1305,16 @@ async def run_simulation(
     await adk_session_service.create_session(app_name=narration_runner.app_name, user_id=USER_ID, session_id=narration_session_id, state={})
     logger.info(f"Narration Runner and Session ({narration_session_id}) initialized.")
 
-    # --- Initialize WorldGenerator Agent, Runner, and Session ---
-    world_generator_agent = create_world_generator_llm_agent(
-       
-        world_mood=world_mood_global, world_type=current_world_type, sub_genre=current_sub_genre
-    )
-    world_generator_runner = Runner(agent=world_generator_agent, app_name=APP_NAME + "_WorldGenerator", session_service=adk_session_service)
-    world_generator_session_id = f"world_generator_session_{world_instance_uuid}"
-    await adk_session_service.create_session(app_name=world_generator_runner.app_name, user_id=USER_ID, session_id=world_generator_session_id, state={})
-    logger.info(f"WorldGenerator Runner and Session ({world_generator_session_id}) initialized.")
+    # REMOVE ALL WORLDGENERATOR INITIALIZATION:
 
+    # --- Initialize WorldGenerator Agent, Runner, and Session ---
+    # world_generator_agent = create_world_generator_llm_agent(
+    #     world_mood=world_mood_global, world_type=current_world_type, sub_genre=current_sub_genre
+    # )
+    # world_generator_runner = Runner(agent=world_generator_agent, app_name=APP_NAME + "_WorldGenerator", session_service=adk_session_service)
+    # world_generator_session_id = f"world_generator_session_{world_instance_uuid}"
+    # await adk_session_service.create_session(app_name=world_generator_runner.app_name, user_id=USER_ID, session_id=world_generator_session_id, state={})
+    # logger.info(f"WorldGenerator Runner and Session ({world_generator_session_id}) initialized.")
 
     # --- Initialize Search Agent, Runner, and Session (already mostly dedicated) ---
     search_llm_agent_instance = create_search_llm_agent()
@@ -1308,7 +1352,6 @@ async def run_simulation(
     # Register system agents to prevent "unknown agent" errors
     simulacra_agents_map["WorldEngineLLMAgent"] = world_engine_agent
     simulacra_agents_map["NarrationLLMAgent"] = narration_agent_instance  # Note: Changed from NarrationAgent to NarrationLLMAgent
-    simulacra_agents_map["WorldGeneratorLLMAgent"] = world_generator_agent # Register WorldGenerator
     if search_llm_agent_instance:
         simulacra_agents_map["SearchAgent"] = search_llm_agent_instance
         simulacra_agents_map["SearchLLMAgent"] = search_llm_agent_instance  # Add alternative name

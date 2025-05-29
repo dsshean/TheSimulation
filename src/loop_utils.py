@@ -555,116 +555,120 @@ def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict |
 
 
 
-def parse_json_output_last(text_output: str) -> Optional[Dict[Any, Any]]:
+def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
     """
-    Attempts to parse a JSON object from a string, handling common LLM output issues.
-    Prioritizes JSON within markdown code fences (```json ... ``` or ``` ... ```).
-    If not found, attempts to find the last complete JSON object in the string.
-    
-    Handles common LLM JSON formatting issues including:
-    - Double quotes inside strings ("") which should be escaped (\")
-    - Extra backticks outside markdown fences
-    - Unbalanced brackets at the end of texts
+    Robustly extracts and parses the last JSON object from text.
+    Handles markdown fences, escaped quotes, and common formatting issues.
     """
-    if not text_output:
-        logger.debug("parse_json_output_last received empty text_output.")
+    if not text or not text.strip():
         return None
-
-    # 1. Attempt to extract from markdown code fences
-    fence_match = re.search(r"```(?:json)?\s*(.*?)\s*```", text_output, re.DOTALL | re.IGNORECASE)
     
-    json_to_parse = None
-
+    # First, try to extract from markdown fence
+    fence_pattern = r'```(?:json)?\s*\n?(.*?)```'
+    fence_match = re.search(fence_pattern, text, re.DOTALL | re.IGNORECASE)
     if fence_match:
-        json_to_parse = fence_match.group(1).strip()
-        logger.debug(f"Extracted from markdown fence: '{json_to_parse[:200]}...'")
+        json_text = fence_match.group(1).strip()
+        logger.debug(f"Extracted from markdown fence: '{json_text[:50]}...'")
     else:
-        # 2. If no markdown fence, try to find the last JSON object (heuristic)
-        logger.debug(f"No markdown fence found in: '{text_output[:200]}...'. Trying heuristic.")
-        last_brace = text_output.rfind('{')
-        if last_brace != -1:
-            open_braces = 0
-            candidate = ""
-            for char_idx, char in enumerate(text_output[last_brace:]):
-                candidate += char
-                if char == '{':
-                    open_braces += 1
-                elif char == '}':
-                    open_braces -= 1
-                    if open_braces == 0:
-                        # Check if this is the end of the string or followed by non-JSON characters
-                        if last_brace + char_idx + 1 == len(text_output) or not text_output[last_brace + char_idx + 1:].strip().startswith(("{", "[")):
-                            json_to_parse = candidate 
-                            logger.debug(f"Heuristic found potential JSON object: '{json_to_parse[:200]}...'")
-                            break 
-            if open_braces != 0: 
-                json_to_parse = None 
-                logger.debug(f"No balanced JSON object found after last '{{'. Candidate was: {candidate[:200]}")
-        
-        if not json_to_parse:
-            last_bracket = text_output.rfind('[')
-            if last_bracket != -1:
-                open_brackets = 0
-                candidate_arr = ""
-                for char_idx_arr, char_arr in enumerate(text_output[last_bracket:]):
-                    candidate_arr += char_arr
-                    if char_arr == '[':
-                        open_brackets += 1
-                    elif char_arr == ']':
-                        open_brackets -= 1
-                        if open_brackets == 0:
-                            if last_bracket + char_idx_arr + 1 == len(text_output) or not text_output[last_bracket + char_idx_arr + 1:].strip().startswith(("{", "[")):
-                                json_to_parse = candidate_arr
-                                logger.debug(f"Heuristic found potential JSON array: '{json_to_parse[:200]}...'")
-                                break
-                if open_brackets != 0:
-                    json_to_parse = None
-                    logger.debug(f"No balanced JSON array found after last '['. Candidate was: {candidate_arr[:200]}")
-
-    if json_to_parse:
-        try:
-            # First attempt: Try direct parsing
-            try:
-                parsed_dict = json.loads(json_to_parse)
-                logger.debug(f"Successfully parsed JSON on first attempt: Type {type(parsed_dict)}")
-                return parsed_dict
-            except json.JSONDecodeError as e1:
-                logger.debug(f"Initial JSON parsing attempt failed: {e1}. Trying with fixups...")
-            
-            # Second attempt: Fix common issues with double quotes in JSON strings
-            fixed_json = json_to_parse
-            
-            # Fix 1: Replace patterns of "" within string values with \"
-            # This handles cases like: "key": "value with ""quotes"" inside"
-            fixed_json = re.sub(r'(": *")([^"]*?)""([^"]*?)""([^"]*?)(")', r'\1\2\"\3\"\4\5', fixed_json)
-            
-            # NEW FIX: Handle unescaped quotes inside JSON strings
-            # This handles the specific case we're seeing in narrative text like: "narrative": "Text with "quotes" inside"
-            # Look for the pattern: ": "...[unescaped quote]...[unescaped quote]..."
-            # Using negative lookbehind (?<!\\) to ensure we only replace quotes that aren't already escaped
-            fixed_json = re.sub(r'(": *"[^"]*?)(?<!\\)"([^"]*?)(?<!\\)"([^"]*?")', r'\1\\"\\2\\"\\3', fixed_json)
-            
-            # Fix 2: More aggressive - replaces all double double-quotes with escaped quotes
-            # This might over-correct but is worth trying
-            fixed_json = re.sub(r'""', r'\\"', fixed_json)
-            
-            # Try parsing the fixed JSON
-            try:
-                parsed_dict = json.loads(fixed_json)
-                logger.info(f"Successfully parsed JSON after fixing quotes: Type {type(parsed_dict)}")
-                return parsed_dict
-            except json.JSONDecodeError as e2:
-                logger.debug(f"Second JSON parsing attempt (after quote fixes) failed: {e2}")
-            
-            # Third attempt: Try more aggressive repairs (could add more methods here)
-            logger.warning(f"All JSON parsing attempts failed. Original: {json_to_parse[:200]}...")
-            return None
-            
-        except Exception as e:
-            logger.warning(f"Final JSON parsing attempt failed for: '{json_to_parse[:200]}...'. Error: {e}")
-            return None
+        json_text = text.strip()
+        logger.debug(f"No markdown fence found, using full text: '{json_text[:50]}...'")
     
-    logger.debug(f"Could not find or parse a valid JSON object from text: {text_output[:200]}...")
+    # Clean up common formatting issues
+    def clean_json_text(json_str: str) -> str:
+        """Clean up common JSON formatting issues"""
+        # Remove any leading/trailing whitespace
+        json_str = json_str.strip()
+        
+        # Fix the specific pattern: ] \n , \n "key" -> ], \n "key"
+        json_str = re.sub(r']\s*\n\s*,\s*\n\s*"', '],\n    "', json_str)
+        
+        # Fix standalone commas on their own lines
+        json_str = re.sub(r']\s*\n\s*,\s*\n', '],\n', json_str)
+        
+        # Fix missing commas between array elements and object properties
+        json_str = re.sub(r'}\s*\n\s*,\s*\n\s*"', '},\n    "', json_str)
+        
+        # Remove trailing commas before closing brackets/braces
+        json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+        
+        return json_str
+    
+    # Try parsing with cleanup
+    cleaned_json = clean_json_text(json_text)
+    
+    try:
+        logger.debug("Initial JSON parsing attempt...")
+        result = json.loads(cleaned_json)
+        logger.debug("JSON parsing successful")
+        return result
+    except json.JSONDecodeError as e:
+        logger.debug(f"Initial JSON parsing attempt failed: {e}. Trying with fixups...")
+    
+    # Try more aggressive fixes for quote issues
+    try:
+        # Fix unescaped quotes and other common issues
+        fixed_json = cleaned_json.replace('\\"', '"').replace('"', '\\"')
+        # Restore proper JSON structure quotes
+        fixed_json = re.sub(r'\\"([^"]*)\\":', r'"\1":', fixed_json)
+        fixed_json = re.sub(r':\s*\\"([^"]*)\\"', r': "\1"', fixed_json)
+        
+        result = json.loads(fixed_json)
+        logger.debug("JSON parsing successful after quote fixes")
+        return result
+    except json.JSONDecodeError as e:
+        logger.debug(f"Second JSON parsing attempt (after quote fixes) failed: {e}")
+    
+    # Try extracting just the JSON object bounds
+    try:
+        # Find the outermost JSON object
+        start_idx = cleaned_json.find('{')
+        if start_idx == -1:
+            raise ValueError("No opening brace found")
+            
+        brace_count = 0
+        end_idx = -1
+        
+        for i in range(start_idx, len(cleaned_json)):
+            if cleaned_json[i] == '{':
+                brace_count += 1
+            elif cleaned_json[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    end_idx = i
+                    break
+        
+        if end_idx == -1:
+            raise ValueError("No matching closing brace found")
+            
+        bounded_json = cleaned_json[start_idx:end_idx + 1]
+        
+        # Apply additional cleanup to the bounded JSON
+        bounded_json = clean_json_text(bounded_json)
+        
+        result = json.loads(bounded_json)
+        logger.debug("JSON parsing successful after brace bounding")
+        return result
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.debug(f"Third JSON parsing attempt (brace bounding) failed: {e}")
+    
+    # Last resort: try to fix the specific malformed pattern in the error
+    try:
+        # Fix the specific discovered_objects array issue
+        pattern = r'("discovered_objects":\s*\[.*?)\]\s*,\s*("discovered_connections")'
+        match = re.search(pattern, cleaned_json, re.DOTALL)
+        if match:
+            before_fix = match.group(1)
+            after_fix = match.group(2)
+            fixed_section = before_fix + '], ' + after_fix
+            cleaned_json = cleaned_json.replace(match.group(0), fixed_section)
+            
+            result = json.loads(cleaned_json)
+            logger.debug("JSON parsing successful after array fix")
+            return result
+    except json.JSONDecodeError as e:
+        logger.debug(f"Final JSON parsing attempt (array fix) failed: {e}")
+    
+    logger.warning(f"All JSON parsing attempts failed. Original: {json_text[:100]}...")
     return None
 
 def get_nested(data: Dict, *keys: str, default: Any = None) -> Any:
