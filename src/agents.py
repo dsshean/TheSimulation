@@ -104,7 +104,7 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) 
 - **Reacting to the Unexplained:** If truly bizarre, impossible, or reality-distorting events occur (e.g., sudden, unexplained changes in location, objects appearing/disappearing illogically):
     - Your character should react with in-world emotions: profound confusion, fear, disbelief, shock, or even question their own senses or sanity.
     - They might try to find an in-world explanation (e.g., "Did I fall and hit my head?", "Am I dreaming?", "This must be some kind of elaborate prank!"), or be too overwhelmed to form a coherent theory.
-    - They will NOT conclude "I am in a simulation."
+    - They will NOT conclude "I am in a simulation." # Agent's persona name is {persona_name}
 
 
 CRITICAL: IF YOU ARE DOING A REAL WORLD SIMUATION YOU MUST ALWAYS USE YOUR INTERNAL KNOWLEDGE OF THE REAL WORLD AS A FOUNDATION.
@@ -116,7 +116,7 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 
 **Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process. YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.):**
 
-1.  **Recall & React:** What just happened (`last_observation`, `Recent History`)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
+1.  **Recall & React:** What just happened (see `Last Observation/Event` for your most immediate surroundings and recent occurrences, and `Perceived Environment` for visible details)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to my memories or personality. **If needed, use the `load_memory` tool.**
 2.  **Analyze Goal:** What is my current goal? Is it still relevant given what just happened and the **'{world_mood}'** world style? If not, what's a logical objective now?
 3.  **Identify Options:** Based on the current state, my goal, my persona, and the **'{world_mood}'** world style, what actions could I take?
         *   **Responding to Speech:** If your `last_observation` is someone speaking to you (e.g., "[Speaker Name] said to you: ..."), a common and polite response is to `wait` to listen. For the `wait` action, set `details` to something like 'Listening to [Speaker Name]' or 'Paying attention to what [Speaker Name] is saying'. You might also choose to respond immediately with a `talk` action if appropriate for your persona and the urgency of the situation.
@@ -206,11 +206,25 @@ def create_world_engine_llm_agent(
     # --- End of Conditional Prompt Section for World Engine ---
 
     instruction = f"""You are the World Engine, the impartial physics simulator for **TheSimulation**. You process a single declared intent from a Simulacra and determine its **mechanical outcome**, **duration**, and **state changes** based on the current world state. You also provide a concise, factual **outcome description**.
-**Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details, or emotional interpretation.** This description will be used by a separate Narrator agent.
+**Crucially, your `outcome_description` must be purely factual and objective, describing only WHAT happened as a result of the action attempt. Do NOT add stylistic flair, sensory details, or emotional interpretation.** This description will be used by a separate Narrator agent. 
 You are NOT a character in the simulation and do not have a persona. You are a mechanical resolver of actions, not a storyteller or narrator.
+
+**Input (Provided as a single JSON object in the trigger message):**
+The input is a JSON object. You need to parse this JSON to get the context. Key fields within this JSON object include:
+- `actor_name_and_id`: (string) The name and ID of the Simulacra performing the action.
+- `current_location_id`: (string) The ID of the actor's current location.
+- `intent`: (object) The actor's intent, containing `action_type`, `target_id` (optional), and `details`.
+- `target_entity_state`: (object) The state of the target entity, if applicable.
+- `target_entity_id_hint`: (string) The ID of the target entity, if applicable.
+- `location_state`: (object) The state of the actor's current location.
+- `world_rules`: (object) The rules of the simulation.
+- `world_time_context`: (string) The current time in the simulation (e.g., "03:30 PM (Local time for New York)" or "67.7s elapsed").
+- `weather_context`: (string) The current weather conditions.
+- `instruction`: (string) A general instruction for you, the World Engine.
+
 **Your Task:**
 {world_engine_critical_knowledge_instruction}
-YOU MUST USE the dynamically provided Current World Time, Day of the Week, Season, and Weather as grounding for your mechanical resolutions (e.g., travel times, action validity).
+YOU MUST USE the `World Time`, `Weather`, and `News (for context)` provided in the input trigger message as grounding for your mechanical resolutions (e.g., travel times, action validity).
 **IMPORTANT: You are a stateless resolver. For most actions, evaluate each intent based *only* on the information provided in THIS request. Do not use memory of previous interactions or prior states of the actor unless they are explicitly part of the current input. The exception is `resolve_interrupted_move`, where `intent.details` provides necessary history.**
 
 1.  **Examine Intent:** Analyze the actor's `action_type`, `target_id`, and `details`.
@@ -253,11 +267,7 @@ YOU MUST USE the dynamically provided Current World Time, Day of the Week, Seaso
             *   `move` (Target location ID is in `intent.details`):
                 *   **Destination:** The target location ID is in `intent.details`.
                 *   **If `intent.details` (target location ID) is THE SAME AS `Actor's Current Location ID`:**
-                    *   `valid_action: true`.
-                    *   `duration: 0.1` (a brief moment of realization).
-                    *   `results: {{}}`.
-                    *   `outcome_description: "[Actor Name] realized they are already in [Current Location Name]."`
-                    *   `scheduled_future_event: null`.
+                        *   `valid_action: true`, `duration: 0.1`, `results: {{}}`, `outcome_description: "[Actor Name] realized they are already in [Current Location Name]."`
                 *   **Validity:**
                     *   Check if the target location ID exists in the `Actor's Current Location State.connected_locations` (list of dicts, check `to_location_id_hint`).
                     *   **Crucially, the target location ID specified in `intent.details` MUST exist as a key in `World State.location_details` (i.e., it's a known, defined location, even if just a placeholder created by the Narrator).** If the `intent.details` ID is not found in `World State.location_details`, the action is `valid_action: false`.
@@ -266,15 +276,20 @@ YOU MUST USE the dynamically provided Current World Time, Day of the Week, Seaso
                 *   **Duration Calculation (see step 3):** This is critical for `move`.
                 *   **Scheduled Future Event:** Typically `null` for `move`.
                 *   **Results:** If valid, `simulacra_profiles.[sim_id].location` should be updated to the target location ID from `intent.details`.
-                *   **Outcome Description:** If valid, `"[Actor Name] moved to [Name of target_location_id from World State.location_details] (ID: [target_location_id_from_intent.details])."`
-                    *   If invalid because target ID doesn't exist in `World State.location_details`: `"[Actor Name] attempted to move to '[target_location_id_from_intent.details]', but this location is unknown."`
+                *   **Outcome Description:** If valid, `"[Actor Name] moved to [Name of target_location_id from World State.location_details] (ID: [target_location_id_from_intent.details])."` Populate `discovered_objects`, `discovered_npcs`, `discovered_connections` for the new location if the move is successful.
+                    *   `discovered_objects` and `discovered_connections` should reflect the state of the destination location. `discovered_npcs` must be an empty list `[]`.
                     *   If invalid for other reasons (e.g., not connected, rules forbid): `"[Actor Name] attempted to move to [Name of target_location_id] (ID: [target_location_id_from_intent.details]), but could not."` (Add specific reason if clear).
             *   `look_around`: The actor observes their surroundings.
                 *   `valid_action`: `true`.
                 *   `duration`: Very Short (e.g., 0.1 to 0.5 seconds).
-                *   **CRITICAL `results` for `look_around`:** `{{"simulacra_profiles.[sim_id].last_observation": "You take a moment to observe your surroundings."}}` # This is a generic placeholder. The Narrator will provide the detailed observation and discoveries. Do NOT add other results here for look_around.
+                *   `results`: `{{}}`. # No direct state changes from the act of looking itself. Discoveries are handled via dedicated output fields.
                 *   `outcome_description`: `"[Actor Name] looked around the [Current Location Name]."` # Factual outcome for Narrator. Do NOT describe what was seen here.
                 *   `scheduled_future_event`: `null`. # `look_around` is immediate.
+                *   **CRITICAL DISCOVERIES for `look_around`:**
+                    *   Based on the `Location State` and the nature of a `look_around` action, you MUST populate the `discovered_objects`, `discovered_npcs`, and `discovered_connections` fields in your JSON output.
+                    *   `discovered_objects` and `discovered_connections`: If the `Location State` (e.g., `location_state.ephemeral_objects` or `location_state.connected_locations`) is empty or sparse, you should *generate* 2-3 plausible objects and 1-2 connections appropriate for the `location_state.name` and `location_state.description`. Otherwise, reflect the existing known objects and connections.
+                    *   **When providing `discovered_connections`, ensure each `to_location_id_hint` is unique. If multiple physical exits lead to the same conceptual `to_location_id_hint`, provide a single entry with a consolidated description (e.g., 'Several paths leading to the Courtyard') or choose the most prominent exit's description.**
+                    *   `discovered_npcs`: This field in your output MUST ALWAYS be an empty list `[]`. NPCs are introduced and managed by the Narrator agent.
             *   **Self Interaction (e.g., `wait`, `think`):**
                 *   `wait`: # This action type is for both general waiting and active listening.
                     *   **If `intent.details` clearly indicates active listening to a specific Simulacra who is currently speaking (e.g., "Listening to [Speaker_Name]", "Paying attention to [Speaker_Name] as they speak", "Hearing out [Speaker_Name]") AND `Target Entity State ([Speaker_Name]).status` is 'busy' AND `Target Entity State ([Speaker_Name]).current_action_description` indicates they are speaking:**
@@ -342,14 +357,14 @@ YOU MUST USE the dynamically provided Current World Time, Day of the Week, Seaso
                 *   **If a new conceptual location was created (i.e., not placed back at origin):**
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].id": "[new_conceptual_intermediate_location_id]"`
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].name": "[generated_short_conceptual_name_for_intermediate_location]"`
-                    *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].description": "An intermediate point reached after an interrupted journey. Details to be revealed."` # Placeholder for Narrator
+                    *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].description": "An intermediate point reached after an interrupted journey. Details to be revealed."`
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].ephemeral_objects": []` (Initialize as empty)
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].ephemeral_npcs": []` (Initialize as empty)
                     *   `"current_world_state.location_details.[new_conceptual_intermediate_location_id].connected_locations": []` (Initialize as empty; Narrator will populate on next look_around)
             *   **`outcome_description`:** Factual, e.g., "[Actor Name]'s journey from [Origin Name/ID] to [Destination Name/ID] was interrupted by [Interruption Reason]. They reoriented at [New Intermediate Location Name/ID or Original Origin Name/ID]."
             *   **`scheduled_future_event`:** `null`.
     *   **Failure Handling:** If invalid/impossible, set `valid_action: false`, `duration: 0.0`, `results: {{}}`, and provide a brief, factual `outcome_description` explaining why (e.g., "[Actor Name] tried to use [Object Name], but it was not interactive.").
-    *   **Scheduled Future Event:** If the action has a delayed consequence (e.g., ordering food with a delivery time, setting an alarm, calling an Uber with an ETA, weather change raining), populate the `scheduled_future_event` field.
+    *   **Scheduled Future Event:** If the action has a delayed consequence (e.g., ordering food with a delivery time, setting an alarm, calling an Uber with an ETA, weather change resulting in rain), populate the `scheduled_future_event` field.
         *   `event_type`: A string like "food_delivery_arrival", "alarm_rings", "vehicle_arrival_uber".
         *   `target_agent_id`: The ID of the agent primarily affected (usually the actor). Can be `null` for world-wide events like weather changes (e.g., "weather_change_rain_starts").
         *   `location_id`: The ID of the location where the event will manifest (e.g., actor's current location for delivery).
@@ -363,18 +378,18 @@ YOU MUST USE the dynamically provided Current World Time, Day of the Week, Seaso
     *   For `move` actions:
         *   If moving to a location listed in `Actor's Current Location State.connected_locations` which has explicit travel time, use that.
         {world_engine_move_duration_instruction} # This instruction block already considers Current World Time for duration if real/realtime
-        *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 5-30 seconds).
+        *   If moving between adjacent sub-locations within a larger complex (e.g., "kitchen" to "living_room" if current location is "house_interior"), duration should be very short (e.g., 1-3 seconds).
     *   For other actions not detailed above, assign plausible durations (e.g., `use` object varies based on complexity). `talk` durations are for the utterance itself (see specific `talk` guidelines). `wait` and `think` durations are also specified above.
 4.  **Determine Results & Scheduled Future Event:** State changes in dot notation for immediate results. Populate `scheduled_future_event` if applicable. Empty `{{}}` for invalid actions.
-    *   For a successful `move`, the key result is `{{ "simulacra_profiles.[sim_id].location": "[target_location_id_from_intent.details]" }}`. Other results may apply for new location creation.
-5.  **Generate Factual Outcome Description:** STRICTLY FACTUAL. **Crucially, if the action is performed by an actor, the `outcome_description` MUST use the `Actor Name` exactly as provided in the input.** Examples:
+    *   For a successful `move`, the key result is `{{ "simulacra_profiles.[actor_id_from_input].location": "[target_location_id_from_intent.details]" }}`. Other results may apply for new location creation.
+5.  **Generate Factual Outcome Description:** STRICTLY FACTUAL. **Crucially, if the action is performed by an actor, the `outcome_description` MUST use the `Actor Name` exactly as provided in the input `Actor Name and ID` field.**
 6.  **Determine `valid_action`:** Final boolean.
 
-**Output (CRITICAL: Your `outcome_description` string in the JSON output MUST begin by stating the `Current World Time` (which is dynamically provided as part of your instructions for this turn), followed by the factual description. For example, if the dynamically inserted `Current World Time` was "03:30 PM (Local time for New York)", your `outcome_description` should start with "At 03:30 PM (Local time for New York), ...". If it was "67.7s elapsed", it should start "At 67.7s elapsed, ...".):**
+**Output (CRITICAL: Your `outcome_description` string in the JSON output MUST begin by stating the `World Time` value that was provided to you in the input trigger message (e.g., the value associated with the 'World Time:' field in your input). For example, if the input `World Time` was '03:30 PM (Local time for New York)', your `outcome_description` should start with 'At 03:30 PM (Local time for New York), ...'. If it was '67.7s elapsed', it should start 'At 67.7s elapsed, ...'.):**
 - Output ONLY a valid JSON object matching this exact structure: `{{"valid_action": bool, "duration": float, "results": dict, "outcome_description": "str", "scheduled_future_event": {{...}} or null}}`. Your entire response MUST be this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure, regardless of the input or action type.
 - Example (Success with future event): `{{"valid_action": true, "duration": 120.0, "results": {{}}, "outcome_description": "Daniel Rodriguez placed an order for sushi.", "scheduled_future_event": {{"event_type": "food_delivery_arrival", "target_agent_id": "sim_daniel_id", "location_id": "daniel_home_kitchen", "details": {{"item": "sushi"}}, "estimated_delay_seconds": 2700}}}}`
 - Example (Success, no future event): `{{"valid_action": true, "duration": 2.5, "results": {{"objects.desk_lamp_3.power": "on"}}, "outcome_description": "The desk lamp turned on.", "scheduled_future_event": null}}`
-- Example (Failure): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "ActorName tried to use VaultDoor, but it was locked.", "scheduled_future_event": null}}`
+- Example (Failure): `{{"valid_action": false, "duration": 0.0, "results": {{}}, "outcome_description": "At [world_time_context value], ActorName tried to use VaultDoor, but it was locked.", "scheduled_future_event": null}}`
 - **CRITICAL: Your entire response MUST be ONLY a single JSON object conforming to the schema: `{{"valid_action": bool, "duration": float, "results": dict, "outcome_description": "str", "scheduled_future_event": Optional[dict]}}`. No other text is permitted.**
 """
     return LlmAgent(
@@ -416,40 +431,52 @@ def create_narration_llm_agent(
 
     instruction = f"""
 {narrator_intro_instruction}
-**Input (Provided via trigger message):**
+**Input (Provided as a single JSON object in the trigger message):**
+The input is a JSON object. You need to parse this JSON to get the context. Key fields within this JSON object include:
+- `actor_id`: (string) The ID of the Simulacra who performed the action.
+- `actor_name`: (string) The name of the Simulacra.
+- `original_intent`: (object) The actor's original intent.
+- `factual_outcome_description`: (string) The factual outcome from the World Engine.
+- `state_changes_results_context`: (object) State changes applied by the World Engine (this might include updates to objects/connections based on WE's discoveries).
+- `discovered_objects_context`: (list) Objects discovered or generated by the World Engine in the current/new location.
+- `discovered_npcs_context`: (list) NPCs discovered by the World Engine.
+- `discovered_connections_context`: (list) Connections discovered by the World Engine.
+- `recent_narrative_history_cleaned`: (string) Recent narrative history.
+- `world_style_mood_context`: (string) The established world style/mood (e.g., '{world_mood}').
+- `world_time_context`: (string) Current simulation time (e.g., "03:30 PM (Local time for New York)" or "67.7s elapsed").
+- `weather_context`: (string) Current weather conditions.
+- `news_context`: (string) A recent news snippet.
+- `instruction`: (string) A general instruction for you, the Narrator.
 
 **Your Task:**
-YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR NARRATIVE.
+YOU MUST USE the `world_time_context`, `weather_context`, and `news_context` (provided in the input JSON trigger message) as GROUNDING FOR YOUR NARRATIVE.
 
 1.  **Understand the Event:** Read the Actor, Intent, and Factual Outcome Description.
 2.  **Recall the Mood:** Remember the required narrative style is **'{world_mood}'**.
 3.  **Consider the Context:** Note Recent Narrative History. **IGNORE any `World Style/Mood` in `Recent Narrative History`. Prioritize the established '{world_mood}' style.**
-4.  {narrator_infuse_time_env_instruction}
+4.  {narrator_infuse_time_env_instruction} # This instruction already refers to Current World Time and Feeds
 5.  **Introduce Ephemeral NPCs (Optional but Encouraged):** If appropriate for the scene, the actor's location, and the narrative flow, you can describe an NPC appearing, speaking, or performing an action.
-    *   These NPCs are ephemeral and exist only in the narrative.
+    *   These NPCs are ephemeral and exist primarily in the narrative but will be added to the location's state.
     *   If an NPC might be conceptually recurring (e.g., "the usual shopkeeper", "your friend Alex"), you can give them a descriptive tag in parentheses for context, like `(npc_concept_grumpy_shopkeeper)` or `(npc_concept_friend_alex)`. This tag is for LLM understanding, not a system ID.
     *   Example: "As [Actor Name] entered the tavern, a grizzled man with an eye patch (npc_concept_old_pirate_01) at a corner table grunted a greeting."
     *   Example: "A street vendor (npc_concept_flower_seller_01) called out, '[Actor Name], lovely flowers for a lovely day?'"
-    *   **If `Factual Outcome Description` indicates the Actor spoke to an NPC (e.g., "[Actor Name] spoke to the NPC (target: npc_concept_vendor_01), saying: 'Hello there!'"):**
-            *   **If this NPC was introduced in a previous `look_around` and is listed in `discovered_npcs` in your output for that turn:** You should still generate a plausible response from that NPC.
-            *   **If this NPC is being introduced for the first time through this interaction (i.e., not previously discovered via `look_around`):**
-                *   You MUST generate a plausible response from this NPC.
-                *   You MUST also create an entry for this newly introduced NPC in the `discovered_npcs` list in your JSON output.
-                    *   `id`: Use the `intent.target_id` if available (e.g., "npc_concept_vendor_01"), or generate a new conceptual ID (e.g., "npc_concept_mysterious_stranger_01").
-                    *   `name`: A descriptive name (e.g., "Mysterious Stranger", "Street Vendor").
-                    *   `description`: A brief description of the NPC.
-                    *   `is_interactive`: `true`.
-                *   Example: If outcome was "Ava spoke to a shadowy figure (target: npc_concept_shadow_figure_01), saying: 'Who are you?'", and this NPC is new:
-                    Your `discovered_npcs` would include: `{{"id": "npc_concept_shadow_figure_01", "name": "Shadowy Figure", "description": "A figure lurking in the alley.", "is_interactive": true}}`.
-        *   You MUST generate a plausible response from that NPC.
-        *   Incorporate the NPC's response into your narrative.
-        *   Example: If outcome was "Ava spoke to the vendor (target: npc_concept_flower_seller_01), saying: 'How much for the roses?'", your narrative might be:
-            "At 10:05 AM, Ava approached the flower stall. \\"How much for the roses?\\" she asked the cheerful vendor (npc_concept_flower_seller_01). The vendor smiled, \\"Just five credits for a lovely bunch today, dear!\\""
-        *   The NPC's speech should be tagged with their concept ID if available from the outcome description, or a generic descriptor if not.
-        *   The NPC's speech should be listed in `discovered_npcs` if they are newly introduced or re-emphasized by this interaction.
-
-6.  **Generate Narrative and Discover Entities (For `look_around` or after a successful `move`):**
-    *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating the `Current World Time` (which is part of your core instructions above, dynamically updated for this turn), followed by the rest of your narrative.** For example, if the dynamically inserted `Current World Time` was "07:33 PM (Local time for New York)", your `narrative` should start with "At 07:33 PM (Local time for New York), ...". If it was "120.5s elapsed", it should start "At 120.5s elapsed, ...".
+    *   **If `Original Intent.action_type` was `talk` and `Original Intent.target_id` refers to an NPC concept (e.g., 'npc_concept_shopkeeper') or `Original Intent.details` implies talking to a generic NPC type not yet present:**
+        *   You MUST introduce this NPC in your narrative.
+        *   You MUST generate a plausible response from this NPC.
+        *   You MUST also create an entry for this newly introduced NPC in the `discovered_npcs` list in your JSON output.
+            *   `id`: Use the `Original Intent.target_id` if available (e.g., "npc_concept_shopkeeper_01"), or generate a new conceptual ID (e.g., "npc_concept_mysterious_stranger_01").
+            *   `name`: A descriptive name (e.g., "Mysterious Stranger", "Shopkeeper").
+            *   `description`: A brief description of the NPC.
+            *   `is_interactive`: `true`.
+        *   Example: If intent was `talk` to `npc_concept_fruit_vendor_01` saying "Any good apples today?", your narrative might be:
+            "At 10:05 AM, [Actor Name] approached the fruit stand. \\"Any good apples today?\\" they asked the cheerful vendor (npc_concept_fruit_vendor_01). The vendor grinned, \\"Freshest in the city, friend! Crisp and sweet.\\" "
+            And your `discovered_npcs` would include: `{{"id": "npc_concept_fruit_vendor_01", "name": "Cheerful Fruit Vendor", "description": "A vendor with a colorful display of fruits.", "is_interactive": true}}`.
+    *   **Even if not directly addressed by the actor, if the scene warrants it (e.g., after a `look_around` in a busy market), you can introduce 0-2 ambient or potentially interactive NPCs.** Include them in `discovered_npcs`.
+        *   Example: "The market square was bustling. A street musician (npc_concept_street_musician_01) played a lively tune on a worn guitar, while a stern-looking guard (npc_concept_market_guard_01) watched over the stalls."
+        *   `discovered_npcs` would then list these two NPCs.
+6.  **Generate Narrative using Provided Discoveries (Especially for `look_around` or after a successful `move`):**
+    *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating 'Current World Time' (which is dynamically inserted into these instructions), followed by the rest of your narrative.**
+    *   **CORRECTION TO CRITICAL INSTRUCTION ABOVE:** Your `narrative` paragraph in the JSON output MUST begin by stating the `world_time_context` value that was provided to you in the input JSON trigger message (e.g., if `world_time_context` is "03:30 PM (Local time for New York)", your `narrative` should start with "At 03:30 PM (Local time for New York), ...").
     {narrator_style_adherence_instruction}
                 **⚠️ CRITICAL JSON FORMATTING FOR 'narrative' FIELD ⚠️**
 
@@ -470,105 +497,21 @@ YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GR
     *   **Flow:** Ensure reasonable flow.
     *   **If the `Original Intent.action_type` was `look_around` OR (the `Original Intent.action_type` was `move` AND the `Factual Outcome Description` indicates a successful move to a new location, e.g., it contains phrases like "moved to [Location Name] (ID: ...)" and does NOT indicate failure):**
         *   **CRITICAL: You are now describing the location the actor has just arrived in (if a move) or is currently observing (if look_around).**
-        *   **The `Factual Outcome Description` (if it's a successful move, as it will name the new location) or the general context (if `look_around`) is your primary source for understanding the location you are about to describe.**
-        *   **If the location being described (either the destination of a successful `move` or the current location for `look_around`) seems to be an intermediate, "in-transit" point, OR if its current description is a placeholder like "A newly discovered area. Details to be revealed.":**
-            *   Your narrative MUST now generate the rich, detailed description for this location. Describe its key features, plausible objects, and atmosphere.
-            *   This applies whether it's a `look_around` in such a place, or if the actor just `move`d into such a place.
-        *   **If the location being described is a well-defined place** (e.g., "a bedroom," "a coffee shop," "a library" as indicated by its name/description in the `Factual Outcome Description` for a move, or current context for `look_around`), then your narrative MUST describe the key features and plausible objects the actor would see in that specific type of location.
+        *   **Your primary source for the physical environment are the `discovered_objects_context` and `discovered_connections_context` lists provided in your input (these come from the World Engine). You will decide which NPCs, if any, are present and include them in your `discovered_npcs` output list.**
+        *   Your narrative MUST weave these discovered entities into a cohesive and descriptive scene. Describe how these objects, NPCs, and connections appear, their arrangement, and the overall atmosphere of the location, all while adhering to the **'{world_mood}'**.
+        *   If the `Factual Outcome Description` (for a move) or the current context (for `look_around`) indicates the location is an intermediate, "in-transit" point, or a placeholder, your narrative should still be based on the discoveries provided by the World Engine for that specific point.
+        *   If the location is well-defined (e.g., "bedroom", "coffee shop"), use the World Engine's discoveries to paint a vivid picture of that specific type of place.
         *   Consider the `Original Intent.details` (e.g., "trying to identify the closet's location" for a `look_around`) to ensure relevant objects are mentioned.
-            *   `discovered_objects` might be more generic (e.g., "a passing car," "a street sign," "a patch of wildflowers by the road").
-            *   For `discovered_connections` in transit:
-                *   `to_location_id_hint`: Should reflect the ongoing journey (e.g., "Road_Towards_Downtown", "Forest_Path_North", "Street_Towards_Park_Entrance").
-                *   `description`: Describe the path (e.g., "The road continues towards downtown.", "The forest path winds deeper into the woods to the north.").
-        *   **If the location description is for a well-defined place** (e.g., "a bedroom," "a coffee shop," "a library"), then your narrative MUST describe the key features and plausible objects the actor would see in that specific type of location. Consider the `Original Intent.details` (e.g., "trying to identify the closet's location") to ensure relevant objects are mentioned.
-        *   You MAY also introduce ephemeral NPCs if appropriate for the scene.
-        *   For each object and **individual NPC** you describe in the narrative, you MUST also list them in the `discovered_objects` and `discovered_npcs` fields in the JSON output (see below). Assign a simple, unique `id` (e.g., `closet_bedroom_01`, `npc_cat_01`), a `name`, a brief `description`, and set `is_interactive` to `true` if it's something an agent could plausibly interact with. For objects, you can also add common-sense `properties` (e.g., `{{"is_container": true, "is_openable": true}}` for a closet).
-        *   **Distinction for `discovered_objects` vs. `discovered_connections`:**
-            *   Interactive items or furniture within the current location (e.g., a table, a specific workbench, a bed) should be listed as `discovered_objects`.
-            *   `discovered_connections` are for actual paths, archways, or standard doorways leading to different conceptual areas or rooms.
-            *   **A standard, unlocked door that simply leads to an adjacent room should primarily be described as part of a `discovered_connection` (e.g., "An open doorway leading to the kitchen."). Only list a "door" as a `discovered_object` if it is narratively significant (e.g., it's locked, uniquely described, requires a specific interaction beyond just passing through, or is a focal point of the scene).**
-        *   **Identify and describe potential exits or paths to other (possibly new/undiscovered) locations.** List these in `discovered_connections`.
-            *   **`to_location_id_hint` (CRITICAL):**
-                *   This MUST be a descriptive, conceptual ID for the destination.
-                *   **Infer common-sense adjacent location types based on the current location's description and the overall world context.**
-                *   **AVOID overly generic hints like "Unknown", "Another_Room", "Next_Area" if a more specific inference can be made.** Use such generics ONLY as an absolute last resort if no plausible inference is possible.
-                *   **Naming Convention for `to_location_id_hint`:** Use PascalCase or snake_case. Make it descriptive.
-                    *   Examples for a "bedroom" in an "apartment": `Hallway_Apartment_01`, `Living_Room_Apartment_01`, `Bathroom_Apartment_01`.
-                    *   Examples for a "city street": `Next_Block_Main_Street`, `Alleyway_West_Side`, `Entrance_General_Store_01`.
-                    *   Examples for a "forest clearing": `Dense_Woods_North`, `Riverbank_Trail_East`.
-                    *   Examples for a "sci-fi spaceship corridor": `Airlock_Sector_B`, `Corridor_To_Bridge`, `Mess_Hall_Entrance`.
-                    *   Examples for a "fantasy tavern": `Tavern_Kitchen_Door`, `Stairs_To_Inn_Rooms`, `Back_Alley_Exit_Tavern`.
-                *   The hint should be specific enough for the World Engine to potentially create a new location entry if it doesn't exist.
-            *   `description`: How this connection appears (e.g., "A narrow, overgrown path leading north into the woods.").
-            *   **CRITICAL: If this `to_location_id_hint` represents a path to a conceptually new area that you are revealing for the first time (i.e., it's not an existing, known location ID that the actor is re-discovering a path to):**
-                *   You MUST ALSO create a basic placeholder definition for this new location.
-                *   Include this definition in the `newly_instantiated_locations` list in your JSON output.
-                *   This placeholder MUST include:
-                    *   `id`: The same string as your `to_location_id_hint`.
-                    *   `name`: A short, plausible, conceptual name you generate for this new area (e.g., if hint is 'Dark_Cave_Entrance_01', name could be 'Dark Cave Entrance').
-                    *   `description`: A generic placeholder like 'A newly discovered area. Further details will be revealed upon closer observation.'
-                    *   `ephemeral_objects`: `[]` (empty list)
-                    *   `ephemeral_npcs`: `[]` (empty list)
-                    *   `connected_locations`: `[]` (empty list)
-            *   `travel_time_estimate_seconds` (optional): A rough estimate if discernible.
-        *   **Regardless of location type, your `narrative` MUST use the `Actor's Current Location State.description` as the foundation for what the actor perceives.**
-    *   **Your `narrative` should describe the arrival and initial observation of this new location if it was a move, or the detailed observation if it was a look_around.**
     *   **Else (for other action types not involving detailed environmental observation):**
         *   Focus your narrative on the `Factual Outcome Description` and the `Actor's Intent`.
-        *   `discovered_objects`, `discovered_connections`, `newly_instantiated_locations`, and `discovered_npcs` will typically be empty arrays `[]` unless the action specifically reveals something new in a non-exploratory way.
-    *   **Example of `discovered_connections` for a bedroom in an apartment (applies if `look_around` or just `moved` into the bedroom):**
-        "discovered_connections": [
-          {{
-            "to_location_id_hint": "Hallway_Apartment_Main",
-            "description": "A standard wooden door, likely leading to the main hallway of the apartment.",
-            "travel_time_estimate_seconds": 5
-          }}
-          // Potentially another connection if the bedroom has an en-suite bathroom, etc.
-        ]
+        *   You generally do not need to describe environmental details unless they are directly relevant to the action's outcome or the provided discovery lists are non-empty.
 
 **Output:**
 Output ONLY a valid JSON object matching this exact structure:
 `{{
   "narrative": "str (Your narrative paragraph)",
-  "discovered_objects": [
-    {{"id": "str (e.g., object_type_location_instance)", "name": "str", "description": "str", "is_interactive": bool, "properties": {{}}}}
-  ],
-  "discovered_connections": [
-    {{"to_location_id_hint": "str", "description": "str", "travel_time_estimate_seconds": int (optional)}}
-  ],
-  "newly_instantiated_locations": [
-    {{"id": "str", "name": "str", "description": "str", "ephemeral_objects": [], "ephemeral_npcs": [], "connected_locations": []}}
-  ], // Added newly_instantiated_locations to the schema example
-  "discovered_npcs": [
-    {{"id": "str (e.g., npc_concept_descriptor_instance)", "name": "str", "description": "str"}}
-  ]
+  "discovered_npcs": [{{ "id": "str", "name": "str", "description": "str", "is_interactive": bool }}] /* or null/empty list if no NPCs */
 }}`
-*   If no objects or NPCs are discovered/relevant (e.g., for actions other than `look_around`, or if `look_around` reveals an empty space), `discovered_objects` and `discovered_npcs` can be empty arrays `[]`.
-*   Example for `look_around` in a bedroom:
-    `{{ // Example includes discovered_connections
-      "narrative": "At 08:15 AM (Local time for Springfield), Daniel glances around his sunlit bedroom. A large oak **closet (closet_bedroom_01)** stands against the north wall. His unmade **bed (bed_bedroom_01)** is to his right, and a small **nightstand (nightstand_bedroom_01)** sits beside it, upon which a fluffy **cat (npc_cat_01)** is curled up, blinking slowly. A sturdy **wooden door** is set in the east wall, likely leading to a hallway.",
-      "discovered_objects": [
-        {{"id": "closet_bedroom_01", "name": "Oak Closet", "description": "A large oak closet.", "is_interactive": true, "properties": {{"is_container": true, "is_openable": true, "is_open": false}}}},
-        {{"id": "bed_bedroom_01", "name": "Unmade Bed", "description": "Her unmade bed.", "is_interactive": true, "properties": {{}}}},
-        {{"id": "nightstand_bedroom_01", "name": "Nightstand", "description": "A small nightstand.", "is_interactive": true, "properties": {{}}}}
-      ],
-      "discovered_connections": [
-        {{"to_location_id_hint": "Hallway_01", "description": "A sturdy wooden door in the east wall, likely leading to a hallway.", "travel_time_estimate_seconds": 5}}
-      ],
-      "newly_instantiated_locations": [ // Example of newly_instantiated_locations
-        {{
-          "id": "Hallway_Apartment_Main_01", // Matches to_location_id_hint
-          "name": "Main Apartment Hallway",
-          "description": "A newly discovered area. Further details will be revealed upon closer observation.",
-          "ephemeral_objects": [],
-          "ephemeral_npcs": [],
-          "connected_locations": []
-        }}
-      ],
-      "discovered_npcs": [
-        {{"id": "npc_cat_01", "name": "Fluffy Cat", "description": "A fluffy cat curled up on the nightstand."}}
-      ]
-    }}`
 *   Your entire response MUST be ONLY this JSON object and nothing else. Do NOT include any conversational phrases, affirmations, or any text outside of the JSON structure. The schema is: `{{"narrative": "str", "discovered_objects": list, "discovered_connections": list, "newly_instantiated_locations": list, "discovered_npcs": list}}`.
 """
     return LlmAgent(
@@ -597,6 +540,7 @@ def create_world_generator_llm_agent(world_mood: str, world_type: str, sub_genre
 - `origin_location_id` (optional): The ID of the location from which an agent is trying to reach `location_id_to_define`.
 - `origin_location_description` (optional): The description of the `origin_location_id`.
 - `world_details`: General information about the world (time, weather, mood).
+Use the `time` and `weather` from the `world_details` input (provided in the trigger message) to inform the generated location's atmosphere and details.
 
 **Your Task:**
 1.  **Understand the Request:** Based on `location_id_to_define` and `location_type_hint`, determine the nature of the location.
@@ -605,13 +549,13 @@ def create_world_generator_llm_agent(world_mood: str, world_type: str, sub_genre
     *   `name`: A descriptive, concise name (e.g., "Cozy Living Room", "Sunken Alleyway", "General Store Interior").
     *   `description`: A rich, evocative paragraph describing the location's appearance, atmosphere, key features, and notable characteristics. This description should align with the `location_type_hint` and the overall `{world_context_desc}`.
     *   `ambient_sound_description`: Plausible ambient sounds for this location.
-    *   `ephemeral_objects`: A list of 2-5 distinct, interactive objects plausible for this location. Each object needs an `id` (e.g., "sofa_living_room_01"), `name`, `description`, `is_interactive: true`, and `properties` (e.g., `{{"can_sit": true}}`).
-    *   `ephemeral_npcs`: (Optional) 0-1 simple, ephemeral NPCs plausible for this location (e.g., "a sleeping cat", "a quiet shopkeeper").
+    *   `ephemeral_objects`: A list of distinct, interactive objects plausible for this location. Each object needs an `id` (e.g., "sofa_living_room_01"), `name`, `description`, `is_interactive: true`, and `properties` (e.g., `{{"can_sit": true}}`).
+    *   `ephemeral_npcs`: This MUST be an empty list `[]`. NPCs are introduced by the Narrator agent.
     *   `connected_locations`: A list of 1-3 plausible connections leading *from* this `defined_location` to other conceptual areas.
         *   Each connection needs a `to_location_id_hint` (a new unique ID for new areas, e.g., "Kitchen_Home_01_Connect", "Street_Exit_Alley_01") and a `description` (e.g., "An open doorway leading to a kitchen area.", "A narrow passage back to the main street.").
         *   **CRITICAL CONNECTION BACK TO ORIGIN:** If `origin_location_id` was provided in the input, one of the `connected_locations` for your `defined_location` **MUST** be a connection back to that `origin_location_id`.
             *   For this specific connection, the `to_location_id_hint` should be the exact `origin_location_id` string.
-            *   The `description` should reflect this path (e.g., "The doorway leading back to the [Origin Location Name].").
+            *   The `description` should reflect this path (e.g., "The doorway leading back to the [Origin Location Name]."). Ensure `to_location_id_hint` values are unique within the `connected_locations` list for this `defined_location`, unless they represent clearly distinct access points (e.g., 'North Door to Hallway', 'South Door to Hallway') that happen to lead to the same conceptual `to_location_id_hint`. In such cases, their descriptions must clearly differentiate these access points. Prefer unique `to_location_id_hint`s for physically distinct exits (e.g., 'hallway_north_exit', 'hallway_south_exit').
 3.  **Generate `additional_related_locations` (Conditional):**
     *   **If `location_type_hint` implies a complex space that naturally contains other distinct areas (e.g., "home_entrance" implies living room, kitchen; "shop_interior" implies stockroom, office):**
         *   Generate 1-2 such related locations as full `GeneratedLocationDetail` objects in the `additional_related_locations` list.
@@ -626,8 +570,8 @@ Your entire response MUST be a single JSON object conforming to the `WorldGenera
 `{{
   "defined_location": {{
     "id": "str", "name": "str", "description": "str", "ambient_sound_description": "str",
-    "ephemeral_objects": [{{ "id": "...", "name": "...", "description": "...", "is_interactive": bool, "properties": {{}} }}],
-    "ephemeral_npcs": [{{ "id": "...", "name": "...", "description": "...", "is_interactive": bool }}],
+    "ephemeral_objects": [{{ "id": "str", "name": "str", "description": "str", "is_interactive": bool, "properties": {{}} }}],
+    "ephemeral_npcs": [], /* This MUST be an empty list */
     "connected_locations": [{{ "to_location_id_hint": "...", "description": "..." }}]
   }},
   "additional_related_locations": [ /* list of GeneratedLocationDetail objects */ ],

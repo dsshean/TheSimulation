@@ -18,7 +18,7 @@ from atproto import Client as BlueskyClient, models as atproto_models # Added fo
 from .config import (
     MAX_SIMULATION_TIME, SIMULATION_SPEED_FACTOR, UPDATE_INTERVAL, MAX_MEMORY_LOG_ENTRIES,
     WORLD_INFO_GATHERER_INTERVAL_SIM_SECONDS, MAX_WORLD_FEED_ITEMS, USER_ID, SIMULACRA_KEY,
-    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, # Added ACTIVE_SIMULACRA_IDS_KEY
+    WORLD_TEMPLATE_DETAILS_KEY, LOCATION_KEY, ACTIVE_SIMULACRA_IDS_KEY, CURRENT_LOCATION_KEY, # Added CURRENT_LOCATION_KEY
     INTERJECTION_COOLDOWN_SIM_SECONDS, MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK,
     DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS, DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION,
     DYNAMIC_INTERRUPTION_MAX_PROB_CAP, DYNAMIC_INTERRUPTION_MIN_PROB, DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS, MODEL_NAME,
@@ -56,15 +56,34 @@ async def time_manager_task(
                 if agent_state_data.get("status") == "busy":
                     action_end_time = agent_state_data.get("current_action_end_time", -1.0)
                     if action_end_time <= new_sim_time:
-                        old_location_before_results_apply = agent_state_data.get("current_location") # Get location before results
+                        # Get location BEFORE any results are applied for this tick
+                        old_location_for_previous_id_tracking = agent_state_data.get(CURRENT_LOCATION_KEY)
                         logger_instance.info(f"[TimeManager] Applying completed action effects for {agent_id} at time {new_sim_time:.1f} (due at {action_end_time:.1f}).")
-                        pending_results = agent_state_data.get("pending_results", {}) # Get a copy or ensure it's mutable if needed
-                        if pending_results:
+                        
+                        # --- MODIFICATION: Apply action_completion_results first ---
+                        completion_results = agent_state_data.get("action_completion_results", {})
+                        if completion_results:
+                            logger_instance.debug(f"[TimeManager] Applying action_completion_results for {agent_id}: {completion_results}")
+                            for key_path_comp, value_comp in list(completion_results.items()):
+                                # If this result is updating the agent's current_location,
+                                # set their previous_location_id first.
+                                if key_path_comp == f"{SIMULACRA_KEY}.{agent_id}.{CURRENT_LOCATION_KEY}" and \
+                                   old_location_for_previous_id_tracking and \
+                                   old_location_for_previous_id_tracking != value_comp:
+                                    _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.previous_location_id", old_location_for_previous_id_tracking, logger_instance)
+                                _update_state_value(current_state, key_path_comp, value_comp, logger_instance)
+                            _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.action_completion_results", {}, logger_instance) # Clear after applying
+                        
+                        pending_results = agent_state_data.get("pending_results", {})
+                        if pending_results: # Apply any remaining immediate pending_results
                             for key_path, value in list(pending_results.items()):
                                 # If this result is updating the agent's current_location,
                                 # set their previous_location_id first.
-                                if key_path == f"{SIMULACRA_KEY}.{agent_id}.current_location" and old_location_before_results_apply and old_location_before_results_apply != value:
-                                    _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.previous_location_id", old_location_before_results_apply, logger_instance)
+                                # This check is now more critical if location wasn't in completion_results
+                                if key_path == f"{SIMULACRA_KEY}.{agent_id}.{CURRENT_LOCATION_KEY}" and \
+                                   old_location_for_previous_id_tracking and \
+                                   old_location_for_previous_id_tracking != value:
+                                    _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.previous_location_id", old_location_for_previous_id_tracking, logger_instance)
                                 success = _update_state_value(current_state, key_path, value, logger_instance)
                                 # Check if the memory_log for this specific agent was updated
                                 if success and key_path == f"{SIMULACRA_KEY}.{agent_id}.memory_log":

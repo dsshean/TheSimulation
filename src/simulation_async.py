@@ -131,33 +131,6 @@ def _list_to_dicts_if_needed(list_of_items: List[Any]) -> List[Dict[str, Any]]:
         # It will return {} for unsupported types within the list.
     ]
 
-
-# --- Helper for Dynamic Instruction Context ---
-def _prepare_dynamic_instruction_context(
-    current_state_dict: Dict[str, Any],
-    sim_time_seconds: float,
-    include_news_in_instruction: bool = True,
-    news_item_count: int = 1 
-) -> Dict[str, str]:
-    """Prepares common dynamic replacement values for agent instructions."""
-    time_str = get_time_string_for_prompt(current_state_dict, sim_elapsed_time_seconds=sim_time_seconds)
-    weather_str = get_nested(current_state_dict, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
-    
-    news_str = "No significant news." # Default if not included or not found
-    if include_news_in_instruction:
-        headlines = [
-            item.get('headline', '') 
-            for item in get_nested(current_state_dict, 'world_feeds', 'news_updates', default=[])[:news_item_count]
-            if item.get('headline', '') # Ensure headline is not empty
-        ]
-        if headlines:
-            news_str = headlines[0] # Use the first headline if available
-            
-    return {
-        "{DYNAMIC_CURRENT_TIME}": time_str,
-        "{DYNAMIC_CURRENT_WEATHER}": weather_str,
-        "{DYNAMIC_CURRENT_NEWS}": news_str
-    }
 # --- Helper Function for ADK Agent Calls ---
 async def _call_adk_agent_and_parse(
     runner: Runner,
@@ -168,8 +141,6 @@ async def _call_adk_agent_and_parse(
     expected_pydantic_model: type,
     agent_name_for_logging: str,
     logger_instance: logging.Logger,
-    original_instruction: Optional[str] = None,
-    instruction_replacements: Optional[Dict[str, str]] = None
 ) -> Optional[Any]:
     """
     Calls an ADK agent, processes its response, and parses it into the expected Pydantic model.
@@ -182,13 +153,6 @@ async def _call_adk_agent_and_parse(
     # So, we can use the agent's dedicated session ID directly.
 
     try:
-        if original_instruction and instruction_replacements:
-            current_instruction = original_instruction
-            for placeholder, value in instruction_replacements.items():
-                current_instruction = current_instruction.replace(placeholder, value)
-            if agent_instance.instruction != current_instruction:
-                agent_instance.instruction = current_instruction
-                modified_instruction = True
 
         # No need to set runner.agent = agent_instance, as the passed `runner`
         # is already the dedicated runner for `agent_instance`.
@@ -236,13 +200,9 @@ async def _call_adk_agent_and_parse(
                 else:
                     print(f"[{agent_name_for_logging}] No content in final response, skipping.")
     finally:
+        pass
         # Restore original instruction if it was modified
-        if modified_instruction and original_instruction:
-            agent_instance.instruction = original_instruction
-        
         # Restore original include_contents setting
-        agent_instance.include_contents = original_include_contents
-
     # If llm_response_data is a dictionary (from robust parsing), convert it to SimpleNamespace.
     # If it's already a Pydantic model instance (from ADK direct parse) or None, it will be returned as is.
     if isinstance(llm_response_data, dict):
@@ -273,6 +233,11 @@ async def narration_task():
             intent = get_nested(action_event, "action")
             results = get_nested(action_event, "results", default={})
             outcome_desc = get_nested(action_event, "outcome_description", default="Something happened.")
+            # Get discovery details from the action_event (passed from World Engine)
+            discovered_objects_for_narration_ctx = action_event.get("discovered_objects_for_narration", [])
+            discovered_npcs_for_narration_ctx = action_event.get("discovered_npcs_for_narration", [])
+            discovered_connections_for_narration_ctx = action_event.get("discovered_connections_for_narration", [])
+
             completion_time = get_nested(action_event, "completion_time", default=state.get("world_time", 0.0))
             actor_location_at_action_time = get_nested(action_event, "actor_current_location_id") # Get location from event
 
@@ -292,43 +257,47 @@ async def narration_task():
             cleaned_recent_narrative = [clean_history_entry(entry) for entry in raw_recent_narrative if clean_history_entry(entry)]
             history_str = "\n".join(cleaned_recent_narrative)
 
+            time_for_narrator_prompt = get_time_string_for_prompt(state, sim_elapsed_time_seconds=completion_time)
+            weather_for_narrator_prompt = get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+            news_updates_for_narrator = get_nested(state, 'world_feeds', 'news_updates', default=[])
+            news_snippet_for_narrator = " ".join([item.get('headline', '') for item in news_updates_for_narrator[:1]]) or "No significant news."
             # Fetch world feeds for the Narrator
             logger.info(f"[NarrationTask] Generating narrative for {actor_name}'s action completion. Outcome: '{outcome_desc}'")
             intent_json = json.dumps(intent, indent=2)
-            results_json = json.dumps(results, indent=2)
-            instruction_replacements_narrator = _prepare_dynamic_instruction_context(state, completion_time, include_news_in_instruction=True, news_item_count=1)
+            # results_json = json.dumps(results, indent=2) # results is already a dict, pass it directly
 
-            trigger_text_narrator = f"""
-Actor ID: {actor_id}
-Actor Name: {actor_name}
-Original Intent: {intent_json}
-Factual Outcome Description: {outcome_desc}
-State Changes (Results): {results_json}
-Recent Narrative History (Cleaned):
-{history_str}
+            # Convert trigger information to a dictionary
+            trigger_data_narrator = {
+                "actor_id": actor_id,
+                "actor_name": actor_name,
+                "original_intent": intent, # intent is already a dict
+                "factual_outcome_description": outcome_desc,
+                "state_changes_results_context": results, # results is already a dict
+                "discovered_objects_context": discovered_objects_for_narration_ctx, # already list of dicts
+                "discovered_npcs_context": discovered_npcs_for_narration_ctx, # already list of dicts
+                "discovered_connections_context": discovered_connections_for_narration_ctx, # already list of dicts
+                "recent_narrative_history_cleaned": history_str,
+                "world_style_mood_context": world_mood_global, # This is the 'world_mood' passed into narration_task
+                "world_time_context": time_for_narrator_prompt,
+                "weather_context": weather_for_narrator_prompt,
+                "news_context": news_snippet_for_narrator,
+                "instruction": "Generate the narrative paragraph based on these details and your agent instructions (remembering the established world style and using the provided JSON context)."
+            }
+            # Convert the dictionary to a compact JSON string
+            trigger_text_narrator = json.dumps(trigger_data_narrator)
 
-Generate the narrative paragraph based on these details and your instructions (remembering the established world style '{world_mood_global}').
-"""
             trigger_content_narrator = genai_types.UserContent(parts=[genai_types.Part(text=trigger_text_narrator)])
-
             validated_narrator_output = await _call_adk_agent_and_parse(
                 narration_runner, narration_agent_instance, narration_session_id, USER_ID,
                 trigger_content_narrator, NarratorOutput, f"NarrationTask_{actor_name}", logger,
-                original_instruction=original_narration_instruction, instruction_replacements=instruction_replacements_narrator
             )
 
             if 'validated_narrator_output' in locals() and validated_narrator_output:
                 try:
-                    # validated_narrator_output can be Pydantic model or SimpleNamespace
-                    logger.debug(f"[NarrationTask] Narrator output received: {json.dumps(_to_dict(validated_narrator_output), indent=2, default=str)}")
-
-                    actual_narrative_paragraph = getattr(validated_narrator_output, 'narrative', "Narration error.")
-                    # These will be lists of Pydantic models if validated_narrator_output is Pydantic,
-                    # or lists of dicts if it's SimpleNamespace (SimpleNamespace doesn't recurse)
-                    discovered_objects = getattr(validated_narrator_output, 'discovered_objects', [])
-                    discovered_connections = getattr(validated_narrator_output, 'discovered_connections', [])
-                    discovered_npcs = getattr(validated_narrator_output, 'discovered_npcs', [])
-                    newly_instantiated_locations_from_narrator = getattr(validated_narrator_output, 'newly_instantiated_locations', [])
+                    # validated_narrator_output is now expected to be a SimpleNamespace (or Pydantic model)
+                    # with only a 'narrative' attribute.
+                    actual_narrative_paragraph = getattr(validated_narrator_output, 'narrative', "Narration error or missing narrative field.")
+                    logger.debug(f"[NarrationTask] Narrator output received (narrative only): {actual_narrative_paragraph[:100]}")
 
                     cleaned_narrative_text = actual_narrative_paragraph
                     internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
@@ -349,55 +318,20 @@ Generate the narrative paragraph based on these details and your instructions (r
                         _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
                     logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
 
-                    if actor_location_at_action_time:
-                        original_intent_from_event = get_nested(action_event, "action", default={})
-                        if original_intent_from_event.get("action_type") == "look_around":
-                            if discovered_objects:
-                                location_path_for_ephemeral_obj = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_objects"
-                                _update_state_value(state, location_path_for_ephemeral_obj, _list_to_dicts_if_needed(discovered_objects), logger)
-                                logger.info(f"[NarrationTask] Updated/Set {len(discovered_objects)} ephemeral objects for location {actor_location_at_action_time} from look_around.")
-                            else: 
-                                location_path_for_ephemeral_obj = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_objects"
-                                _update_state_value(state, location_path_for_ephemeral_obj, [], logger)
-                                logger.info(f"[NarrationTask] Cleared ephemeral objects for location {actor_location_at_action_time} as none were discovered by look_around.")
-                            
-                            if discovered_npcs:
-                                location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
-                                _update_state_value(state, location_path_for_ephemeral_npc, _list_to_dicts_if_needed(discovered_npcs), logger)
-                                logger.info(f"[NarrationTask] Updated/Set {len(discovered_npcs)} ephemeral NPCs for location {actor_location_at_action_time} from look_around.")
-                            else: 
-                                location_path_for_ephemeral_npc = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs"
-                                _update_state_value(state, location_path_for_ephemeral_npc, [], logger)
-                                logger.info(f"[NarrationTask] Cleared ephemeral NPCs for location {actor_location_at_action_time} as none were discovered by look_around.")
-                            
-                            # Phase 4: Store discovered connections
-                            location_path_for_connections = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.connected_locations"
-                            _update_state_value(state, location_path_for_connections, _list_to_dicts_if_needed(discovered_connections), logger)
-                            logger.info(f"[NarrationTask] Updated/Set {len(discovered_connections)} connected_locations for {actor_location_at_action_time} from look_around.")
-
-                            # --- Phase 2: Process newly_instantiated_locations ---
-                            if newly_instantiated_locations_from_narrator:
-                                for loc_placeholder_item in newly_instantiated_locations_from_narrator:
-                                    # Convert to dict first to handle Pydantic models, SimpleNamespace, or dicts uniformly
-                                    loc_data_dict = _to_dict(loc_placeholder_item)
-                                    
-                                    new_loc_id = loc_data_dict.get('id')
-                                    if not new_loc_id:
-                                        logger.warning(f"[NarrationTask] Skipping newly instantiated location because 'id' is missing: {loc_data_dict}")
-                                        continue
-
-                                    # Ensure the path exists before trying to set a value under it.
-                                    # _update_state_value also handles path creation, so this setdefault is more for clarity/safety.
-                                    state.setdefault(WORLD_STATE_KEY, {}).setdefault(LOCATION_DETAILS_KEY, {})
-                                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{new_loc_id}", loc_data_dict, logger)
-                                    logger.info(f"[NarrationTask] Narrator instantiated new location placeholder: '{new_loc_id}' ({loc_data_dict.get('name', new_loc_id)})")
+                    # Discovery details for narrative context now come *from the action_event*
+                    # and are used in the prompt to the Narrator. The Narrator no longer outputs them.
+                    # The state updates for discoveries are handled by TimeManager based on WorldEngine's output.
+                    logger.debug(f"[NarrationTask] Discovery details (if any) from action_event used for narrative context only.")
+                    logger.debug(f"  Discovered objects for narration: {len(action_event.get('discovered_objects_for_narration', []))}")
+                    logger.debug(f"  Discovered NPCs for narration: {len(action_event.get('discovered_npcs_for_narration', []))}")
+                    logger.debug(f"  Discovered connections for narration: {len(action_event.get('discovered_connections_for_narration', []))}")
 
                     # --- Log Narration Event ---
                     _log_event(
                         sim_time=completion_time,
                         agent_id="Narrator",
-                        event_type="narration",
-                        data=_to_dict(validated_narrator_output), 
+                        event_type="narration", # Log the simplified output
+                        data={"narrative": actual_narrative_paragraph},
                         logger_instance=logger, event_logger_global=event_logger_global
                     )
 
@@ -518,15 +452,20 @@ async def world_engine_task_llm():
                         if "street" in target_location_id_from_intent.lower(): type_hint_wg = "street_segment"
                         if "shop" in target_location_id_from_intent.lower() or "store" in target_location_id_from_intent.lower(): type_hint_wg = "shop_interior_generic"
 
-                        wg_trigger_text = f"""
-Location ID to Define: {target_location_id_from_intent}
-Location Type Hint: {type_hint_wg}
-Origin Location ID: {actor_location_id}
-Origin Location Description: {get_nested(location_state_data, "description", "Unknown origin location.")}
-World Details: Current Time: {get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time)}, Weather: {get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')}, Mood: {world_mood_global}
-
-Generate the location details.
-"""
+                        # Convert trigger information to a dictionary
+                        trigger_data_wg = {
+                            "location_id_to_define": target_location_id_from_intent,
+                            "location_type_hint": type_hint_wg,
+                            "origin_location_id_context": actor_location_id,
+                            "origin_location_description_context": get_nested(location_state_data, "description", "Unknown origin location."),
+                            "world_details_context": {
+                                "current_time": get_time_string_for_prompt(state, sim_elapsed_time_seconds=current_sim_time),
+                                "weather": get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.'),
+                                "mood": world_mood_global
+                            },
+                            "instruction": "Generate the location details based on your agent instructions and the provided JSON context."
+                        }
+                        wg_trigger_text = json.dumps(trigger_data_wg)
                         wg_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=wg_trigger_text)])
                         
                         # Original instruction for WorldGenerator is static for now, no dynamic replacements needed in this call
@@ -584,31 +523,29 @@ Generate the location details.
             target_id_we = get_nested(intent, "target_id")
             target_state_data = get_target_entity_state(state, target_id_we, actor_location_id) or {}
 
-            intent_json = json.dumps(intent, indent=2)
-            target_state_json = json.dumps(target_state_data, indent=2) if target_state_data else "{}" # Ensure valid JSON string
-            location_state_json = json.dumps(location_state_data, indent=2)
-            world_rules_json = json.dumps(world_rules, indent=2)
-            trigger_text_we = f"""
-Actor Name and ID: {actor_name} ({actor_id})
-Current Location: {actor_location_id}
-Intent: {intent_json}
-Target Entity State ({target_id_we or 'N/A'}): {target_state_json}
-Location State: {location_state_json}
-World Rules: {world_rules_json}
-World Time: {time_for_world_engine_prompt} 
-Weather: {get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')} 
+            # Convert trigger information to a dictionary
+            trigger_data_we = {
+                "actor_name_and_id": f"{actor_name} ({actor_id})",
+                "current_location_id": actor_location_id,
+                "intent": intent, # intent is already a dict
+                "target_entity_state": target_state_data, # target_state_data is already a dict
+                "target_entity_id_hint": target_id_we or 'N/A',
+                "location_state": location_state_data, # location_state_data is already a dict
+                "world_rules": world_rules, # world_rules is already a dict
+                "world_time_context": time_for_world_engine_prompt,
+                "weather_context": get_nested(state, 'world_feeds', 'weather', 'condition', default='Weather unknown.'),
+                "instruction": "Resolve this intent based on your agent instructions and the provided JSON context."
+            }
+            # Convert the dictionary to a compact JSON string
+            trigger_text_we = json.dumps(trigger_data_we)
 
-Resolve this intent based on your instructions and the provided context.
-"""
             logger.debug(f"[WorldEngineLLM] Sending prompt to LLM for {actor_id}'s intent ({action_type}).")
 
-            instruction_replacements_we = _prepare_dynamic_instruction_context(state, current_sim_time, include_news_in_instruction=False)
             trigger_content_we = genai_types.UserContent(parts=[genai_types.Part(text=trigger_text_we)])
 
             validated_data = await _call_adk_agent_and_parse(
                 world_engine_runner, world_engine_agent, world_engine_session_id, USER_ID,
                 trigger_content_we, WorldEngineResponse, f"WorldEngineLLM_{actor_id}", logger,
-                original_instruction=original_world_engine_instruction, instruction_replacements=instruction_replacements_we
             )
 
             # validated_data can be Pydantic model, SimpleNamespace, or None
@@ -632,38 +569,92 @@ Resolve this intent based on your instructions and the provided context.
             elif getattr(validated_data, 'valid_action', False):
                 completion_time = current_sim_time + getattr(validated_data, 'duration', 0.0)
                 # --- BEGIN ADDITION: Handle scheduled_future_event ---
-                sfe = getattr(validated_data, 'scheduled_future_event', None)
-                if sfe: # sfe can be Pydantic model or SimpleNamespace
+                sfe_dict = _to_dict(getattr(validated_data, 'scheduled_future_event', None)) # Convert to dict for consistent access
+                if sfe_dict:
                     # The event should trigger relative to when the actor's action (speaking) completes.
-                    event_trigger_time = completion_time + getattr(sfe, 'estimated_delay_seconds', 0.0)
+                    event_trigger_time = completion_time + sfe_dict.get('estimated_delay_seconds', 0.0)
 
                     event_to_schedule = {
-                        "event_type": sfe.get('event_type', 'unknown_event'),
-                        "target_agent_id": sfe.get('target_agent_id'), # Defaults to None if key missing
-                        "location_id": sfe.get('location_id', 'unknown_location'),
-                        "details": sfe.get('details', {}), # details is already a dict
+                        "event_type": sfe_dict.get('event_type', 'unknown_event'),
+                        "target_agent_id": sfe_dict.get('target_agent_id'), 
+                        "location_id": sfe_dict.get('location_id', 'unknown_location'),
+                        "details": sfe_dict.get('details', {}), 
                         "trigger_sim_time": event_trigger_time, # Absolute simulation time for the event
                         "source_actor_id": actor_id # The one whose action generated this event
                     }
-
                     state.setdefault("pending_simulation_events", []).append(event_to_schedule)
-                    # Sort pending events by trigger time to process them in order
                     state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
-
                     logger.info(
                         f"[WorldEngineLLM] Scheduled future event '{event_to_schedule.get('event_type')}' "
                         f"for agent {event_to_schedule.get('target_agent_id')} at sim_time {event_trigger_time:.2f} "
                         f"triggered by {actor_id}."
                     )
+
+                # --- Consolidate results for TimeManager ---
+                pending_results_dict = _to_dict(getattr(validated_data, 'results', {}))
+
+                # --- MODIFICATION FOR DURATIONAL ACTIONS LIKE 'move' ---
+                action_completion_results_dict = {}
+                if action_type == "move" and getattr(validated_data, 'duration', 0.0) > 0.1: # If it's a move with real duration
+                    # Defer the location change and location_details update to action_completion_results
+                    location_change_key = f"{SIMULACRA_KEY}.{actor_id}.location"
+                    location_details_key = f"{SIMULACRA_KEY}.{actor_id}.location_details"
+
+                    if location_change_key in pending_results_dict:
+                        action_completion_results_dict[location_change_key] = pending_results_dict.pop(location_change_key)
+                        # Also defer location_details if it was set based on this move
+                        new_location_id_for_details = action_completion_results_dict[location_change_key]
+                        new_location_name_for_details = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id_for_details, "name", default=new_location_id_for_details)
+                        action_completion_results_dict[location_details_key] = f"You are now in {new_location_name_for_details}."
+                        logger.info(f"[WorldEngineLLM] Deferred location change for {actor_id} to action completion.")
+                # --- END MODIFICATION ---
+
+                # Process discoveries from validated_data (WorldEngineResponse) and add them to pending_results_dict
+                # These are immediate discoveries, so they stay in pending_results_dict
+                if actor_location_id: 
+                    discovered_objects_list = _list_to_dicts_if_needed(getattr(validated_data, 'discovered_objects', []))
+                    if discovered_objects_list or intent.get("action_type") == "look_around":
+                        obj_path = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.ephemeral_objects"
+                        pending_results_dict[obj_path] = discovered_objects_list
+                        logger.info(f"[WorldEngineLLM] Queuing update for ephemeral_objects at {actor_location_id}: {len(discovered_objects_list)} items.")
+
+                    discovered_npcs_list = _list_to_dicts_if_needed(getattr(validated_data, 'discovered_npcs', []))
+                    if discovered_npcs_list or intent.get("action_type") == "look_around":
+                        npc_path = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.ephemeral_npcs"
+                        pending_results_dict[npc_path] = discovered_npcs_list
+                        logger.info(f"[WorldEngineLLM] Queuing update for ephemeral_npcs at {actor_location_id}: {len(discovered_npcs_list)} items.")
+
+                    discovered_connections_list = _list_to_dicts_if_needed(getattr(validated_data, 'discovered_connections', []))
+                    if discovered_connections_list or intent.get("action_type") == "look_around":
+                        conn_path = f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_id}.connected_locations"
+                        pending_results_dict[conn_path] = discovered_connections_list
+                        logger.info(f"[WorldEngineLLM] Queuing update for connected_locations at {actor_location_id}: {len(discovered_connections_list)} items.")
+                
+                # Handle 'move' action: update actor's location_details in pending_results
+                # This logic is now handled within the "MODIFICATION FOR DURATIONAL ACTIONS LIKE 'move'" block above,
+                # ensuring location_details is added to action_completion_results_dict if the move is deferred.
+                # If the move is NOT deferred (e.g., duration is 0), location_details would be set by the standard
+                # pending_results mechanism if the WorldEngine LLM included it in its 'results'.
+                # For clarity, we can ensure that if a move is *not* deferred and results in a location change,
+                # its location_details are set in pending_results.
+                if action_type == "move" and pending_results_dict.get(f"{SIMULACRA_KEY}.{actor_id}.location") and not action_completion_results_dict.get(f"{SIMULACRA_KEY}.{actor_id}.location"):
+                    new_location_id = pending_results_dict[f"{SIMULACRA_KEY}.{actor_id}.location"]
+                    new_location_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
+                    pending_results_dict[f"{SIMULACRA_KEY}.{actor_id}.location_details"] = f"You are now in {new_location_name}."
+
                 # --- END ADDITION ---
                 narration_event = {
                     "type": "action_complete", "actor_id": actor_id, "action": intent,
-                    "results": getattr(validated_data, 'results', {}),
+                    "results_for_narration_context": pending_results_dict, # Pass the consolidated results
                     "outcome_description": getattr(validated_data, 'outcome_description', ""),
                     "completion_time": completion_time,
                     "current_action_description": f"Action: {intent.get('action_type', 'unknown')} - Details: {intent.get('details', 'N/A')[:100]}",
                     "actor_current_location_id": actor_location_id, 
                     "world_mood": world_mood_global, 
+                    # Pass discovery lists explicitly from WorldEngine's validated_data for narration context
+                    "discovered_objects_for_narration": _list_to_dicts_if_needed(getattr(validated_data, 'discovered_objects', [])),
+                    "discovered_npcs_for_narration": _list_to_dicts_if_needed(getattr(validated_data, 'discovered_npcs', [])),
+                    "discovered_connections_for_narration": _list_to_dicts_if_needed(getattr(validated_data, 'discovered_connections', [])),
                 }
                 # If the move was to a newly generated location, adjust outcome description slightly for narration
                 if action_type == "move" and target_location_id_from_intent and \
@@ -672,19 +663,12 @@ Resolve this intent based on your instructions and the provided context.
                     loc_name_for_narration = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default=target_location_id_from_intent)
                     narration_event["outcome_description"] = f"{actor_name} moved into the newly revealed area: {loc_name_for_narration} (ID: {target_location_id_from_intent})."
 
-                # --- Phase 3: Update location_details on successful move ---
-                current_results_obj = getattr(validated_data, 'results', {}) # This is a dict
-                if action_type == "move" and current_results_obj.get(f"{SIMULACRA_KEY}.{actor_id}.location"):
-                    new_location_id = current_results_obj[f"{SIMULACRA_KEY}.{actor_id}.location"]
-                    new_location_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
-                    new_location_details_text = f"You have arrived in {new_location_name}."
-                    # Add this to the results that TimeManager will apply
-                    current_results_obj[f"{SIMULACRA_KEY}.{actor_id}.location_details"] = new_location_details_text
-                    logger.info(f"[WorldEngineLLM] Queuing update for {actor_id}'s location_details to: '{new_location_details_text}'")
-                # --- End Phase 3 Change ---
+                # The logic for updating actor's location_details on move is now part of building pending_results_dict above.
+
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", current_results_obj, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", pending_results_dict, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_completion_results", action_completion_results_dict, logger) # Store completion results
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
                     
                     # Refine action description for listening
@@ -808,9 +792,29 @@ def _build_simulacra_prompt(
         )
 
     # --- Other Contextual Information ---
-    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME)
+    agent_current_location_id = agent_state_data.get('location', DEFAULT_HOME_LOCATION_NAME)
     agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
+    # --- ADDED: Get current location name ---
+    current_location_name = get_nested(global_state_ref, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id, "name", default=agent_current_location_id)
+    # --- END ADDED ---
+
+    
     connected_locations = get_nested(global_state_ref, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id, "connected_locations", default=[])
+    # De-duplicate connected_locations, preferring entries with longer (potentially more descriptive) descriptions
+    # if to_location_id_hint is the same.
+    unique_connections_map = {}
+    if isinstance(connected_locations, list): # Changed connected_locations_raw to connected_locations
+        for conn in connected_locations:
+            if isinstance(conn, dict) and "to_location_id_hint" in conn and "description" in conn:
+                hint = conn["to_location_id_hint"]
+                if hint not in unique_connections_map:
+                    unique_connections_map[hint] = conn
+                else:
+                    # If duplicate hint, keep the one with the longer description
+                    if len(conn["description"]) > len(unique_connections_map[hint]["description"]):
+                        unique_connections_map[hint] = conn
+    connected_locations = list(unique_connections_map.values())
+
     raw_recent_narrative = global_state_ref.get("narrative_log", [])[-MEMORY_LOG_CONTEXT_LENGTH:]
     cleaned_recent_narrative = [re.sub(r'^\[T\d+\.\d+\]\s*', '', entry).strip() for entry in raw_recent_narrative]
     history_str = "\n".join(cleaned_recent_narrative)
@@ -821,8 +825,10 @@ def _build_simulacra_prompt(
     prompt_text_parts = [
         f"**Current State Info for {agent_name} ({agent_id}):**",
         f"- Persona: {agent_state_data.get('persona_details', {})}",
-        f"- Current Location ID: {agent_current_location_id or 'Unknown'}",
-        f"- Your Personal Understanding of this Location: \"{agent_personal_location_details}\"",
+        # --- MODIFIED: Added current location name ---
+        f"- You are currently at: {current_location_name} (ID: {agent_current_location_id or 'Unknown'}).",
+        f"- Your Understanding of this Named Location: \"{agent_personal_location_details}\"", # Clarified this refers to the broader named location
+        f"- Your Immediate Vicinity: Described by your 'Last Observation/Event' and 'Perceived Environment' below.", # Added emphasis
         f"- Perceived Environment:\n{perceptual_summary_for_prompt}",
         f"- Recently Departed from this Location:\n{recently_departed_sim_str}", # Added new percept
         f"- Status: {agent_state_data.get('status', 'idle')} ({status_message_for_prompt})",
@@ -835,7 +841,7 @@ def _build_simulacra_prompt(
         f"- Recent Narrative History:\n{history_str if history_str else 'None.'}",
         f"- Exits/Connections from this location: {json.dumps(connected_locations) if connected_locations else 'None observed.'}",
         "\n**General Instructions:**"
-        "Follow your thinking process (Recall/React -> Analyze Goal -> Identify Options -> Prioritize/Choose) and provide your response ONLY in the specified JSON format."
+        "Follow your thinking process (Recall & React based on your 'Last Observation/Event' and 'Perceived Environment' -> Analyze Goal -> Identify Options -> Prioritize/Choose) and provide your response ONLY in the specified JSON format." # Reinforced Last Observation
     ]
     return "\n".join(prompt_text_parts)
 
@@ -875,16 +881,12 @@ async def simulacra_agent_task_llm(agent_id: str):
             )
             logger.debug(f"[{agent_name}] Sending initial context prompt as agent is idle.")
             
-            instruction_replacements_sim = _prepare_dynamic_instruction_context(
-                state, current_world_time_init, include_news_in_instruction=True, news_item_count=1
-            )
 
             initial_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=initial_trigger_text)])
             
             validated_intent = await _call_adk_agent_and_parse(
                 sim_runner, sim_agent, sim_session_id, USER_ID,
                 initial_trigger_content, SimulacraIntentResponse, f"Simulacra_{agent_name}_Initial", logger,
-                original_instruction=original_simulacra_agent_instruction, instruction_replacements=instruction_replacements_sim
             )
             
             if validated_intent:
@@ -918,17 +920,12 @@ async def simulacra_agent_task_llm(agent_id: str):
                 )
                 logger.debug(f"[{agent_name}] Sending subsequent prompt.")
                 
-                # Also update instruction for subsequent calls
-                instruction_replacements_sim_loop = _prepare_dynamic_instruction_context(
-                    state, current_sim_time_busy_loop, include_news_in_instruction=True, news_item_count=1
-                )
 
                 trigger_content_loop = genai_types.UserContent(parts=[genai_types.Part(text=prompt_text)])
 
                 validated_intent = await _call_adk_agent_and_parse(
                     sim_runner, sim_agent, sim_session_id, USER_ID,
                     trigger_content_loop, SimulacraIntentResponse, f"Simulacra_{agent_name}_Subsequent", logger,
-                    original_instruction=original_simulacra_agent_instruction, instruction_replacements=instruction_replacements_sim_loop
                 )
 
                 if validated_intent:
