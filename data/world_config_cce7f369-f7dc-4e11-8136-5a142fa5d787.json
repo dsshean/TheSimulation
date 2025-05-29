@@ -17,10 +17,10 @@
   "setup_timestamp_utc": "2025-05-22T00:46:08.369037+00:00Z",
   "initial_objects": [],
   "initial_location_definitions": {
-    "Home_01": {
-      "id": "Home_01",
-      "name": "Home",
-      "description": "A modern one-bedroom apartment in Long Island City, Queens, offering a convenient commute to Manhattan and stunning skyline views. The space is clean and organized, reflecting her analytical nature, with touches of warmth from travel souvenirs and potted plants.",
+    "Bedroom_01": {
+      "id": "Bedroom_01",
+      "name": "Bedroom",
+      "description": "A cozy bedroom with a large window overlooking the city. The room is filled with plants and personal items, creating a warm and inviting atmosphere.",
       "ephemeral_objects": [],
       "ephemeral_npcs": [],
       "connected_locations": []
