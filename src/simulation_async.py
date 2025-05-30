@@ -648,11 +648,21 @@ async def world_engine_task_llm():
                     if target_id_we:
                         # Check if target is a Simulacra
                         if target_id_we in get_nested(state, SIMULACRA_KEY, default={}):
-                            # IMMEDIATE BLOCKING for Simulacra
+                            # Get target name for better status descriptions
+                            target_name = get_nested(state, SIMULACRA_KEY, target_id_we, "persona_details", "Name", default=target_id_we)
+                            
+                            # IMMEDIATE BLOCKING for BOTH simulacra in conversation
+                            # 1. Set listener (target) to busy
                             _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.status", "busy", logger)
                             _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.current_action_description", f"Listening to {actor_name}", logger)
                             _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.current_action_end_time", completion_time, logger)
-                            logger.info(f"[WorldEngine] IMMEDIATELY set Simulacra {target_id_we} to listening for {getattr(validated_data, 'duration', 0.0)}s")
+                            
+                            # 2. Set speaker (actor) to busy explicitly for conversation
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", f"Speaking to {target_name}", logger)
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
+                            
+                            logger.info(f"[WorldEngine] IMMEDIATELY set both simulacra to conversation mode: {actor_id} speaking to {target_id_we} for {getattr(validated_data, 'duration', 0.0)}s")
                             
                             # Schedule speech delivery
                             speech_event = {
@@ -663,7 +673,7 @@ async def world_engine_task_llm():
                                     "speaker_name": actor_name,
                                     "speech_duration": getattr(validated_data, 'duration', 3.0)
                                 },
-                                "trigger_sim_time": state.get("world_time", 0.0),  # + 0.5,  # Small delay for speech delivery
+                                "trigger_sim_time": state.get("world_time", 0.0),
                                 "source_actor_id": actor_id
                             }
                             state.setdefault("pending_simulation_events", []).append(speech_event)

@@ -4,7 +4,7 @@
     "sim_b797o8",
     "sim_sustdj"
   ],
-  "world_time": 147.96799999999348,
+  "world_time": 187.68700000000536,
   "narrative_log": [
     "[T3.6] At 11:28 PM on Thursday, May 29, 2025 (Local time for New York, New York), the apartment is quiet. Ava takes in the familiar sight of her living room: a comfortable couch sits invitingly in the dim light, a wooden coffee table stands before it, and a tall bookshelf packed with books lines one wall. She notices the front door leading out to the street and the doorway to the kitchen.",
     "[T12.7] At 11:29 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel Rodriguez surveys the room, the soft glow of a standing lamp illuminating the space. A large television dominates one wall, currently dark, reflecting the room's dim ambiance. He notes a family photo frame on a nearby table, a glimpse of a life he presumably knows. From where he stands, Daniel can see doorways leading to the kitchen, the hallway, and the bedroom, offering potential exits. The front door to the street is also visible, a direct path to the overcast night outside.",
@@ -34,7 +34,14 @@
     "[T127.0] At 11:30 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel continued, \"It was called \\\"Airplane Mode.\\\" Have you heard of it? It looked pretty dumb, in a good way.\" The television flickered in the background, casting faint shadows across the room as he waited for Ava's response. Outside, the overcast night pressed on, the city lights struggling to pierce through the thick cloud cover.",
     "[T129.2] At 11:30 PM on Thursday, May 29, 2025 (Local time for New York, New York), Ava, still on the phone with Daniel, asked, \"Which movie are you talking about? What's the name of it?\" The overcast night continued outside, muting the city sounds and casting long shadows in her apartment. She could hear the faint static from Daniel's end of the line.",
     "[T134.0] At 11:30 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel pressed on, a smile evident in his voice even through the phone. \"It's called 'Space Janitors 7: Cosmic Cleanup'. Have you heard of it?\" He waited, listening for Ava's reaction, the low hum of his television filling the brief silence. The overcast night kept the city muffled and quiet outside his window.",
-    "[T140.7] At 11:30 PM on Thursday, May 29, 2025 (Local time for New York, New York), Ava, settling further into her couch as the overcast night muted the city outside, inquired again, her voice laced with curiosity, \"What's the name of the movie? I'm curious!\""
+    "[T140.7] At 11:30 PM on Thursday, May 29, 2025 (Local time for New York, New York), Ava, settling further into her couch as the overcast night muted the city outside, inquired again, her voice laced with curiosity, \"What's the name of the movie? I'm curious!\"",
+    "[T154.2] At 11:47 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel, still on the phone with Ava, finished his sentence. The line crackled slightly, and he waited for her response, the muted glow of the television reflecting in his glasses. Outside, the overcast night continued to blanket the city, and distant sirens occasionally pierced the relative quiet. He hoped she'd find his suggestion amusing.",
+    "[T157.8] At 11:47 PM on Thursday, May 29, 2025 (Local time for New York, New York), Ava replied to Daniel, \"No, I haven't heard of it, but I'm up for watching it!\" The overcast night outside kept the city muted, the distant sirens occasionally rising and falling, competing with the news reports of an infant death causing conflicting reports that emanated faintly from Ava's TV.",
+    "[T162.5] At 11:47 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel heard Ava's reply on the other end of the phone. \"No, I haven't heard of it, but I'm up for watching it!\" Ava exclaimed. He smiled, the faint light from his apartment reflecting off the screen of his phone as the overcast night muted the sounds of the city outside.",
+    "[T166.6] At 11:47 PM on Thursday, May 29, 2025 (Local time for New York, New York), Ava replied to Daniel's movie suggestion, \"Nope, never heard of it, but I'm game!\" The news reports of an infant death causing conflicting reports continued to emanate faintly from her TV, a stark contrast to their lighthearted conversation. The overcast night outside kept the city muted, the distant sirens a constant reminder of the late hour.",
+    "[T170.2] At 11:47 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel Rodriguez, still on the call with Ava, mentioned, \"It's called 'Space Janitors 7: Cosmic Cleanup'. Did you hear that?\" He waited for Ava's reaction, the overcast night outside dimming the city lights. The faint glow of his apartment illuminated his face as he listened for her reply.",
+    "[T174.4] At 11:48 PM on Thursday, May 29, 2025 (Local time for New York, New York), Ava responded to Daniel, her voice a bit clearer now, \"No, I haven't heard of it, but I'm willing to watch it!\" The overcast skies outside seemed to amplify the city's ambient noise, a low hum punctuated by distant sirens. She glanced at the television, the muted reports of Trump's tariffs staying in place briefly distracting her from the call.",
+    "[T178.0] At 11:48 PM on Thursday, May 29, 2025 (Local time for New York, New York), Daniel, still on the phone with Ava as the overcast night deepened, asked, \"Awesome! Do you want to put it on now?\" He shifted slightly in his chair, the muted sounds of the city barely audible through his closed window."
   ],
   "world_template_details": {
     "description": "A new world is beginning.",
@@ -57,12 +64,12 @@
     "sim_b797o8": {
       "current_location": "Home_01",
       "location_details": "You are now in Home.",
-      "last_observation": "It's called 'Space Janitors 7: Cosmic Cleanup'. Have you heard of it?",
-      "goal": "Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked ...",
+      "last_observation": "Awesome! Do you want to put it on now?",
+      "goal": "Okay, so Daniel wants to know where I am. He's so silly. It's super late on Thursday, May 29, 2025, ...",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 147.97799999999347,
+      "current_action_end_time": 187.69700000000535,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -108,16 +115,16 @@
       "location": "Home_01",
       "current_interrupt_probability": null,
       "monologue_history": [
-        "[T85.7] Okay, so I'm finally here in the living room with Daniel. He just asked what kind of movie I'm in the mood for after suggesting something 'indie'. I mentioned earlier that I'm still a bit groggy, so something light like a comedy would probably be best. I should tell him that, and ask him what indie movies he was thinking of specifically. It's late, and I don't want anything too intense. I want to make sure we both enjoy the movie. It's good to be mindful of his preference for indie films too. Okay, time to respond and hopefully find something we both like. The news mentioned a fire but that's under control, so I don't need to think about that. Also, I have the day off tomorrow, so that's cool. Okay, let's respond.",
-        "[T94.4] Okay, so I'm finally here in the living room with Daniel. He just asked what kind of movie I'm in the mood for after suggesting something 'indie'. I just got back from the bathroom after splashing some water on my face, and I mentioned earlier that I was still a bit groggy, so something light like a comedy would probably be best. He then suggested something lighthearted. I should tell him that, and ask him what lighthearted movie was he thinking of specifically. It's late, and I don't want anything too intense, so it should be something relaxing and funny, since I had a long day. The news mentioned a fire but that's under control, so I don't need to think about that. Also, I have the day off tomorrow, so that's cool. Okay, let's respond and hopefully find something we both like. The sky is overcast, too, but not something I'm gonna think too much about right now. Okay, here goes...",
-        "[T98.9] Okay, so I'm finally here with Daniel in the living room. He suggested something lighthearted after I said I wanted to watch something light. Now he says, \"Alright, something funny it is. How about this one? I saw a trailer earlier and it looked pretty ridiculous.\" I should ask him what movie he's talking about specifically. Since I asked for a comedy, I should see if it really fits the bill. I don't want to watch something that's only 'ridiculous' but not actually funny. I also have to trust his judgement a little bit, since he saw the trailer. Let's see what he has in mind. It's overcast outside and the news was a bit heavy, so hopefully it's something silly that'll make us laugh. Okay, time to respond.",
-        "[T103.6] Okay, so I'm finally here with Daniel in the living room. He just said he saw a trailer for a funny movie that looked ridiculous, and suggested watching it. I should definitely ask him what the name of the movie is, and maybe quickly look it up on my phone to see the trailer myself. After all, 'ridiculous' can mean different things to different people. I really do want something genuinely funny. It's late, I'm a bit tired, and something truly funny would be perfect. I also have to trust his taste a little bit. He seemed pretty enthusiastic. Okay, time to respond. It's Thursday, almost Friday, and the news about the baby is so sad. Okay, focus on the movie. He is right here. It will be okay.\n",
-        "[T108.2] Okay, so I'm finally here with Daniel in the living room. He just said he saw a trailer for a funny movie that looked ridiculous, and suggested watching it. Before I agree, I really should find out what movie he's talking about! Just saying it's 'ridiculous' isn't enough to sell me on it. I need to know the name of the movie to get a sense of whether it's actually something I'd enjoy. It's late, I'm a bit tired, and I want to make sure it's something light and funny. Also, he already saw the trailer, so I should probably trust his taste a little bit. It's Thursday, almost Friday, and the news about the baby is still weighing on me, so it would be nice to have a good laugh to end the day. So I should really ask him what the name of the movie is. Let's do that. Okay, time to respond.",
-        "[T112.5] Okay, Daniel suggested watching a funny movie and said he saw a trailer that looked ridiculous. I still need to know *which* movie he's talking about. I need to make sure it's something I'll actually find funny and not just absurd for the sake of being absurd. It's late, and I want to end the day with some good laughs. I should ask him for the title so I can get a better idea. Maybe I can look it up quickly on my phone or something. Okay, here goes...",
-        "[T117.3] Okay, so Daniel suggested watching a funny movie and said he saw a trailer that looked ridiculous. I still need to know *which* movie he's talking about. I need to make sure it's something I'll actually find funny and not just absurd for the sake of being absurd. It's late, and I want to end the day with some good laughs. I should ask him for the title so I can get a better idea. He hasn't said the name of it at all. Also, he is right here, so I don't know why he is talking through the phone. Also, the news is about the baby. I have to ask him what the movie is to move on. I will ask him, again. Okay, here goes...",
         "[T124.3] Okay, so Daniel suggested watching a funny movie and said he saw a trailer that looked ridiculous. I have asked him like five times! I still need to know *which* movie he's talking about. I need to make sure it's something I'll actually find funny and not just absurd for the sake of being absurd. It's late, and I want to end the day with some good laughs. I should ask him for the title so I can get a better idea. He still hasn't said the name of it. He is right here, though, so I should talk to him directly. The news is about the baby. I will ask him, again, but in person this time. Okay, here goes...",
         "[T131.0] Okay, Daniel suggested watching a funny movie and said he saw a trailer that looked ridiculous, and now he tells me it's called \"Airplane Mode.\" Have I heard of it? I don't think so. It does sound pretty dumb, though. But I'm still not convinced it'll actually be *funny*. I guess I should just say that I haven't heard of it, but I'm willing to check it out. It's not like I have a better suggestion right now. It's late and I'm tired, so let's just go with it and see what happens. It's Thursday, almost Friday. Okay, time to respond.",
-        "[T137.6] Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked if I've heard of it. I really haven't. I guess I'm willing to give it a shot, though. It's not like I have any brilliant ideas myself. Plus, he seems pretty into it, and I trust his taste, usually. So, I should just respond and say I haven't heard of it, but I'm game to watch it. It's late on Thursday, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. We can always turn it off. Also, the news is sad. Okay, let's just agree and get the movie started. Maybe it will be great. Okay, time to respond."
+        "[T137.6] Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked if I've heard of it. I really haven't. I guess I'm willing to give it a shot, though. It's not like I have any brilliant ideas myself. Plus, he seems pretty into it, and I trust his taste, usually. So, I should just respond and say I haven't heard of it, but I'm game to watch it. It's late on Thursday, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. We can always turn it off. Also, the news is sad. Okay, let's just agree and get the movie started. Maybe it will be great. Okay, time to respond.",
+        "[T148.0] Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked if I've heard of it. I really haven't. I guess I'm willing to give it a shot, though. It's not like I have any brilliant ideas myself. Plus, he seems pretty into it, and I trust his taste, usually. So, I should just respond and say I haven't heard of it, but I'm game to watch it. It's late on Thursday, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. We can always turn it off. Also, the news is sad. The weather is overcast, too. Okay, let's just agree and get the movie started. Maybe it will be great. Okay, time to respond. I will say I haven't heard of it, but I'm happy to watch it.",
+        "[T153.5] Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked if I've heard of it. I really haven't. I guess I'm willing to give it a shot, though. It's not like I have any brilliant ideas myself. Plus, he seems pretty into it, and I trust his taste, usually. So, I should just respond and say I haven't heard of it, but I'm game to watch it. It's late on Thursday, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. We can always turn it off. The news is sad. The weather is overcast, too. Okay, let's just agree and get the movie started. Maybe it will be great. Okay, time to respond. I will say I haven't heard of it, but I'm happy to watch it.",
+        "[T158.1] Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked if I've heard of it. I really haven't. I guess I'm willing to give it a shot, though. It's not like I have any brilliant ideas myself. Plus, he seems pretty into it, and I trust his taste, usually. So, I should just respond and say I haven't heard of it, but I'm game to watch it. It's late on Thursday, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. The news is sad. The weather is overcast, too. Okay, let's just agree and get the movie started. Maybe it will be great. Okay, time to respond. I will say I haven't heard of it, but I'm happy to watch it. We are on the phone, and I am on the couch. I don't want to be rude. I will respond.",
+        "[T162.6] Okay, so Daniel finally told me the name of the movie: 'Space Janitors 7: Cosmic Cleanup'. He asked if I've heard of it. I really haven't. I guess I'm willing to give it a shot, though. It's not like I have any brilliant ideas myself. Plus, he seems pretty into it, and I trust his taste, usually. So, I should just respond and say I haven't heard of it, but I'm game to watch it. It's late on Thursday, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. The news is sad. The weather is overcast, too. Okay, let's just agree and get the movie started. Maybe it will be great. Okay, time to respond. I will say I haven't heard of it, but I'm happy to watch it. We are on the phone, and I am on the couch. I don't want to be rude. I will respond. He is waiting. I should really say something. Okay, here we go.",
+        "[T170.4] Okay, so Daniel is happy that I said I'm willing to watch 'Space Janitors 7: Cosmic Cleanup'. It's late, almost Friday, and I have tomorrow off, so even if it's terrible, it's not the end of the world. The news is sad. The weather is overcast, too. Okay, let's just agree and get the movie started. I am on the couch. I don't want to be rude. I will respond. He is waiting. I should really say something. He asked me where I am. I am at home, and I am on the couch. Maybe I should say that. Okay, here we go.",
+        "[T176.9] Okay, so Daniel wants to know where I am. It's super late on Thursday, May 29, 2025, almost Friday, and I'm at home on the couch. He's on the phone, so he can't see me. He's probably just trying to figure out if I'm ready to watch the movie 'Space Janitors 7: Cosmic Cleanup' or not. The news is still making me feel down, and the overcast weather isn't helping, but I agreed to watch the movie with him. I don't want to be rude, so I should just answer his question and tell him I'm at home on the couch. Then maybe we can finally get this movie started. Okay, here goes nothing. Time to talk to him.",
+        "[T181.6] Okay, so Daniel wants to know where I am. He's so silly. It's super late on Thursday, May 29, 2025, almost Friday, and I'm at home on the couch. He's on the phone, so he can't see me. He's probably just trying to be funny, I guess. He's probably just trying to figure out if I'm ready to watch the movie 'Space Janitors 7: Cosmic Cleanup' or not. The news is still making me feel down, and the overcast weather isn't helping, but I agreed to watch the movie with him. I don't want to be rude, so I should just answer his question and tell him I'm at home on the couch. I should say it now before it gets any later! Then maybe we can finally get this movie started. Okay, here goes nothing. Time to talk to him."
       ],
       "action_completion_results": {},
       "current_action_description": "Interrupted by Daniel Rodriguez saying something."
@@ -125,12 +132,12 @@
     "sim_sustdj": {
       "current_location": "Home_01",
       "location_details": "Your home and bedroom.",
-      "last_observation": "What's the name of the movie? I'm curious!",
-      "goal": "Okay, Ava just said she was thinking something light, maybe a comedy, because she's still a bit grog...",
+      "last_observation": "I haven't heard of it, but I'm happy to watch it. It sounds...interesting.",
+      "goal": "Okay, Ava said she's never heard of 'Space Janitors 7: Cosmic Cleanup' but is up for watching it! It...",
       "memory_log": [],
       "home_location": "Home_01",
       "status": "idle",
-      "current_action_end_time": 147.97799999999347,
+      "current_action_end_time": 187.69700000000535,
       "pending_results": {},
       "last_interjection_sim_time": 0.0,
       "next_simple_timer_interjection_sim_time": 0.0,
@@ -176,16 +183,16 @@
       "location": "Home_01",
       "current_interrupt_probability": null,
       "monologue_history": [
-        "[T97.4] Okay, Ava's back and confirmed she wants a comedy. It's late, almost midnight on a Thursday, and I'm glad we're finally on the same page. It's overcast and a comedy is perfect. She said \"something light, like a comedy, would be great\". I just chuckled softly, \"Alright, something funny it is. How about this one? I saw a trailer earlier and it looked pretty ridiculous.\" That was my last statement. I didn't mention the title of the movie. I should mention the name of the movie to see what she thinks. I saw the trailer on my phone earlier, I should see if she wants to see that one. Okay, I'll suggest that movie. She is sitting next to me on the comfortable couch so I will talk to her.",
-        "[T102.0] Okay, Ava's back, and she wants a comedy. It's almost midnight on a Thursday, and the weather outside is overcast, making it perfect for a cozy movie night. She said she's still a little groggy, so something light is definitely the way to go. I mentioned seeing a trailer earlier that looked ridiculous. Since I didn't give her the name of the movie, I should tell her what it's called. I saw it on my phone earlier...I wonder if I can pull it up quickly. Let's just tell her the name first, and then gauge her reaction. I'll say, \"It's called 'Space Janitors 7: Cosmic Cleanup'. Have you heard of it?\"",
-        "[T106.7] Okay, Ava's back and wants a comedy. It's late on a Thursday, almost midnight, and she's still a little groggy. Perfect for something light! I mentioned seeing a trailer earlier. I didn't say the movie name yet. Let me tell her what it is. 'Space Janitors 7: Cosmic Cleanup' sounds ridiculous enough to be fun. I'll ask if she's heard of it. Since she's on the Comfortable Couch with me, I'll just talk to her directly.",
-        "[T111.1] Okay, Ava's back and wants a comedy. It's almost midnight on a Thursday, and she's still a little groggy. 'Space Janitors 7: Cosmic Cleanup' is what I was thinking of. I need to see what she thinks. It's overcast, a comedy is perfect. \"I'm thinking something light, like a comedy. I'm still a little groggy, so nothing too intense,\" she said to me. Now she is done talking. I should tell her the name of the movie and ask if she's heard of it. I'm on the couch with her, so I will just talk to her.",
-        "[T115.8] Okay, Ava is back from the bathroom and wants a comedy. It's late, almost midnight on a Thursday, and she's still a bit groggy, so something light is perfect. It is overcast outside. She asked for a comedy, but indie. I wanted to say the name of the movie. Okay, I will tell her the name of the movie. 'Space Janitors 7: Cosmic Cleanup'. It is sitting next to me on the Comfortable Couch, and is sitting here, so I'll just talk to her and ask if she's heard of it.",
-        "[T120.7] Okay, Ava just said she was thinking something light, maybe a comedy, because she's still a bit groggy. It's late, almost midnight on a Thursday, and the weather is overcast. I wanted to suggest that movie 'Space Janitors 7: Cosmic Cleanup' but I want to make sure she hasn't heard of it already, since she wants something 'indie.' Telling her the title and asking if she knows it is the next logical step. She is sitting right here on the Comfortable Couch with me, so I will just talk to her. I can even use the remote control to turn on the television or turn on the lamp if it's too dark.",
-        "[T125.2] Okay, Ava just said she was thinking something light, maybe a comedy, because she's still a bit groggy. It's late, almost midnight on a Thursday, and the weather is overcast. I wanted to suggest that movie 'Space Janitors 7: Cosmic Cleanup' but I want to make sure she hasn't heard of it already, since she mentioned wanting something 'indie'. I will tell her the title and ask if she knows it is the next logical step. She is sitting right here on the Comfortable Couch with me, so I will just talk to her. Let's just do that.",
         "[T130.1] Okay, Ava just said she was thinking something light, maybe a comedy, because she's still a bit groggy. It's late, almost midnight on a Thursday, and the weather is overcast, perfect for a movie night. I wanted to suggest that movie 'Space Janitors 7: Cosmic Cleanup' but I want to make sure she hasn't heard of it already, since she mentioned wanting something 'indie'. I will tell her the title and ask if she knows it is the next logical step. She is sitting right here on the Comfortable Couch with me, so I will just talk to her. I think I'll tell her and see what she says.",
         "[T137.6] Okay, Ava is on the phone and wants a comedy. It's almost midnight on a Thursday, she's still a little groggy, and it's overcast outside. I told her about a movie trailer I saw, but didn't give her the name. She asked what the name of the movie was, twice now. I guess it's time to reveal 'Space Janitors 7: Cosmic Cleanup.' I'll just tell her and see what she thinks. I'm on the couch, so I'll just talk to her and then listen to her reaction.",
-        "[T143.4] Okay, Ava just asked what the name of the movie is. It's almost midnight on a Thursday, she's still a little groggy, and it's overcast outside, perfect for a comedy movie. I told her about a movie trailer I saw, but didn't give her the name. She asked what the name of the movie was. Twice! I guess it's really time to reveal 'Space Janitors 7: Cosmic Cleanup.' I will just tell her and see what she thinks. The last time I told her about 'Space Janitors 7' she didn't say anything. Maybe she wants me to confirm the name now that she's back on the phone. She is on the phone, so I'll just talk to her and then listen to her reaction."
+        "[T143.4] Okay, Ava just asked what the name of the movie is. It's almost midnight on a Thursday, she's still a little groggy, and it's overcast outside, perfect for a comedy movie. I told her about a movie trailer I saw, but didn't give her the name. She asked what the name of the movie was. Twice! I guess it's really time to reveal 'Space Janitors 7: Cosmic Cleanup.' I will just tell her and see what she thinks. The last time I told her about 'Space Janitors 7' she didn't say anything. Maybe she wants me to confirm the name now that she's back on the phone. She is on the phone, so I'll just talk to her and then listen to her reaction.",
+        "[T148.0] Okay, Ava is still on the phone and she wants to know the name of the movie. It's almost midnight on a Thursday, she's still a little groggy, and it's overcast outside, so a light comedy is the way to go. She has asked for the title again so I need to tell her. She's really curious now. I already said 'Space Janitors 7: Cosmic Cleanup'. Since she is asking again, I should just repeat the title. It's easier than trying to describe it. Then I will listen to her reaction.",
+        "[T152.0] Okay, Ava is still on the phone and she wants to know the name of the movie. It's almost midnight on a Thursday, she's still a little groggy, and it's overcast outside, so a light comedy is the way to go. She has asked for the title again! She's really curious. I already said 'Space Janitors 7: Cosmic Cleanup'. Since she is asking again, I should just repeat the title, but maybe she didn't hear me. Then I will listen to her reaction to make sure she heard me this time. What she says next will determine what I will do. So, I'll repeat the title and then just listen.",
+        "[T156.6] Okay, Ava's still on the phone and wants to know the name of the movie *again*. It's almost midnight on a Thursday, she's still a little groggy, and it's overcast outside. I already told her the name: 'Space Janitors 7: Cosmic Cleanup'. Why is she asking again? Maybe the connection is bad, or she got distracted. I'll repeat it one more time, clearly and slowly, and see if she acknowledges it this time. It's the only way to move forward. I'm sitting here on the couch so I'll just speak into the phone. After I tell her the name, I'll wait for a response to make sure she heard me this time.",
+        "[T161.7] Okay, Ava is *still* on the phone and asking about the movie. It's almost midnight, a Thursday, she's still a little groggy, and it's overcast outside - movie night conditions! I *already* told her the name: 'Space Janitors 7: Cosmic Cleanup'. Why is she asking again and again? Maybe she keeps missing it? The phone connection could be bad. Alright, deep breath. I'll repeat it one *last* time, really clearly, and then I'll wait for her to acknowledge. If she asks again after *this*, I'm officially stumped. She said, \"No, I haven't heard of it, but I'm up for watching it!\". Great! That means she heard me this time. Since she hasn't heard of it and she's willing to watch it, I should ask her if she actually wants to watch it. I'm on the couch so I'll just keep talking into the phone. Let's see...",
+        "[T169.5] Okay, Ava said she's never heard of 'Space Janitors 7: Cosmic Cleanup' but is up for watching it. That's great! It's almost midnight on a Thursday, she's still a bit groggy, and it's overcast outside, so it's perfect movie night weather. The news snippets are depressing too, which reinforces the need for a light comedy. Since she's willing, I should confirm that she *actually* wants to watch it right now, considering how late it is. I'm on the couch, talking to her on the phone. I should probably get the TV remote_control_01 in my hand. Okay I should first ask her, and the get the remote. Let's do that. Make sure she is actually up for it first.",
+        "[T178.4] Okay, Ava said she's never heard of 'Space Janitors 7: Cosmic Cleanup' but is up for watching it! It's almost midnight on a Thursday, and she's still a bit groggy. It's overcast outside, news is depressing. Sounds like perfect movie night conditions, but I need to make sure she's *really* up for it, given the late hour. It's easy to say 'yes' when you're tired. I am sitting here on the couch so I will just ask her on the phone and get the remote too.",
+        "[T183.2] Okay, Ava said she's never heard of 'Space Janitors 7: Cosmic Cleanup' but is up for watching it! It's almost midnight on a Thursday, she's still a bit groggy, and it's overcast outside. Sounds like a good setup for a silly movie. She's on the phone right now, so I'll just keep talking to her that way. Since she said she's willing to watch it, I should ask her directly if she *actually* wants to watch it *right now*, or if she's just being polite. It's late, and she might just want to go to bed. I'll phrase it gently. After I ask, I should probably grab the remote control_01 so I'm ready to put the movie on if she's game. I'll just ask first."
       ],
       "action_completion_results": {},
       "current_action_description": "Interrupted by Ava Sharma saying something."
@@ -847,18 +854,214 @@
       },
       "trigger_sim_time": 146.09299999999348,
       "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_sustdj",
+        "speaker_name": "Daniel Rodriguez",
+        "message_content": "Daniel Rodriguez said to you: 'It's called 'Space Janitors 7: Cosmic Cleanup''"
+      },
+      "trigger_sim_time": 154.38700000000534,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "details": {
+        "message_content": "It's called 'Space Janitors 7: Cosmic Cleanup'.",
+        "speaker_name": "Daniel Rodriguez",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 154.78099999998813,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_b797o8",
+        "speaker_name": "Ava Sharma (sim_b797o8)",
+        "message_content": "Ava Sharma (sim_b797o8) said to you: 'No, I haven't heard of it, but I'm up for watching it!'"
+      },
+      "trigger_sim_time": 157.98099999998811,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "details": {
+        "message_content": "No, I haven't heard of it, but I'm up for watching it!",
+        "speaker_name": "Ava Sharma",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 159.48399999999674,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_sustdj",
+        "speaker_name": "Daniel Rodriguez",
+        "message_content": "Daniel Rodriguez said to you: 'It's 'Space Janitors 7: Cosmic Cleanup''"
+      },
+      "trigger_sim_time": 162.68399999999673,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "details": {
+        "message_content": "It's 'Space Janitors 7: Cosmic Cleanup'.",
+        "speaker_name": "Daniel Rodriguez",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 163.59299999999348,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_b797o8",
+        "speaker_name": "Ava Sharma (sim_b797o8)",
+        "message_content": "Ava Sharma (sim_b797o8) said to you: 'Nope, never heard of it, but I'm game!'"
+      },
+      "trigger_sim_time": 166.79299999999347,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "details": {
+        "message_content": "Nope, never heard of it, but I'm game!",
+        "speaker_name": "Ava Sharma",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 167.1710000000021,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_sustdj",
+        "speaker_name": "Daniel Rodriguez",
+        "message_content": "Daniel Rodriguez said to you: 'It's called 'Space Janitors 7: Cosmic Cleanup'. Did you hear that?'"
+      },
+      "trigger_sim_time": 170.37100000000208,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "details": {
+        "message_content": "It's called 'Space Janitors 7: Cosmic Cleanup'. Did you hear that?",
+        "speaker_name": "Daniel Rodriguez",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 171.35899999999674,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_b797o8",
+        "speaker_name": "Ava Sharma (sim_b797o8)",
+        "message_content": "Ava Sharma (sim_b797o8) said to you: 'No, I haven't heard of it, but I'm willing to watch it!'"
+      },
+      "trigger_sim_time": 174.55899999999673,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "details": {
+        "message_content": "No, I haven't heard of it, but I'm willing to watch it!",
+        "speaker_name": "Ava Sharma",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 174.98399999999674,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_sustdj",
+        "speaker_name": "Daniel Rodriguez",
+        "message_content": "Daniel Rodriguez said to you: 'Awesome! Do you want to put it on now?'"
+      },
+      "trigger_sim_time": 178.18399999999673,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_b797o8",
+      "details": {
+        "message_content": "Awesome! Do you want to put it on now?",
+        "speaker_name": "Daniel Rodriguez",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 179.82800000000861,
+      "source_actor_id": "sim_sustdj"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "location_id": "Home_01",
+      "details": {
+        "speaker_id": "sim_b797o8",
+        "speaker_name": "Ava Sharma (sim_b797o8)",
+        "message_content": "Ava Sharma (sim_b797o8) said to you: 'I haven't heard of it, but I'm happy to watch it. It sounds...interesting.'"
+      },
+      "trigger_sim_time": 183.0280000000086,
+      "source_actor_id": "sim_b797o8"
+    },
+    {
+      "event_type": "simulacra_speech_received_as_interrupt",
+      "target_agent_id": "sim_sustdj",
+      "details": {
+        "message_content": "I haven't heard of it, but I'm happy to watch it. It sounds...interesting.",
+        "speaker_name": "Ava Sharma",
+        "speech_duration": 3.0
+      },
+      "trigger_sim_time": 184.46799999999348,
+      "source_actor_id": "sim_b797o8"
     }
   ],
   "world_feeds": {
-    "last_update_sim_time": 10.171999999991385,
+    "last_update_sim_time": 157.875,
     "weather": {
-      "condition": "overcast",
+      "condition": "Overcast",
       "temperature_celsius": 18,
-      "forecast_short": "Passing showers tonight, chance of isolated thunderstorms on Friday, chance of rain showers on Saturday.",
-      "timestamp": 10.171999999991385,
+      "forecast_short": "Passing showers tonight, isolated thunderstorms Friday.",
+      "timestamp": 157.875,
       "source_category": "weather"
     },
     "news_updates": [
+      {
+        "headline": "NY News: Trump Tariffs Stay, Market Basket CEO Out, Kerik Dies",
+        "summary": "A federal court upheld Trump's tariffs, Market Basket's CEO was put on leave amidst controversy, and former NYPD Commissioner Bernard Kerik passed away.",
+        "timestamp": 157.875,
+        "source_category": "regional_news"
+      },
+      {
+        "headline": "Global News: Ukraine Talks Proposed, Middle East Tensions Rise, and Trump in the Headlines",
+        "summary": "World news includes proposed Ukraine talks, escalating Middle East conflict, Trump's press conference with Musk and legal issues, and social/economic developments.",
+        "timestamp": 157.875,
+        "source_category": "world_news"
+      },
       {
         "headline": "NYC News: Infant Death Conflicting Reports, Fire Under Control, and More",
         "summary": "New York City faces conflicting reports on an infant death involving a dog, a Midtown Hilton fire is contained, and other local news includes a Diddy testimony, a recovered gunboat, a rally for a detained student, reconstructive surgery, an upcoming air show, a TB case, and the death of Bernard Kerik.",
@@ -879,6 +1082,12 @@
       }
     ],
     "pop_culture_updates": [
+      {
+        "headline": "NYC Pop Culture Buzz: Lorde, TikTok Trends, and Tribeca!",
+        "summary": "Lorde's new single and Gracie Abrams' sped-up track are trending on TikTok, while NYC sees a mix of music events, including a canceled Kehlani concert and the Tribeca Film Festival.",
+        "timestamp": 157.875,
+        "source_category": "pop_culture"
+      },
       {
         "headline": "NYC Pop Culture: Concert Controversy, Anniversary Tours, and Dog Pride!",
         "summary": "New York City's pop culture scene is buzzing with concert cancellations, Mayday Parade's anniversary, new music releases, and the upcoming Woof Fest.",
