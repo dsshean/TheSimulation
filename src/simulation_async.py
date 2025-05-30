@@ -744,6 +744,22 @@ async def world_engine_task_llm():
                             logger.info(f"[WorldEngineLLM] Deferred location change for {actor_id} to action completion")
 
                 # --- IMMEDIATE DISCOVERY UPDATES TO STATE ---
+                # Handle discovered objects and add them to location
+                if discovered_objects_list:
+                    # Add objects to location's ephemeral objects
+                    current_ephemeral_objects = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, effective_location_id_for_discoveries, "ephemeral_objects", default=[])
+                    
+                    # Merge new objects with existing ones, avoiding duplicates by ID
+                    for new_obj in discovered_objects_list:
+                        # Check if object already exists in this location
+                        if not any(obj.get("id") == new_obj.get("id") for obj in current_ephemeral_objects):
+                            current_ephemeral_objects.append(new_obj)
+                            logger.debug(f"[WorldEngineLLM] Added new ephemeral object {new_obj.get('id')} to location {effective_location_id_for_discoveries}")
+                    
+                    # Update the state with the merged list
+                    _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{effective_location_id_for_discoveries}.ephemeral_objects", current_ephemeral_objects, logger)
+                    logger.info(f"[WorldEngineLLM] Updated ephemeral objects for location {effective_location_id_for_discoveries}")
+
                 # Always apply connection merging for any action that might discover connections
                 if discovered_connections_list or action_type in ["look_around", "move", "explore", "examine"]:
                     update_location_connections(state, effective_location_id_for_discoveries, discovered_connections_list, logger)
