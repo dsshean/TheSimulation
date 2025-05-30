@@ -98,24 +98,36 @@ live_display_object: Optional[Live] = None
 async def safe_queue_get(queue, timeout=5.0, task_name="Unknown"):
     """Safely get from queue with timeout and retry logic."""
     try:
-        return await asyncio.wait_for(queue.get(), timeout=timeout)
+        queue_name = "EVENT_BUS" if queue == event_bus else "NARRATION_QUEUE" if queue == narration_queue else "UNKNOWN_QUEUE"
+        
+        item = await asyncio.wait_for(queue.get(), timeout=timeout)
+        
+        # QUEUE LOGGING - Log what's coming out of the queue
+        logger.info(f"[QUEUE] {queue_name} -> {task_name}: {json.dumps(item, indent=2)}")
+        
+        return item
     except asyncio.TimeoutError:
-        logger.warning(f"[{task_name}] Queue get() timed out after {timeout}s")
+        logger.warning(f"[QUEUE] {queue_name} GET TIMEOUT after {timeout}s for {task_name}")
         return None
     except Exception as e:
-        logger.error(f"[{task_name}] Queue get() error: {e}")
+        logger.error(f"[QUEUE] {queue_name} GET ERROR for {task_name}: {e}")
         return None
 
 async def safe_queue_put(queue, item, timeout=5.0, task_name="Unknown"):
     """Safely put to queue with timeout and retry logic."""
     try:
+        # QUEUE LOGGING - Log what's going into the queue
+        queue_name = "EVENT_BUS" if queue == event_bus else "NARRATION_QUEUE" if queue == narration_queue else "UNKNOWN_QUEUE"
+        logger.info(f"[QUEUE] {queue_name} <- {task_name}: {json.dumps(item, indent=2)}")
+        
         await asyncio.wait_for(queue.put(item), timeout=timeout)
+        logger.info(f"[QUEUE] {queue_name} PUT SUCCESS from {task_name}")
         return True
     except asyncio.TimeoutError:
-        logger.warning(f"[{task_name}] Queue put() timed out after {timeout}s")
+        logger.warning(f"[QUEUE] {queue_name} PUT TIMEOUT after {timeout}s from {task_name}")
         return False
     except Exception as e:
-        logger.error(f"[{task_name}] Queue put() error: {e}")
+        logger.error(f"[QUEUE] {queue_name} PUT ERROR from {task_name}: {e}")
         return False
 
 async def queue_health_monitor():
@@ -452,18 +464,10 @@ async def narration_task():
 
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                         _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
-                    logger.info(f"[NarrationTask] Appended narrative for {actor_name}: {cleaned_narrative_text[:80]}...")
-
-                    # NOTE: State is already updated by WorldEngine, this is just for narrative generation
-                    logger.debug(f"[NarrationTask] Discovery details used for narrative context only (state already updated by WorldEngine)")
-
-                    _log_event(
-                        sim_time=completion_time,
-                        agent_id="Narrator",
-                        event_type="narration",
-                        data={"narrative": actual_narrative_paragraph},
-                        logger_instance=logger, event_logger_global=event_logger_global
-                    )
+                        
+                        # ADD THIS: Set agent to idle when narration completes
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                        logger.info(f"[NarrationTask] Set {actor_id} to idle after setting last_observation")
 
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
@@ -664,7 +668,7 @@ async def world_engine_task_llm():
                             
                             logger.info(f"[WorldEngine] IMMEDIATELY set both simulacra to conversation mode: {actor_id} speaking to {target_id_we} for {getattr(validated_data, 'duration', 0.0)}s")
                             
-                            # Schedule speech delivery
+                            # IMMEDIATE speech delivery (not scheduled) - but don't queue narration yet
                             speech_event = {
                                 "event_type": "simulacra_speech_received_as_interrupt",
                                 "target_agent_id": target_id_we,
@@ -673,10 +677,15 @@ async def world_engine_task_llm():
                                     "speaker_name": actor_name,
                                     "speech_duration": getattr(validated_data, 'duration', 3.0)
                                 },
-                                "trigger_sim_time": state.get("world_time", 0.0),
+                                "trigger_sim_time": state.get("world_time", 0.0),  # IMMEDIATE
                                 "source_actor_id": actor_id
                             }
                             state.setdefault("pending_simulation_events", []).append(speech_event)
+                            logger.info(f"[WorldEngine] IMMEDIATELY queued speech delivery for {target_id_we}")
+                            
+                            # DON'T queue narration immediately for talk actions - it will be queued when action completes
+                            # The narration_event will be created below but not queued until completion_time
+                            skip_immediate_narration_queue = True
                         
                         # ADD THIS: Check if target is an NPC
                         else:
@@ -690,9 +699,10 @@ async def world_engine_task_llm():
                             else:
                                 # Could also check global NPCs or objects here
                                 logger.debug(f"[WorldEngine] Talk target {target_id_we} not found as Simulacra or NPC in current location")
-                # --- Handle scheduled_future_event ---
+                # --- Handle scheduled_future_event --- 
+                # REMOVE THIS BLOCK FOR TALK ACTIONS - they should be handled immediately above
                 sfe_dict = _to_dict(getattr(validated_data, 'scheduled_future_event', None))
-                if sfe_dict:
+                if sfe_dict and action_type != "talk":  # ADD THIS CONDITION
                     event_trigger_time = completion_time + sfe_dict.get('estimated_delay_seconds', 0.0)
                     event_to_schedule = {
                         "event_type": sfe_dict.get('event_type', 'unknown_event'),
@@ -810,13 +820,26 @@ async def world_engine_task_llm():
                         action_desc_for_state = outcome_description
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", action_desc_for_state, logger)
                     
-                    narration_success = await safe_queue_put(narration_queue, narration_event, timeout=5.0, task_name=f"WorldEngineLLM_{actor_id}")
-
-                    if not narration_success:
-                        logger.error(f"[WorldEngineLLM] Failed to queue narration for {actor_id}")
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", outcome_description, logger)
+                    # Queue narration event - but delay it for talk actions until completion
+                    if action_type == "talk" and skip_immediate_narration_queue:
+                        # Schedule narration to be queued at completion time
+                        delayed_narration_event = {
+                            "event_type": "delayed_narration",
+                            "narration_data": narration_event,
+                            "trigger_sim_time": completion_time,
+                            "source_actor_id": actor_id
+                        }
+                        state.setdefault("pending_simulation_events", []).append(delayed_narration_event)
+                        state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
+                        logger.info(f"[WorldEngineLLM] Scheduled narration for talk action to trigger at {completion_time:.1f}s")
                     else:
-                        logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state immediately, set end time {completion_time:.1f}s")
+                        narration_success = await safe_queue_put(narration_queue, narration_event, timeout=5.0, task_name=f"WorldEngineLLM_{actor_id}")
+
+                        if not narration_success:
+                            logger.error(f"[WorldEngineLLM] Failed to queue narration for {actor_id}")
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", outcome_description, logger)
+                        else:
+                            logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state immediately, set end time {completion_time:.1f}s")
                 else:
                     logger.error(f"[WorldEngineLLM] Actor {actor_id} not found in state after valid action resolution.")
             else: 
@@ -1099,7 +1122,7 @@ async def simulacra_agent_task_llm(agent_id: str):
             if consecutive_failures >= max_consecutive_failures:
                 logger.warning(f"[{agent_name}] Too many consecutive failures ({consecutive_failures}). Backing off for {failure_backoff_time}s")
                 await asyncio.sleep(failure_backoff_time)
-                consecutive_failures = 0  # Reset after backoff
+                consecutive_failures = 0 # Reset after backoff
                 
             await asyncio.sleep(AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS)
             current_sim_time_busy_loop = state.get("world_time", 0.0)
@@ -1296,6 +1319,7 @@ async def run_simulation(
         sys.exit(1)
     try:
         genai.configure(api_key=API_KEY)
+
         logger.info("Google Generative AI configured.")
     except Exception as e:
         logger.critical(f"Failed to configure Google API: {e}", exc_info=True)

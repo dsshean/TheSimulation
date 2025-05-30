@@ -44,6 +44,15 @@ logger, unique_log_filename = setup_unique_logger(
 )
 logger.info(f"--- Application Start ({APP_NAME}) --- Logging to: {unique_log_filename}")
 
+# Disable verbose logging for third-party modules
+logging.getLogger('google').setLevel(logging.WARNING)
+logging.getLogger('google_adk').setLevel(logging.WARNING) 
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
+logging.getLogger('google_genai').setLevel(logging.WARNING)
+logging.getLogger('geopy').setLevel(logging.WARNING)
+
 # --- Event Logger Setup ---
 event_logger: Optional[logging.Logger] = None # Initialize to None, type hint for clarity
 event_log_filename: str = "event_log_not_initialized.jsonl"

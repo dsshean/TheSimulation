@@ -97,7 +97,7 @@ async def time_manager_task(
                             logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
                         # Clear interrupt probability and set status to idle for agent-specific action completions
                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
-                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance)
+                        # _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # Removed per request
                         logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
 
             await process_pending_simulation_events(current_state, logger_instance)
@@ -464,90 +464,104 @@ Generate this image."""
         except Exception as e_gen:
             logger_instance.error(f"[NarrativeImageGenerator] Error during image generation API call: {e_gen}", exc_info=True)
 
-async def process_pending_simulation_events(current_state, logger_instance):
+
+async def process_pending_simulation_events(current_state: Dict[str, Any], logger_instance: logging.Logger):
     """
     Process and deliver pending simulation events, including speech interrupts.
-    Should be called regularly (e.g., from time_manager_task).
+    Removes processed events from the pending list.
     """
     current_sim_time = current_state.get("world_time", 0.0)
     pending_events_list = current_state.get("pending_simulation_events", [])
-    processed_event_indices = []
+    
+    # New list to hold events that are NOT processed in this cycle (i.e., future events)
+    remaining_pending_events = []
+    events_were_processed_in_this_call = False # Flag to see if any event was processed
 
-    for i, event_data in enumerate(pending_events_list):
+    if not pending_events_list:
+        return
+
+    # Sort by trigger time to ensure chronological processing if multiple are due in the same tick
+    pending_events_list.sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
+
+    for event_data in list(pending_events_list): # Iterate over a copy
         if event_data.get("trigger_sim_time", float('inf')) <= current_sim_time:
+            events_were_processed_in_this_call = True # Mark that we are processing an event
             event_type = event_data.get("event_type")
-            logger_instance.info(f"[ProcessEvents] Processing scheduled event: '{event_type}' at sim_time {current_sim_time:.2f}")
+            target_agent_id = event_data.get("target_agent_id", "N/A")
+            source_actor_id = event_data.get("source_actor_id", "N/A") 
+            event_trigger_time = event_data.get("trigger_sim_time", "N/A")
+
+            # FIX: Pre-format the event_trigger_time
+            formatted_event_trigger_time = f"{event_trigger_time:.2f}" if isinstance(event_trigger_time, float) else str(event_trigger_time)
+
+            logger_instance.info(
+                f"[ProcessEvents] Processing scheduled event: '{event_type}' for target '{target_agent_id}' "
+                f"from source '{source_actor_id}' at sim_time {current_sim_time:.2f} "
+                f"(event trigger: {formatted_event_trigger_time})" # Use the pre-formatted string
+            )
 
             if event_type == "simulacra_speech_received_as_interrupt":
-                target_agent_id = event_data.get("target_agent_id")
+                # Target can be Simulacra or NPC
                 message_details = event_data.get("details", {})
                 speech_content = message_details.get("message_content", "Someone spoke to you.")
                 speaker_name = message_details.get("speaker_name", "Someone")
+                # source_actor_id is already defined above
 
+                # Check if target is a Simulacra
                 if target_agent_id and target_agent_id in get_nested(current_state, SIMULACRA_KEY, default={}):
-                    logger_instance.info(f"[ProcessEvents] Applying speech interrupt to {target_agent_id} from {speaker_name}")
+                    logger_instance.info(f"[ProcessEvents] Applying speech interrupt to Simulacra {target_agent_id} from {speaker_name} ({source_actor_id})")
 
                     updates_for_interrupt = {
                         f"{SIMULACRA_KEY}.{target_agent_id}.last_observation": speech_content,
-                        f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
-                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": current_sim_time + 0.01,
+                        f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle", # Allows agent to react
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": current_sim_time + 0.01, # Minimal time
                         f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {},
-                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} ({source_actor_id}) saying something.",
                         f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None,
                     }
                     for key_path, value in updates_for_interrupt.items():
                         _update_state_value(current_state, key_path, value, logger_instance)
+                    logger_instance.info(f"[ProcessEvents] Simulacra {target_agent_id} processed speech interrupt from {source_actor_id}.")
 
-                    logger_instance.info(f"[ProcessEvents] Agent {target_agent_id} processed speech interrupt")
-                else:
-                    logger_instance.warning(f"[ProcessEvents] Target agent '{target_agent_id}' not found")
-
-            # Update to handle NPC speech too:
-            elif event_type == "simulacra_speech_received_as_interrupt":
-                target_agent_id = event_data.get("target_agent_id")
-                message_details = event_data.get("details", {})
-                speech_content = message_details.get("message_content", "Someone spoke to you.")
-                speaker_name = message_details.get("speaker_name", "Someone")
-
-                # Handle Simulacra targets
-                if target_agent_id and target_agent_id in get_nested(current_state, SIMULACRA_KEY, default={}):
-                    logger_instance.info(f"[ProcessEvents] Applying speech interrupt to Simulacra {target_agent_id} from {speaker_name}")
-
-                    updates_for_interrupt = {
-                        f"{SIMULACRA_KEY}.{target_agent_id}.last_observation": speech_content,
-                        f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
-                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": current_sim_time + 0.01,
-                        f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {},
-                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
-                        f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None,
-                    }
-                    for key_path, value in updates_for_interrupt.items():
-                        _update_state_value(current_state, key_path, value, logger_instance)
-
-                    logger_instance.info(f"[ProcessEvents] Simulacra {target_agent_id} processed speech interrupt")
-
-                # Handle NPC targets  
-                else:
-                    # Find NPC in current locations with proper validation
-                    npc_found = False
-                    location_details = get_nested(current_state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={})
+                else: # Check if target is an NPC
+                    npc_found_in_any_location = False
+                    location_details_map = get_nested(current_state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={})
+                    if isinstance(location_details_map, dict):
+                        for loc_id, loc_data in location_details_map.items():
+                            if isinstance(loc_data, dict):
+                                ephemeral_npcs_list = loc_data.get("ephemeral_npcs", [])
+                                if isinstance(ephemeral_npcs_list, list):
+                                    for npc_state in ephemeral_npcs_list:
+                                        if isinstance(npc_state, dict) and npc_state.get("id") == target_agent_id:
+                                            npc_state["last_heard"] = speech_content 
+                                            npc_state["status"] = "idle" 
+                                            logger_instance.info(f"[ProcessEvents] Delivered speech from {source_actor_id} to NPC {target_agent_id} in location {loc_id}")
+                                            npc_found_in_any_location = True
+                                            break
+                            if npc_found_in_any_location: break
+                    if not npc_found_in_any_location:
+                        logger_instance.warning(f"[ProcessEvents] Speech target '{target_agent_id}' for speech from '{source_actor_id}' not found as Simulacra or active NPC.")
+            
+            elif event_type == "delayed_narration":
+                narration_data = event_data.get("narration_data")
+                source_actor_for_narration = event_data.get("source_actor_id", "Unknown")
+                if narration_data:
+                    from .simulation_async import narration_queue, safe_queue_put # Ensure these are accessible
                     
-                    if not isinstance(location_details, dict):
-                        logger_instance.warning(f"[ProcessEvents] Invalid location_details structure: {type(location_details)}")
+                    if narration_queue is not None and safe_queue_put is not None:
+                        logger_instance.info(f"[ProcessEvents] Queuing delayed narration for original actor {narration_data.get('actor_id')}, event sourced by {source_actor_for_narration}")
+                        await safe_queue_put(narration_queue, narration_data, task_name=f"ProcessEvents_DelayedNarration_{source_actor_for_narration}")
                     else:
-                        for location_id, location_data in location_details.items():
-                            if not isinstance(location_data, dict):
-                                continue
-                                
-                            ephemeral_npcs = location_data.get("ephemeral_npcs", [])
-                            if not isinstance(ephemeral_npcs, list):
-                                continue
-                                
-                            for npc in ephemeral_npcs:
-                                if isinstance(npc, dict) and npc.get("id") == target_agent_id:
-                                    npc["last_heard"] = message_details.get("message_content", "")
-                                    npc["status"] = "idle"  # NPC can respond now
-                                    logger_instance.info(f"[ProcessEvents] Delivered speech to NPC {target_agent_id} in location {location_id}")
-                                    npc_found = True
-                                    break
-                            
+                        logger_instance.error("[ProcessEvents] narration_queue or safe_queue_put is None/not available. Cannot queue delayed narration.")
+                else:
+                    logger_instance.warning(f"[ProcessEvents] Delayed narration event from source {source_actor_for_narration} missing narration_data.")
+            
+            # Add other event_type handling here if needed for other custom events
+            
+        else: # Event's trigger time is in the future
+            remaining_pending_events.append(event_data)
+
+    # Update the state's list with only the events that are still truly pending
+    if events_were_processed_in_this_call or len(pending_events_list) != len(remaining_pending_events):
+        current_state["pending_simulation_events"] = remaining_pending_events
+        logger_instance.debug(f"[ProcessEvents] Updated pending_simulation_events. Original size: {len(pending_events_list)}, New size: {len(remaining_pending_events)}")
