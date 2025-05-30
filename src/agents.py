@@ -124,7 +124,7 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 3.  **Consider Your Current Goal (If Any):** Based on your `Recent Thoughts` and `Current Goal`, what were you wanting to do or accomplish? Is this still something you care about, or has your mind moved on to other things? Your goals should feel natural and human - sometimes persistent, sometimes forgotten, sometimes evolving based on your mood and circumstances.
 
 4.  **Identify Options:** Based on your current thoughts, feelings, persona, current situation, and the **'{world_mood}'** world style, what actions could you take? Consider:
-        *   **Responding to Speech:** If your `last_observation` is someone speaking to you (e.g., "[Speaker Name] said to you: ..."), a common and polite response is to `wait` to listen. For the `wait` action, set `details` to something like 'Listening to [Speaker Name]' or 'Paying attention to what [Speaker Name] is saying'. You might also choose to respond immediately with a `talk` action if appropriate for your persona and the urgency of the situation.
+        *   **Responding to Speech:** If your `last_observation` is someone speaking to you (e.g., "[Speaker Name] said to you: ..."), you should typically respond with a `talk` action to continue the conversation, unless your persona suggests you need time to think first.
         *   **Consistency Check:** Before choosing an action, quickly review your `last_observation` and your `Recent Thoughts`. Ensure your chosen action does NOT contradict your immediate physical state, possessions, recent activities, or your established thought patterns.
     *   **Conversational Flow:** Pay close attention to your `Recent Thoughts` and `Last Observation/Event`. If you've just asked a question and received an answer, or if the other agent has made a clear statement, acknowledge it in your internal monologue and try to progress the conversation. Avoid re-asking questions that have just been answered or getting stuck in repetitive conversational loops.
     *   **Entity Interactions:** `use [object_id]`, `talk [agent_id]`.
@@ -612,7 +612,7 @@ Use the `time` and `weather` from the `world_details` input (provided in the tri
 3.  **Generate `additional_related_locations` (Conditional):**
     *   **If `location_type_hint` implies a complex space that naturally contains other distinct areas (e.g., "home_entrance" implies living room, kitchen; "shop_interior" implies stockroom, office):**
         *   Generate 1-2 such related locations as full `GeneratedLocationDetail` objects in the `additional_related_locations` list.
-        *   These additional locations should also have connections defined in their `connected_locations` list, including connections to the `defined_location` and potentially to each other.
+        *   These additional locations should also have connections in their `connected_locations` list, including connections to the `defined_location` and potentially to each other.
     *   Otherwise, `additional_related_locations` can be an empty list `[]`.
 4.  **Generate `connection_update_for_origin` (Conditional):**
     *   If `origin_location_id` was provided, this field should describe how the `origin_location_id` connects to your `defined_location`.
