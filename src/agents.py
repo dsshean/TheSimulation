@@ -8,7 +8,7 @@ from typing import Optional
 import logging
 
 # Import constants from the config module
-from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME, MEMORY_LOG_CONTEXT_LENGTH
+from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME
 from .models import SimulacraIntentResponse, WorldEngineResponse, NarratorOutput, WorldGeneratorOutput # Import Pydantic models
 
 async def always_clear_llm_contents_callback(
@@ -513,17 +513,17 @@ YOU MUST USE the `world_time_context`, `weather_context`, and `news_context` (pr
     *   If an NPC might be conceptually recurring (e.g., "the usual shopkeeper", "your friend Alex"), you can give them a descriptive tag in parentheses for context, like `(npc_concept_grumpy_shopkeeper)` or `(npc_concept_friend_alex)`. This tag is for LLM understanding, not a system ID.
     *   Example: "As [Actor Name] entered the tavern, a grizzled man with an eye patch (npc_concept_old_pirate_01) at a corner table grunted a greeting."
     *   Example: "A street vendor (npc_concept_flower_seller_01) called out, '[Actor Name], lovely flowers for a lovely day?'"
-    *   **If `Original Intent.action_type` was `talk` and `Original Intent.target_id` refers to an NPC concept (e.g., 'npc_concept_shopkeeper') or `Original Intent.details` implies talking to a generic NPC type not yet present:**
-        *   You MUST introduce this NPC in your narrative.
-        *   You MUST generate a plausible response from this NPC.
-        *   You MUST also create an entry for this newly introduced NPC in the `discovered_npcs` list in your JSON output.
-            *   `id`: Use the `Original Intent.target_id` if available (e.g., "npc_concept_shopkeeper_01"), or generate a new conceptual ID (e.g., "npc_concept_mysterious_stranger_01").
-            *   `name`: A descriptive name (e.g., "Mysterious Stranger", "Shopkeeper").
-            *   `description`: A brief description of the NPC.
-            *   `is_interactive`: `true`.
+    *   **CRITICAL: If `Original Intent.action_type` was `talk` and `Original Intent.target_id` refers to an NPC concept (e.g., 'npc_concept_shopkeeper') or if the target entity info indicates an NPC:**
+        *   You MUST introduce this NPC in your narrative if not already present.
+        *   You MUST generate a plausible response from this NPC that directly addresses what the actor said.
+        *   The NPC's response should reflect their personality, role, and the context of the conversation.
         *   Example: If intent was `talk` to `npc_concept_fruit_vendor_01` saying "Any good apples today?", your narrative might be:
-            "At 10:05 AM, [Actor Name] approached the fruit stand. \\"Any good apples today?\\" they asked the cheerful vendor (npc_concept_fruit_vendor_01). The vendor grinned, \\"Freshest in the city, friend! Crisp and sweet.\\" "
-            And your `discovered_npcs` would include: `{{"id": "npc_concept_fruit_vendor_01", "name": "Cheerful Fruit Vendor", "description": "A vendor with a colorful display of fruits.", "is_interactive": true}}`.
+            "At 10:05 AM, [Actor Name] approached the fruit stand. \\"Any good apples today?\\" they asked the cheerful vendor. The vendor grinned, \\"Freshest in the city, friend! Crisp and sweet. Just picked this morning!\\" "
+        *   You MUST also create an entry for this NPC in the `discovered_npcs` list in your JSON output:
+            *   `id`: Use the `Original Intent.target_id` if available, or generate a new conceptual ID.
+            *   `name`: A descriptive name (e.g., "Cheerful Fruit Vendor").
+            *   `description`: A brief description of the NPC's appearance and demeanor.
+            *   `is_interactive`: `true`.
     *   **Even if not directly addressed by the actor, if the scene warrants it (e.g., after a `look_around` in a busy market), you can introduce 0-2 ambient or potentially interactive NPCs.** Include them in `discovered_npcs`.
         *   Example: "The market square was bustling. A street musician (npc_concept_street_musician_01) played a lively tune on a worn guitar, while a stern-looking guard (npc_concept_market_guard_01) watched over the stalls."
         *   `discovered_npcs` would then list these two NPCs.

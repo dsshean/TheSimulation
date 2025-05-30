@@ -37,19 +37,13 @@ from .agents import (create_search_llm_agent, create_simulacra_llm_agent,
 from .config import (  # For run_simulation; For self-reflection; New constants for dynamic_interruption_task; PROB_INTERJECT_AS_NARRATIVE removed; from this import list; Import Bluesky and social post config; Import SIMULACRA_KEY
     ACTIVE_SIMULACRA_IDS_KEY, AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS,
     AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS, API_KEY, APP_NAME,
-    BLUESKY_APP_PASSWORD, BLUESKY_HANDLE, CURRENT_LOCATION_KEY,
-    DEFAULT_HOME_DESCRIPTION, DEFAULT_HOME_LOCATION_NAME, # DYNAMIC_INTERRUPTION constants moved to core_tasks import
-    ENABLE_BLUESKY_POSTING, # ENABLE_NARRATIVE_IMAGE_GENERATION moved to core_tasks import
-    HOME_LOCATION_KEY,
-    IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME, MODEL_NAME, # Removed AGENT_MODEL_NAME alias
-    IMAGE_GENERATION_OUTPUT_DIR, INTERJECTION_COOLDOWN_SIM_SECONDS,
-    LIFE_SUMMARY_DIR, LOCATION_DETAILS_KEY, LOCATION_KEY,
-    LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, MAX_MEMORY_LOG_ENTRIES, # MODEL_NAME as AGENT_MODEL_NAME removed
-    MAX_SIMULATION_TIME, MEMORY_LOG_CONTEXT_LENGTH,
-    MIN_DURATION_FOR_DYNAMIC_INTERRUPTION_CHECK,
-    PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, SEARCH_AGENT_MODEL_NAME,
-    SIMULACRA_KEY, SIMULACRA_PROFILES_KEY, SIMULATION_SPEED_FACTOR,
-    SOCIAL_POST_HASHTAGS, SOCIAL_POST_TEXT_LIMIT, STATE_DIR, UPDATE_INTERVAL, # CONFIG_MODEL_NAME removed
+    DEFAULT_HOME_LOCATION_NAME, # DYNAMIC_INTERRUPTION constants moved to core_tasks import
+    INTERJECTION_COOLDOWN_SIM_SECONDS,
+    LOCATION_DETAILS_KEY, LOCATION_KEY,
+    LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, 
+    MEMORY_LOG_CONTEXT_LENGTH,
+    PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, 
+    SIMULACRA_KEY, STATE_DIR, UPDATE_INTERVAL, # CONFIG_MODEL_NAME removed
     USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
 from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (get_nested, load_json_file,
@@ -60,7 +54,7 @@ from .models import NarratorOutput, GeneratedLocationDetail  # Removed WorldGene
 from .models import SimulacraIntentResponse, WorldEngineResponse
 from .simulation_utils import (  # Utility functions; generate_llm_interjection_detail REMOVED
     _update_state_value, generate_table, get_time_string_for_prompt, get_target_entity_state, # Re-added get_time_string_for_prompt, added get_target_entity_state
-    _log_event) # get_random_style_combination is used by core_tasks
+    _log_event, handle_action_interruption) # get_random_style_combination is used by core_tasks
 from .state_loader import parse_location_string  # Used in run_simulation
 
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
@@ -628,6 +622,64 @@ async def world_engine_task_llm():
             elif getattr(validated_data, 'valid_action', False):
                 completion_time = current_sim_time + getattr(validated_data, 'duration', 0.0)
                 
+                # ADD YOUR UNIVERSAL INTERRUPTION CODE HERE - before any action-specific handling
+                # Check if target is another Simulacra and handle interruption if needed
+                if target_id_we and target_id_we in get_nested(state, SIMULACRA_KEY, default={}):
+                    # Check if target is busy (in the middle of an action)
+                    target_status = get_nested(state, f"{SIMULACRA_KEY}.{target_id_we}.status", default="idle")
+                    target_name = get_nested(state, f"{SIMULACRA_KEY}.{target_id_we}.name", default=target_id_we)
+                    
+                    if target_status == "busy":
+                        logger.info(f"[WorldEngineLLM] {actor_name}'s {action_type} action is interrupting {target_name}")
+                        handle_action_interruption(state, target_id_we, actor_id, actor_name, logger)
+                        
+                    # Set target to busy regardless (this happens for all targeted actions)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.status", "busy", logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.current_action_description", 
+                                       f"Responding to {actor_name}'s {action_type}", logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.current_action_end_time", 
+                                       completion_time, logger)
+                
+                # --- ADD TALK ACTION HANDLING ---
+                if action_type == "talk":
+                    target_id_we = get_nested(intent, "target_id")
+                    speech_content = get_nested(intent, "details", default="")
+                    
+                    if target_id_we:
+                        # Check if target is a Simulacra
+                        if target_id_we in get_nested(state, SIMULACRA_KEY, default={}):
+                            # IMMEDIATE BLOCKING for Simulacra
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.status", "busy", logger)
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.current_action_description", f"Listening to {actor_name}", logger)
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{target_id_we}.current_action_end_time", completion_time, logger)
+                            logger.info(f"[WorldEngine] IMMEDIATELY set Simulacra {target_id_we} to listening for {getattr(validated_data, 'duration', 0.0)}s")
+                            
+                            # Schedule speech delivery
+                            speech_event = {
+                                "event_type": "simulacra_speech_received_as_interrupt",
+                                "target_agent_id": target_id_we,
+                                "details": {
+                                    "message_content": speech_content,
+                                    "speaker_name": actor_name,
+                                    "speech_duration": getattr(validated_data, 'duration', 3.0)
+                                },
+                                "trigger_sim_time": state.get("world_time", 0.0),  # + 0.5,  # Small delay for speech delivery
+                                "source_actor_id": actor_id
+                            }
+                            state.setdefault("pending_simulation_events", []).append(speech_event)
+                        
+                        # ADD THIS: Check if target is an NPC
+                        else:
+                            # Check if target is an NPC in current location
+                            ephemeral_npcs = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, "ephemeral_npcs", default=[])
+                            npc_found = any(npc.get("id") == target_id_we for npc in ephemeral_npcs)
+                            
+                            if npc_found:
+                                # Valid NPC talk - Narrator will generate the NPC's response
+                                logger.info(f"[WorldEngine] Validated talk to NPC {target_id_we} - response will be generated by Narrator")
+                            else:
+                                # Could also check global NPCs or objects here
+                                logger.debug(f"[WorldEngine] Talk target {target_id_we} not found as Simulacra or NPC in current location")
                 # --- Handle scheduled_future_event ---
                 sfe_dict = _to_dict(getattr(validated_data, 'scheduled_future_event', None))
                 if sfe_dict:
@@ -710,6 +762,8 @@ async def world_engine_task_llm():
                     "discovered_objects_for_narration": discovered_objects_list,
                     "discovered_npcs_for_narration": discovered_npcs_list,
                     "discovered_connections_for_narration": discovered_connections_list,
+                    # ADD THIS: Include target information for talk actions
+                    "target_entity_info": target_state_data if action_type == "talk" else None,
                 }
 
                 # Special handling for newly generated locations

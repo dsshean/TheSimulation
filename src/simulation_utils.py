@@ -27,8 +27,8 @@ from timezonefinder import TimezoneFinder
 from .config import APP_NAME  # Added APP_NAME for geopy user_agent
 from .config import (  # PROB_INTERJECT_AS_NARRATIVE removed; SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"; Added SIMULACRA_KEY; Added WORLD_STATE_KEY, LOCATION_DETAILS_KEY
     ACTIVE_SIMULACRA_IDS_KEY, LOCATION_DETAILS_KEY, LOCATION_KEY, MODEL_NAME,
-    PROB_INTERJECT_AS_SELF_REFLECTION, SIMULACRA_KEY, USER_ID, WORLD_STATE_KEY,
-    WORLD_TEMPLATE_DETAILS_KEY, WORLD_FEEDS_KEY) # Added WORLD_FEEDS_KEY
+    SIMULACRA_KEY, WORLD_STATE_KEY,
+    WORLD_TEMPLATE_DETAILS_KEY)
 from .loop_utils import \
     get_nested  # Assuming get_nested remains in loop_utils or is moved here
 
@@ -596,3 +596,54 @@ def get_target_entity_state(
                     return eph_entity
                 
     return None # Target not found
+
+def handle_action_interruption(state, target_id, interrupter_id, interrupter_name, logger):
+    """
+    Handles interruption of a target's current action by another agent.
+    Works for ANY action without needing action-specific logic.
+    """
+    # Get target info
+    target_name = get_nested(state, f"{SIMULACRA_KEY}.{target_id}.name", default="Unknown")
+    current_action_desc = get_nested(state, f"{SIMULACRA_KEY}.{target_id}.current_action_description", 
+                                    default="doing something")
+    
+    # Record the interrupted action details to prevent repetition
+    current_action_type = get_nested(state, f"{SIMULACRA_KEY}.{target_id}.current_action", default=None)
+    current_action_target = get_nested(state, f"{SIMULACRA_KEY}.{target_id}.current_action_target", default=None)
+    current_action_details = get_nested(state, f"{SIMULACRA_KEY}.{target_id}.current_action_details", default=None)
+    
+    # Store these as "last_interrupted_*" so the agent knows what was interrupted
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.last_interrupted_action", current_action_type, logger)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.last_interrupted_target", current_action_target, logger)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.last_interrupted_details", current_action_details, logger)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.last_interrupted_time", state.get("world_time", 0.0), logger)
+    
+    # Clear ANY pending results - universally works for all action types
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.action_completion_results", {}, logger)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.pending_results", {}, logger)
+    
+    # Clear any duplicate pending intents in the event queue
+    if "pending_simulation_events" in state:
+        filtered_events = [
+            event for event in state["pending_simulation_events"]
+            if not (
+                event.get("source_actor_id") == target_id and
+                event.get("event_type") == "intent_declared"
+            )
+        ]
+        if len(filtered_events) < len(state["pending_simulation_events"]):
+            logger.info(f"[Interruption] Removed {len(state['pending_simulation_events']) - len(filtered_events)} pending intents from {target_name}")
+            state["pending_simulation_events"] = filtered_events
+    
+    # Mark that this action was interrupted (for narration)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.action_interrupted", True, logger)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.interrupted_action_description", 
+                        current_action_desc, logger)
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.interrupted_by", 
+                        interrupter_name, logger)
+    
+    # Log the event for debugging and narrative purposes
+    _log_event(state, "action_interrupted", 
+               f"{target_name} was interrupted while {current_action_desc} by {interrupter_name}")
+    
+    return True

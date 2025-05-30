@@ -24,7 +24,7 @@ from .config import (
     DYNAMIC_INTERRUPTION_MAX_PROB_CAP, DYNAMIC_INTERRUPTION_MIN_PROB, DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS, MODEL_NAME,
     ENABLE_NARRATIVE_IMAGE_GENERATION, IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME, # For image task
     IMAGE_GENERATION_OUTPUT_DIR, ENABLE_BLUESKY_POSTING, BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, # For image task
-    SOCIAL_POST_TEXT_LIMIT, SOCIAL_POST_HASHTAGS # For image task
+    SOCIAL_POST_TEXT_LIMIT, SOCIAL_POST_HASHTAGS, WORLD_STATE_KEY, LOCATION_DETAILS_KEY  # For image task
 )
 # simulation_utils will be called by tasks in simulation_async.py or here, passing state
 from .simulation_utils import (_update_state_value, generate_table, generate_simulated_world_feed_content,
@@ -100,57 +100,7 @@ async def time_manager_task(
                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance)
                         logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
 
-            # --- BEGIN ADDITION: Process General Scheduled Events from pending_simulation_events ---
-            processed_event_indices = []
-            pending_events_list = current_state.get("pending_simulation_events", [])
-
-            for i, event_data in enumerate(pending_events_list):
-                if event_data.get("trigger_sim_time", float('inf')) <= new_sim_time:
-                    event_type = event_data.get("event_type")
-                    logger_instance.info(f"[TimeManager] Processing scheduled event: '{event_type}' at sim_time {new_sim_time:.2f} (due at {event_data.get('trigger_sim_time'):.2f})")
-
-                    if event_type == "simulacra_speech_received_as_interrupt":
-                        target_agent_id = event_data.get("target_agent_id")
-                        message_details = event_data.get("details", {})
-                        speech_content = message_details.get("message_content", "Someone spoke to you.")
-                        speaker_name = message_details.get("speaker_name", "Someone") # Fallback
-
-                        # Check if the target agent exists and is a simulacra
-                        if target_agent_id and target_agent_id in get_nested(current_state, SIMULACRA_KEY, default={}):
-                            logger_instance.info(
-                                f"[TimeManager] Applying 'simulacra_speech_received_as_interrupt' to {target_agent_id} "
-                                f"from {speaker_name}."
-                            )
-
-                            updates_for_interrupt = {
-                                f"{SIMULACRA_KEY}.{target_agent_id}.last_observation": speech_content,
-                                f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
-                                # Make them act very soon by setting their action end time to now + tiny delay
-                                f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": new_sim_time + 0.01,
-                                f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {}, # Clear any pending results from a potentially interrupted action
-                                f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
-                                f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None, # Reset interrupt probability
-                            }
-                            for key_path, value in updates_for_interrupt.items():
-                                _update_state_value(current_state, key_path, value, logger_instance)
-
-                            logger_instance.info(
-                                f"[TimeManager] Agent {target_agent_id} processed speech interrupt. New observation set. Status set to idle."
-                            )
-                            # Optional: Trigger narration for the *interrupted agent* here if desired (conceptual)
-                        else:
-                            logger_instance.warning(f"[TimeManager] Target agent '{target_agent_id}' for speech interrupt not found or invalid.")
-
-                    # Add other event_type handlers here if needed in the future
-                    # elif event_type == "another_event_type":
-                    #    ...
-
-                    processed_event_indices.append(i) # Mark event for removal
-
-            # Remove processed events (iterate in reverse to avoid index issues during pop)
-            for i in sorted(processed_event_indices, reverse=True):
-                pending_events_list.pop(i)
-            # --- END ADDITION ---
+            await process_pending_simulation_events(current_state, logger_instance)
             
             live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
             await asyncio.sleep(UPDATE_INTERVAL)
@@ -513,3 +463,91 @@ Generate this image."""
 
         except Exception as e_gen:
             logger_instance.error(f"[NarrativeImageGenerator] Error during image generation API call: {e_gen}", exc_info=True)
+
+async def process_pending_simulation_events(current_state, logger_instance):
+    """
+    Process and deliver pending simulation events, including speech interrupts.
+    Should be called regularly (e.g., from time_manager_task).
+    """
+    current_sim_time = current_state.get("world_time", 0.0)
+    pending_events_list = current_state.get("pending_simulation_events", [])
+    processed_event_indices = []
+
+    for i, event_data in enumerate(pending_events_list):
+        if event_data.get("trigger_sim_time", float('inf')) <= current_sim_time:
+            event_type = event_data.get("event_type")
+            logger_instance.info(f"[ProcessEvents] Processing scheduled event: '{event_type}' at sim_time {current_sim_time:.2f}")
+
+            if event_type == "simulacra_speech_received_as_interrupt":
+                target_agent_id = event_data.get("target_agent_id")
+                message_details = event_data.get("details", {})
+                speech_content = message_details.get("message_content", "Someone spoke to you.")
+                speaker_name = message_details.get("speaker_name", "Someone")
+
+                if target_agent_id and target_agent_id in get_nested(current_state, SIMULACRA_KEY, default={}):
+                    logger_instance.info(f"[ProcessEvents] Applying speech interrupt to {target_agent_id} from {speaker_name}")
+
+                    updates_for_interrupt = {
+                        f"{SIMULACRA_KEY}.{target_agent_id}.last_observation": speech_content,
+                        f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": current_sim_time + 0.01,
+                        f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {},
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None,
+                    }
+                    for key_path, value in updates_for_interrupt.items():
+                        _update_state_value(current_state, key_path, value, logger_instance)
+
+                    logger_instance.info(f"[ProcessEvents] Agent {target_agent_id} processed speech interrupt")
+                else:
+                    logger_instance.warning(f"[ProcessEvents] Target agent '{target_agent_id}' not found")
+
+            # Update to handle NPC speech too:
+            elif event_type == "simulacra_speech_received_as_interrupt":
+                target_agent_id = event_data.get("target_agent_id")
+                message_details = event_data.get("details", {})
+                speech_content = message_details.get("message_content", "Someone spoke to you.")
+                speaker_name = message_details.get("speaker_name", "Someone")
+
+                # Handle Simulacra targets
+                if target_agent_id and target_agent_id in get_nested(current_state, SIMULACRA_KEY, default={}):
+                    logger_instance.info(f"[ProcessEvents] Applying speech interrupt to Simulacra {target_agent_id} from {speaker_name}")
+
+                    updates_for_interrupt = {
+                        f"{SIMULACRA_KEY}.{target_agent_id}.last_observation": speech_content,
+                        f"{SIMULACRA_KEY}.{target_agent_id}.status": "idle",
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_end_time": current_sim_time + 0.01,
+                        f"{SIMULACRA_KEY}.{target_agent_id}.pending_results": {},
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_action_description": f"Interrupted by {speaker_name} saying something.",
+                        f"{SIMULACRA_KEY}.{target_agent_id}.current_interrupt_probability": None,
+                    }
+                    for key_path, value in updates_for_interrupt.items():
+                        _update_state_value(current_state, key_path, value, logger_instance)
+
+                    logger_instance.info(f"[ProcessEvents] Simulacra {target_agent_id} processed speech interrupt")
+
+                # Handle NPC targets  
+                else:
+                    # Find NPC in current locations with proper validation
+                    npc_found = False
+                    location_details = get_nested(current_state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, default={})
+                    
+                    if not isinstance(location_details, dict):
+                        logger_instance.warning(f"[ProcessEvents] Invalid location_details structure: {type(location_details)}")
+                    else:
+                        for location_id, location_data in location_details.items():
+                            if not isinstance(location_data, dict):
+                                continue
+                                
+                            ephemeral_npcs = location_data.get("ephemeral_npcs", [])
+                            if not isinstance(ephemeral_npcs, list):
+                                continue
+                                
+                            for npc in ephemeral_npcs:
+                                if isinstance(npc, dict) and npc.get("id") == target_agent_id:
+                                    npc["last_heard"] = message_details.get("message_content", "")
+                                    npc["status"] = "idle"  # NPC can respond now
+                                    logger_instance.info(f"[ProcessEvents] Delivered speech to NPC {target_agent_id} in location {location_id}")
+                                    npc_found = True
+                                    break
+                            
