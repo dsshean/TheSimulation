@@ -28,10 +28,8 @@ MEMORY_LOG_CONTEXT_LENGTH = 10
 MAX_MEMORY_LOG_ENTRIES = 500
 
 # --- Agent Self-Reflection Parameters (for simulacra_agent_task_llm) ---
-AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS = float(os.getenv("AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS", 120.0)) # How often self-reflection is considered
-LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS = float(os.getenv("LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS", 300.0)) # Min duration for self-reflection
+# AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS and LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS are now effectively managed by dynamic_interruption_task settings
 INTERJECTION_COOLDOWN_SIM_SECONDS = float(os.getenv("INTERJECTION_COOLDOWN_SIM_SECONDS", 450.0)) # Cooldown for any type of interjection for an agent
-PROB_INTERJECT_AS_SELF_REFLECTION = float(os.getenv("PROB_INTERJECT_AS_SELF_REFLECTION", 0.60)) # Chance of self-reflection if conditions met for simulacra_agent_task_llm
 AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS = float(os.getenv("AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS", 0.5)) # How often agent tasks check their status
 
 # --- Dynamic Interruption Task Parameters (for dynamic_interruption_task) ---

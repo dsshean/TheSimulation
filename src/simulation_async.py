@@ -37,7 +37,7 @@ from .agents import (create_search_llm_agent, create_simulacra_llm_agent,
 from .config import (  # For run_simulation; For self-reflection; New constants for dynamic_interruption_task; PROB_INTERJECT_AS_NARRATIVE removed; from this import list; Import Bluesky and social post config; Import SIMULACRA_KEY
     ACTIVE_SIMULACRA_IDS_KEY, AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS,
     AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS, API_KEY, APP_NAME,
-    DEFAULT_HOME_LOCATION_NAME, # DYNAMIC_INTERRUPTION constants moved to core_tasks import
+    DEFAULT_HOME_LOCATION_NAME, CURRENT_LOCATION_KEY, # DYNAMIC_INTERRUPTION constants moved to core_tasks import; Added CURRENT_LOCATION_KEY
     INTERJECTION_COOLDOWN_SIM_SECONDS,
     LOCATION_DETAILS_KEY, LOCATION_KEY,
     LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, 
@@ -462,31 +462,30 @@ async def narration_task():
                     if len(state["narrative_log"]) > max_narrative_log:
                         state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
 
+                    # --- NEW: Process discovered_npcs from Narrator ---
+                    narrator_discovered_npcs = getattr(validated_narrator_output, 'discovered_npcs', [])
+                    if narrator_discovered_npcs:
+                        # Determine the location where these NPCs should be placed.
+                        # actor_location_at_action_time was already retrieved earlier in narration_task.
+                        if actor_location_at_action_time:
+                            current_location_npcs = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_at_action_time, "ephemeral_npcs", default=[])
+                            
+                            # Convert Pydantic models to dicts if they aren't already
+                            npcs_to_add_as_dicts = _list_to_dicts_if_needed(narrator_discovered_npcs)
+
+                            for new_npc_dict in npcs_to_add_as_dicts:
+                                if not any(npc.get("id") == new_npc_dict.get("id") for npc in current_location_npcs):
+                                    current_location_npcs.append(new_npc_dict)
+                                    logger.info(f"[NarrationTask] Added new NPC '{new_npc_dict.get('name')}' (ID: {new_npc_dict.get('id')}) to location {actor_location_at_action_time} from Narrator output.")
+                            
+                            _update_state_value(state, f"{WORLD_STATE_KEY}.{LOCATION_DETAILS_KEY}.{actor_location_at_action_time}.ephemeral_npcs", current_location_npcs, logger)
+                        else:
+                            logger.warning(f"[NarrationTask] Narrator discovered NPCs, but actor_location_at_action_time for {actor_id} is unknown. NPCs not placed.")
+                    # --- END NEW ---
+
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
-                        # --- MODIFICATION START: Preserve busy status for long actions ---
-                        agent_current_status_before_narration = get_nested(state, SIMULACRA_KEY, actor_id, "status")
-                        
-                        # Retrieve agent_action_end_time and ensure it's a float for comparison
-                        agent_action_end_time_from_state = get_nested(state, SIMULACRA_KEY, actor_id, "current_action_end_time")
-                        if not isinstance(agent_action_end_time_from_state, (int, float)):
-                            logger.warning(f"[NarrationTask] Agent {actor_id}'s current_action_end_time was '{agent_action_end_time_from_state}' (type: {type(agent_action_end_time_from_state)}). Defaulting to 0.0 for comparison.")
-                            agent_action_end_time = 0.0
-                        else:
-                            agent_action_end_time = agent_action_end_time_from_state
-
-                        # completion_time from the event is used as current_sim_time_narration
-                        current_sim_time_narration = completion_time 
-
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger) # Always update observation
-
-                        if agent_current_status_before_narration == "busy" and agent_action_end_time > current_sim_time_narration:
-                            # If the agent is busy with a task that hasn't ended, don't set them to idle.
-                            logger.info(f"[NarrationTask] Agent {actor_id} is busy with an ongoing task (ends at {agent_action_end_time:.1f}s). Preserving busy status after narration.")
-                        else:
-                            # If not busy with a long task, or if the task just ended, set to idle.
-                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
-                            logger.info(f"[NarrationTask] Set {actor_id} to idle after narration (task ended or was not long/busy).")
-                        # --- MODIFICATION END ---
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
+                        logger.info(f"[NarrationTask] Updated last_observation for {actor_id}.")
 
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
@@ -984,7 +983,7 @@ def _build_simulacra_prompt(
         )
 
     # Get location data from consolidated state
-    agent_current_location_id = agent_state_data.get('location', DEFAULT_HOME_LOCATION_NAME)
+    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME) # Use CURRENT_LOCATION_KEY
     agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
     current_location_name = get_nested(global_state_ref, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id, "name", default=agent_current_location_id)
     
@@ -1530,13 +1529,6 @@ async def run_simulation(
             tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
             for sim_id_val_task in final_active_sim_ids: 
                 tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id_val_task), name=f"Simulacra_{sim_id_val_task}"))
-
-            tasks.append(asyncio.create_task(narrative_image_generation_task(
-                current_state=state,
-                world_mood=world_mood_global,
-                logger_instance=logger,
-                event_logger_instance=event_logger_global
-            ), name="NarrativeImageGenerator"))
 
             tasks.append(asyncio.create_task(queue_health_monitor(), name="QueueHealthMonitor"))
 

@@ -119,7 +119,11 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
     - **Natural thought progression:** How do your current thoughts and feelings naturally flow from what you were thinking before? People's minds don't reset - they continue trains of thought, remember what they were concerned about, and their mood carries forward.
     - **Current mindset:** What's your overall mental state and mood based on your recent thought patterns? Are you feeling focused, distracted, content, worried, curious, etc.?
 
-2.  **React to Current Situation:** What just happened (see `Last Observation/Event` for your most immediate surroundings and recent occurrences)? How did my last action turn out? How does this make *me* ({persona_name}) feel? What sensory details stand out? How does the established **'{world_mood}'** world style influence my perception? Connect this to your recent thoughts and natural mental flow.
+2.  **React to Current Situation & Acknowledge Changes:**
+    *   **What just happened?** Examine your `Last Observation/Event`. This describes your most immediate surroundings and recent occurrences.
+    *   **How did my last action turn out?** The `Last Observation/Event` often reflects the outcome of your previous action.
+    *   **Acknowledge Changes:** If the `Last Observation/Event` indicates a significant change (e.g., you've arrived in a new location, an NPC spoke to you, an object's state changed due to your action), your internal monologue **MUST** acknowledge this new reality. For example, if you intended to go to the kitchen and the `Last Observation/Event` says you entered the kitchen, your thoughts should now be about *being in the kitchen*, not about *wanting to go* to the kitchen. Your internal monologue should reflect that you are now in the new state/location.
+    *   **How does this make *me* ({persona_name}) feel?** What are your immediate thoughts and emotions in response to this new situation? What sensory details stand out? How does the established **'{world_mood}'** world style influence your perception? Connect this to your recent thoughts and natural mental flow, but ensure you are grounded in the present reality described by the `Last Observation/Event` and your current location.
 
 3.  **Consider Your Current Goal (If Any):** Based on your `Recent Thoughts` and `Current Goal`, what were you wanting to do or accomplish? Is this still something you care about, or has your mind moved on to other things? Your goals should feel natural and human - sometimes persistent, sometimes forgotten, sometimes evolving based on your mood and circumstances.
 
@@ -270,8 +274,13 @@ def create_world_engine_llm_agent(
                     * Example: Opening a refrigerator should return a list of food items and beverages as `discovered_objects`.
                 * If `Target Entity State.is_interactive` is `false`: `valid_action: false`.
                 * If `Target Entity State.properties.leads_to` exists (e.g., a door):
-                    * `valid_action: true`, `duration`: Short (appropriate for task), `results`: {{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}, `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to location ID '[Target Entity State.properties.leads_to_value]'."`
-                * Else (for other usable objects): Check properties like `toggleable`, `lockable`, and current state to determine outcome, duration, and results (e.g., turning a lamp on/off).
+                    * `valid_action: true`, `duration`: Short (appropriate for task), `results`: {{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}, `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to location ID '[Target Entity State.properties.leads_to_value]'."` # Ensure actor_id is used here, not sim_id
+                * Else (for other usable objects not covered by specific rules above, e.g., not containers, not doors):
+                    * Determine the outcome, duration, and results based on the object's nature (`Target Entity State`), its properties, and the actor's `intent.details`.
+                    * **The `results` field MUST reflect all direct consequences of the interaction. This includes any state changes to the object itself (e.g., a switch turning on) AND any information or reaction the actor perceives from the object (e.g., text displayed, a sound made, a physical response from the object). Structure this information appropriately within the `results` dictionary.**
+                    * Example of a state change in results: `results: {{"objects.light_switch_01.properties.state": "on"}}`
+                    * Example of perceived information/reaction in results: `results: {{"observed_data": "The terminal screen flickers: 'ACCESS GRANTED'."}}` or `results: {{"object_response": "The old lever creaks and moves slightly."}}`
+                    * `outcome_description` should be a concise, factual statement of what the actor did and the primary result.
             * `talk` (Actor initiates speech):
                 * **Target is a Simulacra:**
                     * Verify Actor and Target are in the same `current_location_id`.
@@ -308,7 +317,7 @@ def create_world_engine_llm_agent(
                     * **If `target_loc_id` is NOT in `world_state_location_details_context` (i.e., an undefined location):**
                         * You MUST generate details for this new `target_loc_id`. These details go into the `results` output.
                         * Generated location attributes:
-                            * `id`: Must be `target_loc_id`.
+                                * `id`: **CRITICALLY IMPORTANT: This `id` MUST BE EXACTLY THE SAME AS `target_loc_id` (the value from `intent.details`). DO NOT generate a new, different ID string for this field.**
                             * `name`: A plausible, descriptive name (e.g., "Dimly Lit Corridor").
                             * `description`: A brief, evocative description.
                             * `ambient_sound_description`: Plausible ambient sounds.

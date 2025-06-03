@@ -93,12 +93,12 @@ async def time_manager_task(
                                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.memory_log", current_mem_log[-MAX_MEMORY_LOG_ENTRIES:], logger_instance)
                                         logger_instance.debug(f"[TimeManager] Pruned memory log for {agent_id} to {MAX_MEMORY_LOG_ENTRIES} entries.")
                             _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.pending_results", {}, logger_instance)
-                        else:
-                            logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
+                        # else: # This log can be noisy if pending_results is often empty after completion_results
+                            # logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
                         # Clear interrupt probability and set status to idle for agent-specific action completions
-                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance)
-                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # Agent is now idle and results are applied
-                        logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # Agent is now idle and ready for next turn
+                        logger_instance.info(f"[TimeManager] Action for {agent_id} completed. Set status to idle.")
 
             await process_pending_simulation_events(current_state, logger_instance)
             
@@ -299,25 +299,14 @@ Output ONLY the narrative sentence(s)."""
 
 async def narrative_image_generation_task(
     current_state: Dict[str, Any],
-    world_mood: str,
+    world_mood: str, # world_mood_global from simulation_async
     logger_instance: logging.Logger,
-    event_logger_instance: Optional[logging.Logger]
+    event_logger_instance: Optional[logging.Logger] # For _log_event
 ):
     """
     Periodically generates an image based on the latest narrative log entry.
-    Also checks for manual trigger events.
+    Logs the filename to the event logger. (Moved from simulation_async.py)
     """
-    async def check_for_manual_trigger():
-        """Check if there's a manual trigger event in the pending events queue"""
-        pending_events = current_state.get("pending_simulation_events", [])
-        for i, event in enumerate(pending_events):
-            if event.get("event_type") == "generate_narrative_image":
-                # Remove this event
-                pending_events.pop(i)  # Use pop instead of del for safety
-                logger_instance.info("[NarrativeImageGenerator] Processing manual trigger event")
-                return True
-        return False
-    
     if not ENABLE_NARRATIVE_IMAGE_GENERATION:
         logger_instance.info("[NarrativeImageGenerator] Task is disabled by configuration.")
         try:
@@ -328,34 +317,153 @@ async def narrative_image_generation_task(
         return
 
     logger_instance.info(f"[NarrativeImageGenerator] Task started. Interval: {IMAGE_GENERATION_INTERVAL_REAL_SECONDS}s. Model: {IMAGE_GENERATION_MODEL_NAME}. Output: {IMAGE_GENERATION_OUTPUT_DIR}")
-    
-    await asyncio.sleep(random.uniform(5.0, 10.0))  # Initial delay
-    last_generation_time = time.monotonic()
+
+    img_gen_client = genai_image.Client() # Initialize image generation client
+    bluesky_api_client: Optional[BlueskyClient] = None
+    if ENABLE_BLUESKY_POSTING:
+        if BLUESKY_HANDLE and BLUESKY_APP_PASSWORD:
+            bluesky_api_client = BlueskyClient()
+        else:
+            logger_instance.warning("[NarrativeImageGenerator] Bluesky posting enabled, but handle or app password missing. Posting will be skipped.")
+
+    await asyncio.sleep(random.uniform(5.0, 10.0)) # Initial delay
 
     while True:
-        # Check for manual trigger first
-        if await check_for_manual_trigger():
-            # Generate image immediately if manual trigger detected
-            logger_instance.info("[NarrativeImageGenerator] Manual trigger detected, generating image")
-            await generate_narrative_image(current_state, world_mood, logger_instance, event_logger_instance)
-            # Don't update last_generation_time for manual triggers
-        else:
-            # Check if it's time for scheduled generation
-            current_time = time.monotonic()
-            elapsed = current_time - last_generation_time
-            
-            if elapsed >= IMAGE_GENERATION_INTERVAL_REAL_SECONDS:
-                # Time for scheduled generation
-                logger_instance.info("[NarrativeImageGenerator] Scheduled interval reached, generating image")
-                if await generate_narrative_image(current_state, world_mood, logger_instance, event_logger_instance):
-                    last_generation_time = current_time  # Only update on successful generation
-            else:
-                # Wait a bit and check again
-                await asyncio.sleep(min(1.0, IMAGE_GENERATION_INTERVAL_REAL_SECONDS - elapsed))
-                continue
-                
-        # After generation (manual or scheduled), wait a bit before checking again
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(IMAGE_GENERATION_INTERVAL_REAL_SECONDS)
+
+        if not current_state or not current_state.get("narrative_log"):
+            logger_instance.debug("[NarrativeImageGenerator] No narrative log. Skipping.")
+            continue
+
+        narrative_log_entries = current_state.get("narrative_log", [])
+        if not narrative_log_entries:
+            logger_instance.debug("[NarrativeImageGenerator] Narrative log empty. Skipping.")
+            continue
+
+        latest_narrative_full = narrative_log_entries[-1]
+        original_narrative_prompt_text = re.sub(r'^\[T\d+\.\d+\]\s*', '', latest_narrative_full).strip()
+        if not original_narrative_prompt_text:
+            logger_instance.debug("[NarrativeImageGenerator] Latest narrative entry empty after strip. Skipping.")
+            continue
+
+        current_sim_time_for_filename = current_state.get("world_time", 0.0)
+        actor_name_in_narrative = "the observer"
+        match = re.match(r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)", original_narrative_prompt_text)
+        if match and match.group(1) not in ["As", "The", "A", "An", "It", "He", "She", "They", "Then", "Suddenly", "During", "While"]:
+            actor_name_in_narrative = match.group(1)
+
+        time_string_for_image_prompt = get_time_string_for_prompt(current_state, sim_elapsed_time_seconds=current_sim_time_for_filename)
+        weather_condition_for_image_prompt = get_nested(current_state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
+        current_world_mood_ig = get_nested(current_state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default=world_mood)
+
+        refined_narrative_for_image = original_narrative_prompt_text
+        try:
+            refinement_llm = genai.GenerativeModel(MODEL_NAME) # Standard text model for refinement
+            prompt_for_refinement = f"""You are an expert at transforming narrative text into concise, visually descriptive prompts ideal for an image generation model. Your goal is to focus on a single, clear subject, potentially with a naturally blurred background.
+Original Narrative Context: "{original_narrative_prompt_text}"
+Current Time: "{time_string_for_image_prompt}"
+Current Weather: "{weather_condition_for_image_prompt}"
+World Mood: "{current_world_mood_ig}"
+Instructions for Refinement:
+1.  Identify a single, compelling visual element or a very brief, static moment from the 'Original Narrative Context'.
+2.  Describe this single subject clearly and vividly. Use descriptive language for the subject and its relationship to any implied background.
+3.  If appropriate, suggest a composition that would naturally lead to a blurred background (e.g., "A close-up of...", "A detailed shot of...", "A lone figure with the background softly blurred...").
+4.  Keep the refined description concise (preferably 1-2 sentences).
+5.  The refined description should be purely visual and directly usable as an image prompt.
+6.  Do NOT include any instructions for the image generation model itself (like "Generate an image of..."). Just provide the refined descriptive text.
+Refined Visual Description:"""
+            logger_instance.info(f"[NarrativeImageGenerator] Refining narrative for image: '{original_narrative_prompt_text[:100]}...'")
+            response_refinement = await refinement_llm.generate_content_async(prompt_for_refinement)
+            if response_refinement.text:
+                refined_narrative_for_image = response_refinement.text.strip()
+                logger_instance.info(f"[NarrativeImageGenerator] Refined narrative: '{refined_narrative_for_image}'")
+        except Exception as e_refine:
+            logger_instance.error(f"[NarrativeImageGenerator] Error refining narrative: {e_refine}. Using original.", exc_info=True)
+
+        random_style_for_image = get_random_style_combination(logger_instance=logger_instance, num_general=0, num_lighting=1, num_color=1, num_technique=1, num_composition=1, num_atmosphere=1)
+        prompt_for_image_gen = f"""Generate a high-quality, visually appealing, **photo-realistic** photograph of a scene or subject directly related to the following narrative context, as if captured by {actor_name_in_narrative}.
+Narrative Context: "{refined_narrative_for_image}"
+Style: "{random_style_for_image}"
+Instructions for the Image:
+The image should feature:
+-   Time of Day: Reflect the lighting and atmosphere typical of "{time_string_for_image_prompt}".
+-   Weather: Depict the conditions described by "{weather_condition_for_image_prompt}".
+-   Season: Infer the season from the date in the time string and depict it.
+-   A clear subject directly related to the Narrative Context.
+-   Lighting, composition, and focus that give it the aesthetic of a professional, high-engagement social media photograph.
+-   Details that align with the World Mood: "{current_world_mood_ig}".
+-   A composition that is balanced and aesthetically pleasing, with a strong emphasis on a clear, well-defined subject within a natural or slightly blurred background.
+Style: Modern, editorial-quality, photo-realistic photograph, authentic textures, natural colors. Aspect ratio: 4:5 (portrait) or 1:1 (square).
+Crucial Exclusions: No digital overlays, UI elements, watermarks, logos. The actor ({actor_name_in_narrative}) MUST NOT be visible.
+Generate this image."""
+        logger_instance.info(f"[NarrativeImageGenerator] Requesting image (T{current_sim_time_for_filename:.1f}): \"{refined_narrative_for_image}\"")
+
+        try:
+            response = await asyncio.to_thread(
+                img_gen_client.models.generate_images, model=IMAGE_GENERATION_MODEL_NAME,
+                prompt=prompt_for_image_gen,
+                config=genai_image.types.GenerateImagesConfig(number_of_images=1)
+            )
+            image_generated_successfully = False
+            saved_image_path_for_social_post: Optional[str] = None
+
+            for gen_img in response.generated_images:
+                try:
+                    pil_image = Image.open(BytesIO(gen_img.image.image_bytes))
+                    timestamp_str = time.strftime("%Y%m%d_%H%M%S")
+                    sim_time_str_file = f"T{current_sim_time_for_filename:.0f}"
+                    image_filename = f"narrative_{sim_time_str_file}_{timestamp_str}.png"
+                    image_path = os.path.join(IMAGE_GENERATION_OUTPUT_DIR, image_filename)
+                    pil_image.save(image_path)
+                    logger_instance.info(f"[NarrativeImageGenerator] Saved image: {image_path}")
+                    image_generated_successfully = True
+                    saved_image_path_for_social_post = image_path
+                    _log_event(current_sim_time_for_filename, "ImageGenerator", "image_generation",
+                               {"image_filename": image_filename, "prompt_snippet": refined_narrative_for_image},
+                               logger_instance, event_logger_instance)
+                    break
+                except Exception as e_img_proc:
+                    logger_instance.error(f"[NarrativeImageGenerator] Error processing/saving image: {e_img_proc}", exc_info=True)
+
+            if ENABLE_BLUESKY_POSTING and bluesky_api_client and image_generated_successfully and saved_image_path_for_social_post:
+                logger_instance.info(f"[NarrativeImageGenerator] Attempting Bluesky post for: {saved_image_path_for_social_post}")
+                try:
+                    if not bluesky_api_client.me: # Check if login is needed
+                        bluesky_api_client.login(BLUESKY_HANDLE, BLUESKY_APP_PASSWORD)
+
+                    image_bytes_for_upload = None
+                    with open(saved_image_path_for_social_post, 'rb') as f_img_bs:
+                        image_bytes_for_upload = f_img_bs.read()
+                    # Note: Bluesky image size limit (around 976KB) might require compression logic here if images are large.
+                    # This example assumes images are generally within limits or compression is handled by the image model.
+
+                    alt_text_bs = f"Image from simulation at T{current_sim_time_for_filename:.0f}s: {refined_narrative_for_image}"[:1000] # Bluesky alt text limit
+                    post_text_raw_bs = alt_text_bs
+                    effective_text_limit_bs = max(0, SOCIAL_POST_TEXT_LIMIT - (len(SOCIAL_POST_HASHTAGS) + 5)) # Approx space for hashtags
+                    post_text_bs = post_text_raw_bs[:effective_text_limit_bs]
+                    if len(post_text_raw_bs) > effective_text_limit_bs:
+                        post_text_bs = post_text_bs.rsplit(' ', 1)[0] + '...' if ' ' in post_text_bs else post_text_bs + '...'
+                    final_post_content_bs = f"{post_text_bs}\n\n{SOCIAL_POST_HASHTAGS}".strip()
+
+                    upload_blob_response = bluesky_api_client.com.atproto.repo.upload_blob(image_bytes_for_upload)
+                    embed_image = atproto_models.AppBskyEmbedImages.Image(alt=alt_text_bs, image=upload_blob_response.blob)
+                    embed_main = atproto_models.AppBskyEmbedImages.Main(images=[embed_image])
+
+                    bluesky_api_client.com.atproto.repo.create_record(
+                        atproto_models.ComAtprotoRepoCreateRecord.Data(
+                            repo=bluesky_api_client.me.did, collection=atproto_models.ids.AppBskyFeedPost,
+                            record=atproto_models.AppBskyFeedPost.Main(
+                                created_at=bluesky_api_client.get_current_time_iso(), text=final_post_content_bs, embed=embed_main
+                            )
+                        )
+                    )
+                    logger_instance.info(f"[NarrativeImageGenerator] Successfully posted to Bluesky: '{final_post_content_bs[:50]}...'")
+                except Exception as e_bsky:
+                    logger_instance.error(f"[NarrativeImageGenerator] Error posting to Bluesky: {e_bsky}", exc_info=True)
+
+        except Exception as e_gen:
+            logger_instance.error(f"[NarrativeImageGenerator] Error during image generation API call: {e_gen}", exc_info=True)
+
 
 async def process_pending_simulation_events(current_state: Dict[str, Any], logger_instance: logging.Logger):
     """
@@ -457,163 +565,3 @@ async def process_pending_simulation_events(current_state: Dict[str, Any], logge
     if events_were_processed_in_this_call or len(pending_events_list) != len(remaining_pending_events):
         current_state["pending_simulation_events"] = remaining_pending_events
         logger_instance.debug(f"[ProcessEvents] Updated pending_simulation_events. Original size: {len(pending_events_list)}, New size: {len(remaining_pending_events)}")
-
-async def generate_narrative_image(
-    current_state: Dict[str, Any],
-    world_mood: str,
-    logger_instance: logging.Logger,
-    event_logger_instance: Optional[logging.Logger]
-) -> bool:
-    """
-    Generate an image based on the latest narrative log entry.
-    Returns True if image was successfully generated, False otherwise.
-    """
-    if not current_state or not current_state.get("narrative_log"):
-        logger_instance.debug("[NarrativeImageGenerator] No narrative log. Skipping.")
-        return False
-
-    narrative_log_entries = current_state.get("narrative_log", [])
-    if not narrative_log_entries:
-        logger_instance.debug("[NarrativeImageGenerator] Narrative log empty. Skipping.")
-        return False
-
-    latest_narrative_full = narrative_log_entries[-1]
-    original_narrative_prompt_text = re.sub(r'^\[T\d+\.\d+\]\s*', '', latest_narrative_full).strip()
-    if not original_narrative_prompt_text:
-        logger_instance.debug("[NarrativeImageGenerator] Latest narrative entry empty after strip. Skipping.")
-        return False
-
-    current_sim_time_for_filename = current_state.get("world_time", 0.0)
-    world_instance_uuid = current_state.get("world_instance_uuid", "unknown_uuid") # Get the UUID
-    actor_name_in_narrative = "the observer"
-    match = re.match(r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)", original_narrative_prompt_text)
-    if match and match.group(1) not in ["As", "The", "A", "An", "It", "He", "She", "They", "Then", "Suddenly", "During", "While"]:
-        actor_name_in_narrative = match.group(1)
-
-    time_string_for_image_prompt = get_time_string_for_prompt(current_state, sim_elapsed_time_seconds=current_sim_time_for_filename)
-    weather_condition_for_image_prompt = get_nested(current_state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
-    current_world_mood_ig = get_nested(current_state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default=world_mood)
-
-    refined_narrative_for_image = original_narrative_prompt_text
-    try:
-        refinement_llm = genai.GenerativeModel(MODEL_NAME) # Standard text model for refinement
-        prompt_for_refinement = f"""You are an expert at transforming narrative text into concise, visually descriptive prompts ideal for an image generation model. Your goal is to focus on a single, clear subject, potentially with a naturally blurred background.
-Original Narrative Context: "{original_narrative_prompt_text}"
-Current Time: "{time_string_for_image_prompt}"
-Current Weather: "{weather_condition_for_image_prompt}"
-World Mood: "{current_world_mood_ig}"
-Instructions for Refinement:
-1.  Identify a single, compelling visual element or a very brief, static moment from the 'Original Narrative Context'.
-2.  Describe this single subject clearly and vividly. Use descriptive language for the subject and its relationship to any implied background.
-3.  If appropriate, suggest a composition that would naturally lead to a blurred background (e.g., "A close-up of...", "A detailed shot of...", "A lone figure with the background softly blurred...").
-4.  Keep the refined description concise (preferably 1-2 sentences).
-5.  The refined description should be purely visual and directly usable as an image prompt.
-6.  Do NOT include any instructions for the image generation model itself (like "Generate an image of..."). Just provide the refined descriptive text.
-Refined Visual Description:"""
-        logger_instance.info(f"[NarrativeImageGenerator] Refining narrative for image: '{original_narrative_prompt_text[:100]}...'")
-        response_refinement = await refinement_llm.generate_content_async(prompt_for_refinement)
-        if response_refinement.text:
-            refined_narrative_for_image = response_refinement.text.strip()
-            logger_instance.info(f"[NarrativeImageGenerator] Refined narrative: '{refined_narrative_for_image}'")
-    except Exception as e_refine:
-        logger_instance.error(f"[NarrativeImageGenerator] Error refining narrative: {e_refine}. Using original.", exc_info=True)
-
-    img_gen_client = genai_image.Client()
-    random_style_for_image = get_random_style_combination(logger_instance=logger_instance, num_general=0, num_lighting=1, num_color=1, num_technique=1, num_composition=1, num_atmosphere=1)
-    prompt_for_image_gen = f"""Generate a high-quality, visually appealing, **photo-realistic** photograph of a scene or subject directly related to the following narrative context. The image should represent what might be observed or experienced from the perspective of {actor_name_in_narrative}, or be thematically linked to their current situation.
-Narrative Context: "{refined_narrative_for_image}"
-Style: "{random_style_for_image}"
-Instructions for the Image:
-The image should feature:
--   Time of Day: Reflect the lighting and atmosphere typical of "{time_string_for_image_prompt}".
--   Weather: Depict the conditions described by "{weather_condition_for_image_prompt}".
--   Season: Infer the season from the date in the time string and depict it.
--   A clear subject directly related to the Narrative Context.
--   Lighting, composition, and focus that give it the aesthetic of a professional, high-engagement social media photograph.
--   Details that align with the World Mood: "{current_world_mood_ig}".
--   A composition that is balanced and aesthetically pleasing, with a strong emphasis on a clear, well-defined subject within a natural or slightly blurred background.
-Style: Modern, editorial-quality, photo-realistic photograph, authentic textures, natural colors. Aspect ratio: 4:5 (portrait) or 1:1 (square).
-**ABSOLUTELY CRUCIAL EXCLUSION: The actor ({actor_name_in_narrative}) MUST NOT, under any circumstances, be visible in the image. Focus SOLELY on the environment, objects, or other non-actor elements described or implied by the narrative context.** No digital overlays, UI elements, watermarks, or logos.
-Generate this image."""
-    logger_instance.info(f"[NarrativeImageGenerator] Requesting image (T{current_sim_time_for_filename:.1f}): \"{refined_narrative_for_image}\"")
-
-    try:
-        response = await asyncio.to_thread(
-            img_gen_client.models.generate_images, model=IMAGE_GENERATION_MODEL_NAME,
-            prompt=prompt_for_image_gen,
-            config=genai_image.types.GenerateImagesConfig(number_of_images=1)
-        )
-        image_generated_successfully = False
-        saved_image_path_for_social_post: Optional[str] = None
-
-        for gen_img in response.generated_images:
-            try:
-                pil_image = Image.open(BytesIO(gen_img.image.image_bytes))
-                timestamp_str = time.strftime("%Y%m%d_%H%M%S")
-                sim_time_str_file = f"T{current_sim_time_for_filename:.0f}"
-
-                # Create a subdirectory for the current world instance UUID
-                instance_specific_image_dir = os.path.join(IMAGE_GENERATION_OUTPUT_DIR, world_instance_uuid)
-                os.makedirs(instance_specific_image_dir, exist_ok=True)
-
-                image_filename = f"narrative_{sim_time_str_file}_{timestamp_str}.png"
-                image_path = os.path.join(instance_specific_image_dir, image_filename) # Save in the instance-specific directory
-                pil_image.save(image_path)
-                logger_instance.info(f"[NarrativeImageGenerator] Saved image: {image_path}")
-                image_generated_successfully = True
-                saved_image_path_for_social_post = image_path
-                # Make the logged filename relative to the IMAGE_GENERATION_OUTPUT_DIR, including the UUID
-                logged_image_filename = os.path.join(world_instance_uuid, image_filename)
-                _log_event(current_sim_time_for_filename, "ImageGenerator", "image_generation",
-                           {"image_filename": logged_image_filename, 
-                            "prompt_snippet": refined_narrative_for_image},
-                           logger_instance, event_logger_instance)
-                break
-            except Exception as e_img_proc:
-                logger_instance.error(f"[NarrativeImageGenerator] Error processing/saving image: {e_img_proc}", exc_info=True)
-
-        # Handle Bluesky posting if enabled and successful
-        bluesky_api_client = None
-        if ENABLE_BLUESKY_POSTING and image_generated_successfully and saved_image_path_for_social_post:
-            if BLUESKY_HANDLE and BLUESKY_APP_PASSWORD:
-                bluesky_api_client = BlueskyClient()
-            
-            if bluesky_api_client:
-                logger_instance.info(f"[NarrativeImageGenerator] Attempting Bluesky post for: {saved_image_path_for_social_post}")
-                try:
-                    if not bluesky_api_client.me: # Check if login is needed
-                        bluesky_api_client.login(BLUESKY_HANDLE, BLUESKY_APP_PASSWORD)
-
-                    image_bytes_for_upload = None
-                    with open(saved_image_path_for_social_post, 'rb') as f_img_bs:
-                        image_bytes_for_upload = f_img_bs.read()
-
-                    alt_text_bs = f"Image from simulation at T{current_sim_time_for_filename:.0f}s: {refined_narrative_for_image}"[:1000]
-                    post_text_raw_bs = alt_text_bs
-                    effective_text_limit_bs = max(0, SOCIAL_POST_TEXT_LIMIT - (len(SOCIAL_POST_HASHTAGS) + 5))
-                    post_text_bs = post_text_raw_bs[:effective_text_limit_bs]
-                    if len(post_text_raw_bs) > effective_text_limit_bs:
-                        post_text_bs = post_text_bs.rsplit(' ', 1)[0] + '...' if ' ' in post_text_bs else post_text_bs + '...'
-                    final_post_content_bs = f"{post_text_bs}\n\n{SOCIAL_POST_HASHTAGS}".strip()
-
-                    upload_blob_response = bluesky_api_client.com.atproto.repo.upload_blob(image_bytes_for_upload)
-                    embed_image = atproto_models.AppBskyEmbedImages.Image(alt=alt_text_bs, image=upload_blob_response.blob)
-                    embed_main = atproto_models.AppBskyEmbedImages.Main(images=[embed_image])
-
-                    bluesky_api_client.com.atproto.repo.create_record(
-                        atproto_models.ComAtprotoRepoCreateRecord.Data(
-                            repo=bluesky_api_client.me.did, collection=atproto_models.ids.AppBskyFeedPost,
-                            record=atproto_models.AppBskyFeedPost.Main(
-                                created_at=bluesky_api_client.get_current_time_iso(), text=final_post_content_bs, embed=embed_main
-                            )
-                        )
-                    )
-                    logger_instance.info(f"[NarrativeImageGenerator] Successfully posted to Bluesky: '{final_post_content_bs[:50]}...'")
-                except Exception as e_bsky:
-                    logger_instance.error(f"[NarrativeImageGenerator] Error posting to Bluesky: {e_bsky}", exc_info=True)
-
-        return image_generated_successfully
-
-    except Exception as e_gen:
-        logger_instance.error(f"[NarrativeImageGenerator] Error during image generation API call: {e_gen}", exc_info=True)
-        return False
