@@ -96,8 +96,8 @@ async def time_manager_task(
                         else:
                             logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
                         # Clear interrupt probability and set status to idle for agent-specific action completions
-                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
-                        # _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # Removed per request
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance)
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # Agent is now idle and results are applied
                         logger_instance.info(f"[TimeManager] Set {agent_id} status to idle.")
 
             await process_pending_simulation_events(current_state, logger_instance)

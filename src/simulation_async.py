@@ -463,11 +463,30 @@ async def narration_task():
                         state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
 
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
+                        # --- MODIFICATION START: Preserve busy status for long actions ---
+                        agent_current_status_before_narration = get_nested(state, SIMULACRA_KEY, actor_id, "status")
                         
-                        # ADD THIS: Set agent to idle when narration completes
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
-                        logger.info(f"[NarrationTask] Set {actor_id} to idle after setting last_observation")
+                        # Retrieve agent_action_end_time and ensure it's a float for comparison
+                        agent_action_end_time_from_state = get_nested(state, SIMULACRA_KEY, actor_id, "current_action_end_time")
+                        if not isinstance(agent_action_end_time_from_state, (int, float)):
+                            logger.warning(f"[NarrationTask] Agent {actor_id}'s current_action_end_time was '{agent_action_end_time_from_state}' (type: {type(agent_action_end_time_from_state)}). Defaulting to 0.0 for comparison.")
+                            agent_action_end_time = 0.0
+                        else:
+                            agent_action_end_time = agent_action_end_time_from_state
+
+                        # completion_time from the event is used as current_sim_time_narration
+                        current_sim_time_narration = completion_time 
+
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger) # Always update observation
+
+                        if agent_current_status_before_narration == "busy" and agent_action_end_time > current_sim_time_narration:
+                            # If the agent is busy with a task that hasn't ended, don't set them to idle.
+                            logger.info(f"[NarrationTask] Agent {actor_id} is busy with an ongoing task (ends at {agent_action_end_time:.1f}s). Preserving busy status after narration.")
+                        else:
+                            # If not busy with a long task, or if the task just ended, set to idle.
+                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                            logger.info(f"[NarrationTask] Set {actor_id} to idle after narration (task ended or was not long/busy).")
+                        # --- MODIFICATION END ---
 
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
