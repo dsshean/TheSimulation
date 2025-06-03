@@ -23,7 +23,7 @@ from .config import (
     DYNAMIC_INTERRUPTION_TARGET_DURATION_SECONDS, DYNAMIC_INTERRUPTION_PROB_AT_TARGET_DURATION,
     DYNAMIC_INTERRUPTION_MAX_PROB_CAP, DYNAMIC_INTERRUPTION_MIN_PROB, DYNAMIC_INTERRUPTION_CHECK_REAL_SECONDS, MODEL_NAME,
     ENABLE_NARRATIVE_IMAGE_GENERATION, IMAGE_GENERATION_INTERVAL_REAL_SECONDS, IMAGE_GENERATION_MODEL_NAME, # For image task
-    IMAGE_GENERATION_OUTPUT_DIR, ENABLE_BLUESKY_POSTING, BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, # For image task
+    IMAGE_GENERATION_OUTPUT_DIR, ENABLE_BLUESKY_POSTING, BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, BLUESKY_MAX_IMAGE_SIZE_BYTES, # For image task
     SOCIAL_POST_TEXT_LIMIT, SOCIAL_POST_HASHTAGS, WORLD_STATE_KEY, LOCATION_DETAILS_KEY  # For image task
 )
 # simulation_utils will be called by tasks in simulation_async.py or here, passing state
@@ -407,57 +407,114 @@ Generate this image."""
             image_generated_successfully = False
             saved_image_path_for_social_post: Optional[str] = None
 
+            world_instance_uuid = current_state.get("world_instance_uuid")
+            if not world_instance_uuid:
+                logger_instance.error("[NarrativeImageGenerator] World instance UUID not found in state. Cannot save image to UUID subdirectory.")
+                continue # Skip image generation if UUID is missing
+
+            # Create the UUID subdirectory
+            uuid_image_output_dir = os.path.join(IMAGE_GENERATION_OUTPUT_DIR, str(world_instance_uuid))
+            os.makedirs(uuid_image_output_dir, exist_ok=True)
+
             for gen_img in response.generated_images:
                 try:
                     pil_image = Image.open(BytesIO(gen_img.image.image_bytes))
                     timestamp_str = time.strftime("%Y%m%d_%H%M%S")
+                    # Filename without the UUID prefix
                     sim_time_str_file = f"T{current_sim_time_for_filename:.0f}"
                     image_filename = f"narrative_{sim_time_str_file}_{timestamp_str}.png"
-                    image_path = os.path.join(IMAGE_GENERATION_OUTPUT_DIR, image_filename)
-                    pil_image.save(image_path)
-                    logger_instance.info(f"[NarrativeImageGenerator] Saved image: {image_path}")
+                    # Full path including the UUID subdirectory
+                    full_image_path = os.path.join(uuid_image_output_dir, image_filename)
+                    pil_image.save(full_image_path)
+                    logger_instance.info(f"[NarrativeImageGenerator] Saved image: {full_image_path}")
+
+                    # The path logged to the event should be RELATIVE to IMAGE_GENERATION_OUTPUT_DIR
+                    # This is what bluesky_post.py will use.
+                    relative_image_path_for_log = os.path.join(str(world_instance_uuid), image_filename)
+
+                    # The line pil_image.save(image_path) was erroneous as image_path was not defined.
+                    # The image is correctly saved to full_image_path above.
+
                     image_generated_successfully = True
-                    saved_image_path_for_social_post = image_path
+                    saved_image_path_for_social_post = full_image_path # Use the correct path
                     _log_event(current_sim_time_for_filename, "ImageGenerator", "image_generation",
-                               {"image_filename": image_filename, "prompt_snippet": refined_narrative_for_image},
+                               {"image_filename": relative_image_path_for_log, "prompt_snippet": refined_narrative_for_image},
                                logger_instance, event_logger_instance)
                     break
                 except Exception as e_img_proc:
                     logger_instance.error(f"[NarrativeImageGenerator] Error processing/saving image: {e_img_proc}", exc_info=True)
 
-            if ENABLE_BLUESKY_POSTING and bluesky_api_client and image_generated_successfully and saved_image_path_for_social_post:
-                logger_instance.info(f"[NarrativeImageGenerator] Attempting Bluesky post for: {saved_image_path_for_social_post}")
+            # Use the full path for Bluesky posting attempt
+            if ENABLE_BLUESKY_POSTING and bluesky_api_client and image_generated_successfully and full_image_path:
+                logger_instance.info(f"[NarrativeImageGenerator] Attempting Bluesky post for: {full_image_path}")
                 try:
                     if not bluesky_api_client.me: # Check if login is needed
                         bluesky_api_client.login(BLUESKY_HANDLE, BLUESKY_APP_PASSWORD)
 
-                    image_bytes_for_upload = None
-                    with open(saved_image_path_for_social_post, 'rb') as f_img_bs:
-                        image_bytes_for_upload = f_img_bs.read()
-                    # Note: Bluesky image size limit (around 976KB) might require compression logic here if images are large.
-                    # This example assumes images are generally within limits or compression is handled by the image model.
+                    image_bytes_for_upload: Optional[bytes] = None
+                    original_file_size = os.path.getsize(full_image_path)
+                    logger_instance.info(f"[NarrativeImageGenerator] Original image size for Bluesky: {original_file_size / 1024:.2f} KB")
 
-                    alt_text_bs = f"Image from simulation at T{current_sim_time_for_filename:.0f}s: {refined_narrative_for_image}"[:1000] # Bluesky alt text limit
-                    post_text_raw_bs = alt_text_bs
-                    effective_text_limit_bs = max(0, SOCIAL_POST_TEXT_LIMIT - (len(SOCIAL_POST_HASHTAGS) + 5)) # Approx space for hashtags
-                    post_text_bs = post_text_raw_bs[:effective_text_limit_bs]
-                    if len(post_text_raw_bs) > effective_text_limit_bs:
-                        post_text_bs = post_text_bs.rsplit(' ', 1)[0] + '...' if ' ' in post_text_bs else post_text_bs + '...'
-                    final_post_content_bs = f"{post_text_bs}\n\n{SOCIAL_POST_HASHTAGS}".strip()
+                    if original_file_size > BLUESKY_MAX_IMAGE_SIZE_BYTES:
+                        logger_instance.info(f"[NarrativeImageGenerator] Image {full_image_path} exceeds Bluesky limit. Attempting compression.")
+                        try:
+                            pil_img_for_bs = Image.open(full_image_path)
+                            # Convert to RGB if it's RGBA, as JPEG doesn't support alpha
+                            if pil_img_for_bs.mode == 'RGBA':
+                                pil_img_for_bs = pil_img_for_bs.convert('RGB')
 
-                    upload_blob_response = bluesky_api_client.com.atproto.repo.upload_blob(image_bytes_for_upload)
-                    embed_image = atproto_models.AppBskyEmbedImages.Image(alt=alt_text_bs, image=upload_blob_response.blob)
-                    embed_main = atproto_models.AppBskyEmbedImages.Main(images=[embed_image])
+                            temp_image_buffer = BytesIO()
+                            quality = 85 # Start with a reasonable quality for JPEG
+                            while quality >= 50: # Don't go below 50 quality
+                                temp_image_buffer.seek(0)
+                                temp_image_buffer.truncate()
+                                pil_img_for_bs.save(temp_image_buffer, format="JPEG", quality=quality, optimize=True)
+                                if temp_image_buffer.tell() <= BLUESKY_MAX_IMAGE_SIZE_BYTES:
+                                    logger_instance.info(f"[NarrativeImageGenerator] Compressed image to {temp_image_buffer.tell() / 1024:.2f}KB (JPEG quality {quality}).")
+                                    image_bytes_for_upload = temp_image_buffer.getvalue()
+                                    break
+                                quality -= 10
+                            if not image_bytes_for_upload:
+                                logger_instance.warning(f"[NarrativeImageGenerator] Could not compress image {full_image_path} sufficiently. Final attempt size: {temp_image_buffer.tell() / 1024:.2f}KB. Upload might fail.")
+                                # Fallback to original bytes if compression failed to meet target, Bluesky will likely reject.
+                                # Or, you could choose *not* to upload if compression fails badly.
+                                # For now, let's still try with the smallest compressed version we got, or original if that was smaller.
+                                if temp_image_buffer.tell() < original_file_size:
+                                     image_bytes_for_upload = temp_image_buffer.getvalue()
+                        except Exception as e_compress:
+                            logger_instance.error(f"[NarrativeImageGenerator] Error during image compression: {e_compress}. Will attempt with original.", exc_info=True)
 
-                    bluesky_api_client.com.atproto.repo.create_record(
-                        atproto_models.ComAtprotoRepoCreateRecord.Data(
-                            repo=bluesky_api_client.me.did, collection=atproto_models.ids.AppBskyFeedPost,
-                            record=atproto_models.AppBskyFeedPost.Main(
-                                created_at=bluesky_api_client.get_current_time_iso(), text=final_post_content_bs, embed=embed_main
+                    if image_bytes_for_upload is None: # If not compressed or compression failed, use original
+                        with open(full_image_path, 'rb') as f_img_bs:
+                            image_bytes_for_upload = f_img_bs.read()
+
+                    # The image_bytes_for_upload is now correctly set by the compression logic above,
+                    # or by reading full_image_path if compression was skipped/failed.
+                    if image_bytes_for_upload: # Proceed only if we have bytes to upload
+                        alt_text_bs = f"Image from simulation at T{current_sim_time_for_filename:.0f}s: {refined_narrative_for_image}"[:1000] # Bluesky alt text limit
+                        post_text_raw_bs = alt_text_bs
+                        effective_text_limit_bs = max(0, SOCIAL_POST_TEXT_LIMIT - (len(SOCIAL_POST_HASHTAGS) + 5)) # Approx space for hashtags
+                        post_text_bs = post_text_raw_bs[:effective_text_limit_bs]
+                        if len(post_text_raw_bs) > effective_text_limit_bs:
+                            post_text_bs = post_text_bs.rsplit(' ', 1)[0] + '...' if ' ' in post_text_bs else post_text_bs + '...'
+                        final_post_content_bs = f"{post_text_bs}\n\n{SOCIAL_POST_HASHTAGS}".strip()
+                        
+                        # Use the image_bytes_for_upload variable
+                        upload_blob_response = bluesky_api_client.com.atproto.repo.upload_blob(image_bytes_for_upload)
+                        embed_image = atproto_models.AppBskyEmbedImages.Image(alt=alt_text_bs, image=upload_blob_response.blob)
+                        embed_main = atproto_models.AppBskyEmbedImages.Main(images=[embed_image])
+
+                        bluesky_api_client.com.atproto.repo.create_record(
+                            atproto_models.ComAtprotoRepoCreateRecord.Data(
+                                repo=bluesky_api_client.me.did, collection=atproto_models.ids.AppBskyFeedPost,
+                                record=atproto_models.AppBskyFeedPost.Main(
+                                    created_at=bluesky_api_client.get_current_time_iso(), text=final_post_content_bs, embed=embed_main
+                                )
                             )
                         )
-                    )
-                    logger_instance.info(f"[NarrativeImageGenerator] Successfully posted to Bluesky: '{final_post_content_bs[:50]}...'")
+                        logger_instance.info(f"[NarrativeImageGenerator] Successfully posted to Bluesky: '{final_post_content_bs[:50]}...'")
+                    else:
+                        logger_instance.warning("[NarrativeImageGenerator] No image bytes available for Bluesky upload after processing. Skipping image part of post.")
                 except Exception as e_bsky:
                     logger_instance.error(f"[NarrativeImageGenerator] Error posting to Bluesky: {e_bsky}", exc_info=True)
 

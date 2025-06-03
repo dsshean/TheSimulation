@@ -14,7 +14,7 @@ from atproto import Client, models as atproto_models # Aliased import
 # --- Configuration ---
 WORLD_SIMULATION_UUID = None # Will be loaded dynamically
 MAX_POST_LENGTH = 300 # Bluesky's character limit (graphemes approx) - align with SOCIAL_POST_TEXT_LIMIT
-IMAGE_BASE_DIR = "" # Dynamically set based on input JSONL file path
+IMAGE_ACTUAL_DIR = "" # Will be set to the correct data/narrative_images path
 
 # Constants for Bluesky posting (mirroring parts of your project's config.py)
 BLUESKY_MAX_IMAGE_SIZE_BYTES = 976 * 1024  # 976KB
@@ -125,9 +125,9 @@ def _send_to_bluesky_api(text_content, image_path=None, alt_text=None):
     try:
         embed_to_post = None
         if image_path:
-            full_image_path = image_path
-            if IMAGE_BASE_DIR and not os.path.isabs(image_path):
-                full_image_path = os.path.join(IMAGE_BASE_DIR, image_path)
+            # Construct full_image_path using IMAGE_ACTUAL_DIR
+            # image_path is just the filename from the event log (now includes UUID subdir)
+            full_image_path = os.path.join(IMAGE_ACTUAL_DIR, image_path) if IMAGE_ACTUAL_DIR and not os.path.isabs(image_path) else image_path
 
             if not os.path.exists(full_image_path):
                 console.print(f"[yellow]Image file not found:[/yellow] {full_image_path}. Posting text only.")
@@ -258,8 +258,9 @@ def post_to_bluesky(text_content, image_path=None, alt_text=None):
     console.print(f"[bold]Content[/] ({len(text_content)} chars):\n{text_content}")
     if image_path:
         full_image_path = image_path
-        if IMAGE_BASE_DIR and not os.path.isabs(image_path):
-            full_image_path = os.path.join(IMAGE_BASE_DIR, image_path)
+        # Construct full_image_path using IMAGE_ACTUAL_DIR for display
+        # image_path is just the filename from the event log (now includes UUID subdir)
+        full_image_path = os.path.join(IMAGE_ACTUAL_DIR, image_path) if IMAGE_ACTUAL_DIR and not os.path.isabs(image_path) else image_path
         
         console.print(f"[bold]Attaching Image:[/bold] {full_image_path}")
         if os.path.exists(full_image_path):

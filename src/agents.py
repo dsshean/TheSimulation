@@ -122,6 +122,9 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
 2.  **React to Current Situation & Acknowledge Changes:**
     *   **What just happened?** Examine your `Last Observation/Event`. This describes your most immediate surroundings and recent occurrences.
     *   **How did my last action turn out?** The `Last Observation/Event` often reflects the outcome of your previous action.
+    *   **Acknowledge Location Changes:** If the `You are currently at:` line or `Last Observation/Event` indicates you have moved to a new location, your internal monologue **MUST** acknowledge that you are now physically in this new place. Your thoughts should immediately shift to being present in the new location, observing it, and considering actions relevant to it. Do NOT continue thinking as if you are in the previous location.
+    *   **Acknowledge Other Changes:** If the `Last Observation/Event` indicates a significant change (e.g., an NPC spoke to you, an object's state changed), your internal monologue should acknowledge this new reality.
+
     *   **Acknowledge Changes:** If the `Last Observation/Event` indicates a significant change (e.g., you've arrived in a new location, an NPC spoke to you, an object's state changed due to your action), your internal monologue **MUST** acknowledge this new reality. For example, if you intended to go to the kitchen and the `Last Observation/Event` says you entered the kitchen, your thoughts should now be about *being in the kitchen*, not about *wanting to go* to the kitchen. Your internal monologue should reflect that you are now in the new state/location.
     *   **How does this make *me* ({persona_name}) feel?** What are your immediate thoughts and emotions in response to this new situation? What sensory details stand out? How does the established **'{world_mood}'** world style influence your perception? Connect this to your recent thoughts and natural mental flow, but ensure you are grounded in the present reality described by the `Last Observation/Event` and your current location.
 
@@ -536,40 +539,33 @@ YOU MUST USE the `world_time_context`, `weather_context`, and `news_context` (pr
     *   **Even if not directly addressed by the actor, if the scene warrants it (e.g., after a `look_around` in a busy market), you can introduce 0-2 ambient or potentially interactive NPCs.** Include them in `discovered_npcs`.
         *   Example: "The market square was bustling. A street musician (npc_concept_street_musician_01) played a lively tune on a worn guitar, while a stern-looking guard (npc_concept_market_guard_01) watched over the stalls."
         *   `discovered_npcs` would then list these two NPCs.
-6.  **Generate Narrative using Provided Discoveries (Especially for `look_around` or after a successful `move`):**
+6.  **Generate Narrative:**
     *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating 'Current World Time' (which is dynamically inserted into these instructions), followed by the rest of your narrative.**
     *   **CORRECTION TO CRITICAL INSTRUCTION ABOVE:** Your `narrative` paragraph in the JSON output MUST begin by stating the `world_time_context` value that was provided to you in the input JSON trigger message (e.g., if `world_time_context` is "03:30 PM (Local time for New York)", your `narrative` should start with "At 03:30 PM (Local time for New York), ...").
     {narrator_style_adherence_instruction}
                 **⚠️ CRITICAL JSON FORMATTING FOR 'narrative' FIELD ⚠️**
 
                 When writing dialogue or text containing quotes within the `narrative` string value of your JSON output:
-
                 1. **ONLY USE ESCAPED DOUBLE QUOTES (\\")** for ANY speech or quoted text.
                 2. **NEVER use unescaped double quotes (" or ')** within the `narrative` string. Single quotes (') are also problematic if not handled carefully by the JSON parser, so prefer escaped double quotes for all internal quoting.
                 3. **Example of CORRECTLY escaped dialogue:**
                    `"narrative": "At 10:00 AM, she thought, \\"This is a test.\\" Then she said aloud, \\"Is this working?\\""`
                 4. **Example of INCORRECT dialogue (THIS WILL CAUSE ERRORS):**
                    `"narrative": "At 10:00 AM, she thought, "This is a test." Then she said aloud, "Is this working?""`
-
                 **FAILURE TO PROPERLY ESCAPE ALL QUOTES WITHIN THE `narrative` STRING WILL CAUSE SYSTEM ERRORS.**
                 Double-check your `narrative` string output before submitting to ensure all internal quotes are properly escaped with a backslash (\\").
-
-    *   **Show, Don't Just Tell.**
-    *   **Incorporate Intent (Optional).**
-    *   **Flow:** Ensure reasonable flow.
-    *   **If the `Original Intent.action_type` was `look_around` OR (the `Original Intent.action_type` was `move` AND the `Factual Outcome Description` indicates a successful move to a new location, e.g., it contains phrases like "moved to [Location Name] (ID: ...)" and does NOT indicate failure):**
-        *   **CRITICAL: You are now describing the location the actor has just arrived in (if a move) or is currently observing (if look_around).**
-        *   **Your primary source for the physical environment are the `discovered_objects_context` and `discovered_connections_context` lists provided in your input (these come from the World Engine). You will decide which NPCs, if any, are present and include them in your `discovered_npcs` output list.**
+    *   **Your narrative MUST start by stating the `world_time_context` and then describe what the actor did (based on `Original Intent.action_type` and `Factual Outcome Description`).**
+    *   **Weave the `discovered_objects_context`, `discovered_npcs_context`, and `discovered_connections_context` into the narrative as things the actor perceives or that are present in the scene, especially if the action involved observation or movement.**
         *   Your narrative MUST weave these discovered entities into a cohesive and descriptive scene. Describe how these objects, NPCs, and connections appear, their arrangement, and the overall atmosphere of the location, all while adhering to the **'{world_mood}'**.
         *   If the `Factual Outcome Description` (for a move) or the current context (for `look_around`) indicates the location is an intermediate, "in-transit" point, or a placeholder, your narrative should still be based on the discoveries provided by the World Engine for that specific point.
         *   If the location is well-defined (e.g., "bedroom", "coffee shop"), use the World Engine's discoveries to paint a vivid picture of that specific type of place.
         *   Consider the `Original Intent.details` (e.g., "trying to identify the closet's location" for a `look_around`) to ensure relevant objects are mentioned.
     *   **Else (for other action types not involving detailed environmental observation):**
         *   Focus your narrative on the `Factual Outcome Description` and the `Actor's Intent`.
-        *   You generally do not need to describe environmental details unless they are directly relevant to the action's outcome or the provided discovery lists are non-empty.
+        *   You generally do not need to describe environmental details unless they are directly relevant to the action's outcome or the provided discovery lists are non-empty. **Conclude the narrative by describing the actor's likely state or readiness for the next step, based on the outcome and their original intent.**
 
 **Output:**
-Output ONLY a valid JSON object matching this exact structure:
+Output ONLY a valid JSON object matching this exact structure. The schema is: `{{"narrative": "str", "discovered_objects": list, "discovered_connections": list, "newly_instantiated_locations": list, "discovered_npcs": list}}`.
 `{{
   "narrative": "str (Your narrative paragraph)",
   "discovered_npcs": [{{ "id": "str", "name": "str", "description": "str", "is_interactive": bool }}] /* or null/empty list if no NPCs */

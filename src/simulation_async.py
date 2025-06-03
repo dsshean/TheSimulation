@@ -647,6 +647,7 @@ async def world_engine_task_llm():
                 # ADD YOUR UNIVERSAL INTERRUPTION CODE HERE - before any action-specific handling
                 # Check if target is another Simulacra and handle interruption if needed
                 if target_id_we and target_id_we in get_nested(state, SIMULACRA_KEY, default={}):
+                # NOTE: The following block applies to any action targeting another Simulacra, not just "talk"
                     # Check if target is busy (in the middle of an action)
                     target_status = get_nested(state, f"{SIMULACRA_KEY}.{target_id_we}.status", default="idle")
                     target_name = get_nested(state, f"{SIMULACRA_KEY}.{target_id_we}.name", default=target_id_we)
@@ -663,6 +664,7 @@ async def world_engine_task_llm():
                                        completion_time, logger)
                 
                 # --- ADD TALK ACTION HANDLING ---
+                skip_immediate_narration_queue = False # Initialize default
                 if action_type == "talk":
                     target_id_we = get_nested(intent, "target_id")
                     speech_content = get_nested(intent, "details", default="")
@@ -929,6 +931,7 @@ def _build_simulacra_prompt(
     """Builds the detailed prompt for the Simulacra agent - reads from consolidated state."""
     
     # All agents now read from the same state source
+    # PerceptionManager will get location details internally from the global state reference
     fresh_percepts = perception_manager_instance.get_percepts_for_simulacrum(agent_id)
     logger.debug(f"[{agent_name}] Built percepts from consolidated state: {json.dumps(fresh_percepts, sort_keys=True)[:250]}...")
 
@@ -983,8 +986,8 @@ def _build_simulacra_prompt(
         )
 
     # Get location data from consolidated state
-    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME) # Use CURRENT_LOCATION_KEY
-    agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
+    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME) # Still needed for "You are at:" and connections
+    agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.") # This is the agent's memory/understanding
     current_location_name = get_nested(global_state_ref, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id, "name", default=agent_current_location_id)
     
     # Get connections from consolidated state (single source of truth)
@@ -1527,6 +1530,12 @@ async def run_simulation(
             
             tasks.append(asyncio.create_task(narration_task(), name="NarrationTask"))
             tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
+            tasks.append(asyncio.create_task(narrative_image_generation_task(
+                current_state=state,
+                world_mood=world_mood_global,
+                logger_instance=logger,
+                event_logger_instance=event_logger_global
+            ), name="NarrativeImageGenerationTask"))
             for sim_id_val_task in final_active_sim_ids: 
                 tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id_val_task), name=f"Simulacra_{sim_id_val_task}"))
 

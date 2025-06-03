@@ -56,8 +56,8 @@ class PerceptionManager:
             if sim_id == perceiving_sim_id:
                 continue # Skip self
 
-            other_sim_current_loc = sim_data.get(CURRENT_LOCATION_KEY)
-            other_sim_previous_loc = sim_data.get("previous_location_id")
+            other_sim_current_loc = sim_data.get(CURRENT_LOCATION_KEY) # Still need their current location
+            other_sim_previous_loc = sim_data.get("previous_location_id") # Still need their previous location
 
             if other_sim_current_loc == current_location_id:
                 # This simulacrum is in the same location

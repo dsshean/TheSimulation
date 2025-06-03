@@ -9,6 +9,7 @@ ENABLE_BLUESKY_POSTING = os.getenv("ENABLE_BLUESKY_POSTING", "False").lower() ==
 BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE") # Your Bluesky handle (e.g., yourname.bsky.social)
 BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD") # An app-specific password
 # --- Hashtags for Social Posts ---
+BLUESKY_MAX_IMAGE_SIZE_BYTES = int(os.getenv("BLUESKY_MAX_IMAGE_SIZE_BYTES", 976 * 1024)) # 976KB
 SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#TheSimulation #AI #DigitalTwin #ProceduralStorytelling")
 # --- Character Limit for Social Posts (excluding image/hashtags) ---
 SOCIAL_POST_TEXT_LIMIT = int(os.getenv("SOCIAL_POST_TEXT_LIMIT", "300"))
@@ -28,8 +29,10 @@ MEMORY_LOG_CONTEXT_LENGTH = 10
 MAX_MEMORY_LOG_ENTRIES = 500
 
 # --- Agent Self-Reflection Parameters (for simulacra_agent_task_llm) ---
-# AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS and LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS are now effectively managed by dynamic_interruption_task settings
+AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS = float(os.getenv("AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS", 120.0)) # How often self-reflection is considered
+LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS = float(os.getenv("LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS", 300.0)) # Min duration for self-reflection
 INTERJECTION_COOLDOWN_SIM_SECONDS = float(os.getenv("INTERJECTION_COOLDOWN_SIM_SECONDS", 450.0)) # Cooldown for any type of interjection for an agent
+PROB_INTERJECT_AS_SELF_REFLECTION = float(os.getenv("PROB_INTERJECT_AS_SELF_REFLECTION", 0.60)) # Chance of self-reflection if conditions met for simulacra_agent_task_llm
 AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS = float(os.getenv("AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS", 0.5)) # How often agent tasks check their status
 
 # --- Dynamic Interruption Task Parameters (for dynamic_interruption_task) ---
@@ -55,7 +58,7 @@ RANDOM_SEED: Optional[int] = int(RANDOM_SEED_VALUE) if RANDOM_SEED_VALUE and RAN
 
 # --- Narrative Image Generation Parameters ---
 ENABLE_NARRATIVE_IMAGE_GENERATION = os.getenv("ENABLE_NARRATIVE_IMAGE_GENERATION", "False").lower() == "true"
-IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 120.0)) # How often to generate an image
+IMAGE_GENERATION_INTERVAL_REAL_SECONDS = float(os.getenv("IMAGE_GENERATION_INTERVAL_REAL_SECONDS", 1800.0)) # How often to generate an image
 IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "imagen-3.0-generate-002") # #imagen-4.0-generate-preview-05-20 Or your preview model, e.g., "gemini-2.0-flash-preview-image-generation"
 # IMAGE_GENERATION_MODEL_NAME = os.getenv("IMAGE_GENERATION_MODEL_NAME", "imagen-4.0-generate-preview-05-20") # #imagen-4.0-generate-preview-05-20
 IMAGE_GENERATION_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "narrative_images")
@@ -68,23 +71,12 @@ TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN") # Needed for v2 client actions
 
-ENABLE_BLUESKY_POSTING = os.getenv("ENABLE_BLUESKY_POSTING", "False").lower() == "true"
-BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE") # Your Bluesky handle (e.g., yourname.bsky.social)
-BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD") # An app-specific password
-
-# --- Hashtags for Social Posts ---
-SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#DigitalTwin #SimulationTheory #LLM")
-
-# --- Character Limit for Social Posts (excluding image/hashtags) ---
-SOCIAL_POST_TEXT_LIMIT = int(os.getenv("SOCIAL_POST_TEXT_LIMIT", "200"))
-
-
 # --- State Keys ---
 WORLD_STATE_KEY = "current_world_state"
 ACTIVE_SIMULACRA_IDS_KEY = "active_simulacra_ids"
 LOCATION_DETAILS_KEY = "location_details"
 SIMULACRA_PROFILES_KEY = "simulacra_profiles" # This is the old constant, SIMULACRA_KEY now points to this value.
-CURRENT_LOCATION_KEY = "current_location"
+CURRENT_LOCATION_KEY = "location"
 HOME_LOCATION_KEY = "home_location"
 WORLD_TEMPLATE_DETAILS_KEY = "world_template_details"
 INITIAL_LOCATION_DEFINITIONS_KEY = "initial_location_definitions" # New key for world_config
