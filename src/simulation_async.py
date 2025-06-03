@@ -799,7 +799,7 @@ async def world_engine_task_llm():
                     "discovered_npcs_for_narration": discovered_npcs_list,
                     "discovered_connections_for_narration": discovered_connections_list,
                     # ADD THIS: Include target information for talk actions
-                    "target_entity_info": target_state_data if action_type == "talk" else None,
+                    # "target_entity_info": target_state_data if action_type == "talk" else None,
                 }
 
                 # Special handling for newly generated locations
@@ -1511,6 +1511,13 @@ async def run_simulation(
             tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
             for sim_id_val_task in final_active_sim_ids: 
                 tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id_val_task), name=f"Simulacra_{sim_id_val_task}"))
+
+            tasks.append(asyncio.create_task(narrative_image_generation_task(
+                current_state=state,
+                world_mood=world_mood_global,
+                logger_instance=logger,
+                event_logger_instance=event_logger_global
+            ), name="NarrativeImageGenerator"))
 
             tasks.append(asyncio.create_task(queue_health_monitor(), name="QueueHealthMonitor"))
 
