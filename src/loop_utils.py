@@ -553,8 +553,6 @@ def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict |
 
     return loaded_state_data, state_file_path
 
-
-
 def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
     """
     Try direct JSON parse first, then fallback to robust extraction and cleanup.
@@ -563,9 +561,21 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
         return None
 
     # Try direct parse (strip markdown fence if present)
-    fence_pattern = r'```(?:json)?\s*\n?(.*?)```'
-    fence_match = re.search(fence_pattern, text, re.DOTALL | re.IGNORECASE)
-    json_text = fence_match.group(1).strip() if fence_match else text.strip()
+    # Improved regex pattern to better handle code blocks with or without language specifier
+    fence_pattern = r'```(?:json)?\s*([\s\S]*?)```'
+    fence_match = re.search(fence_pattern, text, re.DOTALL)
+    
+    # More robust handling of the match
+    if fence_match:
+        try:
+            json_text = fence_match.group(1).strip()
+            logger.debug(f"Found JSON in code block: {json_text[:50]}...")
+        except (IndexError, AttributeError):
+            logger.debug("Code block regex matched but couldn't extract content")
+            json_text = text.strip()
+    else:
+        json_text = text.strip()
+        logger.debug("No code block found, using entire text")
 
     try:
         # Try direct parse
