@@ -95,10 +95,10 @@ async def time_manager_task(
                             _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.pending_results", {}, logger_instance)
                         # else: # This log can be noisy if pending_results is often empty after completion_results
                             # logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
-                        # Clear interrupt probability and set status to idle for agent-specific action completions
+                        # Clear interrupt probability. Agent status will be set to 'idle' by the narration_task after observation update.
                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
-                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # Agent is now idle and ready for next turn
-                        logger_instance.info(f"[TimeManager] Action for {agent_id} completed. Set status to idle.")
+                        # _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # REMOVED: Narration task will set to idle
+                        logger_instance.info(f"[TimeManager] Action for {agent_id} mechanically completed. Effects applied. Narration will set to idle.")
 
             await process_pending_simulation_events(current_state, logger_instance)
             
@@ -371,6 +371,7 @@ Instructions for Refinement:
 4.  Keep the refined description concise (preferably 1-2 sentences).
 5.  The refined description should be purely visual and directly usable as an image prompt.
 6.  Do NOT include any instructions for the image generation model itself (like "Generate an image of..."). Just provide the refined descriptive text.
+7.  The "single subject" should be an object, a part of the environment, or an abstract concept from the narrative. DO NOT make the actor ({actor_name_in_narrative}) the primary subject of the visual description.
 Refined Visual Description:"""
             logger_instance.info(f"[NarrativeImageGenerator] Refining narrative for image: '{original_narrative_prompt_text[:100]}...'")
             response_refinement = await refinement_llm.generate_content_async(prompt_for_refinement)
@@ -381,7 +382,7 @@ Refined Visual Description:"""
             logger_instance.error(f"[NarrativeImageGenerator] Error refining narrative: {e_refine}. Using original.", exc_info=True)
 
         random_style_for_image = get_random_style_combination(logger_instance=logger_instance, num_general=0, num_lighting=1, num_color=1, num_technique=1, num_composition=1, num_atmosphere=1)
-        prompt_for_image_gen = f"""Generate a high-quality, visually appealing, **photo-realistic** photograph of a scene or subject directly related to the following narrative context, as if captured by {actor_name_in_narrative}.
+        prompt_for_image_gen = f"""Generate a high-quality, visually appealing, **photo-realistic** photograph depicting a scene or subject directly related to the following narrative context. The viewpoint should be observational, focusing on the environment or key elements described.
 Narrative Context: "{refined_narrative_for_image}"
 Style: "{random_style_for_image}"
 Instructions for the Image:
@@ -394,7 +395,7 @@ The image should feature:
 -   Details that align with the World Mood: "{current_world_mood_ig}".
 -   A composition that is balanced and aesthetically pleasing, with a strong emphasis on a clear, well-defined subject within a natural or slightly blurred background.
 Style: Modern, editorial-quality, photo-realistic photograph, authentic textures, natural colors. Aspect ratio: 4:5 (portrait) or 1:1 (square).
-Crucial Exclusions: No digital overlays, UI elements, watermarks, logos. The actor ({actor_name_in_narrative}) MUST NOT be visible.
+ABSOLUTELY CRUCIAL EXCLUSIONS: No digital overlays, UI elements, watermarks, or logos. The actor ({actor_name_in_narrative}) or ANY human figures MUST NOT be visible in the image. The focus is SOLELY on the described scene, objects, or atmosphere.
 Generate this image."""
         logger_instance.info(f"[NarrativeImageGenerator] Requesting image (T{current_sim_time_for_filename:.1f}): \"{refined_narrative_for_image}\"")
 

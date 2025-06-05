@@ -485,7 +485,12 @@ async def narration_task():
 
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                         _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
-                        logger.info(f"[NarrationTask] Updated last_observation for {actor_id}.")
+                        
+                        # --- NEW: Set agent to idle and update action description after narration ---
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", "Idle, observing outcome.", logger)
+                        logger.info(f"[NarrationTask] Updated last_observation for {actor_id} and set status to idle.")
+                        # --- END NEW ---
 
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
@@ -822,25 +827,24 @@ async def world_engine_task_llm():
                     # "target_entity_info": target_state_data if action_type == "talk" else None,
                 }
 
-                # Special handling for newly generated locations
-                # REMOVE THIS ENTIRE BLOCK - it references undefined variables from WorldGenerator
-                # if action_type == "move" and target_location_id_from_intent and not is_target_defined:
-                #     loc_name_for_narration = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default=target_location_id_from_intent)
-                #     narration_event["outcome_description"] = f"{actor_name} moved into the newly revealed area: {loc_name_for_narration} (ID: {target_location_id_from_intent})."
-
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", pending_results_dict, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_completion_results", action_completion_results_dict, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
-                    
+
                     # Refine action description for listening
                     action_desc_for_state = narration_event["current_action_description"]
                     if action_type == "wait" and "listened attentively to" in outcome_description:
                         action_desc_for_state = outcome_description
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", action_desc_for_state, logger)
-                    
-                    # Queue narration event - but delay it for talk actions until completion
+
+                    action_duration = getattr(validated_data, 'duration', 0.0)
+
+                    # Delay narration for actions with duration.
+                    # 'talk' actions with skip_immediate_narration_queue=True are handled first.
+                    # Then, other actions with duration > 0.1s.
+                    # Otherwise, queue narration immediately.
                     if action_type == "talk" and skip_immediate_narration_queue:
                         # Schedule narration to be queued at completion time
                         delayed_narration_event = {
@@ -851,15 +855,24 @@ async def world_engine_task_llm():
                         }
                         state.setdefault("pending_simulation_events", []).append(delayed_narration_event)
                         state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
-                        logger.info(f"[WorldEngineLLM] Scheduled narration for talk action to trigger at {completion_time:.1f}s")
-                    else:
+                        logger.info(f"[WorldEngineLLM] Scheduled narration for talk action (Simulacra target) to trigger at {completion_time:.1f}s")
+                    elif action_duration > 0.1: # For other actions with duration (e.g., move, use, talk to NPC with duration)
+                        delayed_narration_event = {
+                            "event_type": "delayed_narration",
+                            "narration_data": narration_event,
+                            "trigger_sim_time": completion_time,
+                            "source_actor_id": actor_id
+                        }
+                        state.setdefault("pending_simulation_events", []).append(delayed_narration_event)
+                        state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
+                        logger.info(f"[WorldEngineLLM] Scheduled narration for action '{action_type}' (duration: {action_duration:.1f}s) to trigger at {completion_time:.1f}s")
+                    else: # For actions with very short/zero duration
                         narration_success = await safe_queue_put(narration_queue, narration_event, timeout=5.0, task_name=f"WorldEngineLLM_{actor_id}")
-
                         if not narration_success:
                             logger.error(f"[WorldEngineLLM] Failed to queue narration for {actor_id}")
                             _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", outcome_description, logger)
                         else:
-                            logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state immediately, set end time {completion_time:.1f}s")
+                            logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state, set end time {completion_time:.1f}s. Queued narration immediately for short/zero duration action.")
                 else:
                     logger.error(f"[WorldEngineLLM] Actor {actor_id} not found in state after valid action resolution.")
             else: 

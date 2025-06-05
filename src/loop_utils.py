@@ -582,6 +582,13 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
         json_str = re.sub(r']\s*\n\s*,\s*\n', '],\n', json_str)
         # Fix missing commas between array elements and object properties
         json_str = re.sub(r'}\s*\n\s*,\s*\n\s*"', '},\n    "', json_str)
+
+        # --- NEW: Fix for missing comma between a closing brace } and a new key " ---
+        # e.g. "results": { ... } "discovered_connections": [ ... ]
+        # becomes "results": { ... }, "discovered_connections": [ ... ]
+        json_str = re.sub(r'(})\s*(")', r'\1,\2', json_str)
+        # --- END NEW ---
+
         # Remove trailing commas before closing brackets/braces
         json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
         # Fix common LLM mistake: array closed with ] instead of }]
@@ -665,6 +672,7 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
 
     logger.warning(f"All JSON parsing attempts failed. Original: {json_text[:100]}...")
     return None
+
 def get_nested(data: Dict, *keys: str, default: Any = None) -> Any:
     """Safely retrieve nested dictionary values."""
     current = data
