@@ -159,12 +159,12 @@ TheSimulation operates through a series of asynchronous components, orchestrated
       ```
     - You can also override other default settings from `src/config.py` in this `.env` file. See the Configuration (`config.py` and `.env`) section for more details.
 
-5.  **World Setup (`setup_simulation.py`)**
-    - Run the `setup_simulation.py` script. This interactive script will guide you through:
+5.  **World Setup (`setup_simulation_adk.py`)**
+    - Run the `setup_simulation_adk.py` script. This interactive script will guide you through:
       - Defining the basic parameters of your simulation world (e.g., genre, location).
       - Generating initial "life summaries" (personas, goals, backstories) for your Simulacra agents using an LLM.
     ```bash
-    python setup_simulation.py
+    python setup_simulation_adk.py
     ```
     - This script will create two crucial types of files in the `data/` directory:
       - `data/states/world_config_[uuid].json`: Contains the initial configuration and static details of your simulation world. (This file might initially be created in `data/` and then used to form part of the full simulation state).
