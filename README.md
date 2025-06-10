@@ -2,41 +2,6 @@
 
 Exploring Simulation Theory through Large Language Models
 
-Update as of:
-5/27/2025
-
-- Release V1
-
-* Code migrated to ADK V1.0
-* Agent Isolation to address uncontrolled Contents growth.
-
-5/22/2025
-
-- All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
-- Interactive mode is functional also - use client.py and select a simulacra to interact with.
-- Next steps - code is bloated and very messy - since all major features are functioning correctly, most of the code will be refactored to be cleaner and more modular. Tackling global states also to be more in line with ADK patters for deployment in GCP in cloudrun environment to running 24/7.
-- Further enhancements - as in better async handling ops for multi agent interactiton and other interaces for say game design to use patterns in Unity/Unreal to create fully immersive NPCs or Research Purposus.
-
-5/21/2025
-
-- fixed condition that drove simulacra insane due to the inability to move from an unknown location. see race_condition_log for details
-
-5/20/2025
-
-- setup_simulation.py migrated to use ADK - use setup_simulation_adk.py for more robust simulacra generation.
-- Input mode: The code is there to interact with the simulated world and simulacra, but cannot be accessed due to rich console. Thinking of migrating the interface to streamlit or other webui to enable this mode.
-
-5/19/2025
-
-- Current state - Fully functional - Needs enhancements and contributions welcomed.
-- World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
-- Image generation moved to Imagen 3 - Bluesky integration live
-- To DO:
-- Rework of life_generation.py using ADK - migrataion in progress and option to post entire life generation sequence to Bluesky
-- Posting of interactions to Bluesky - possibly to keep up with realtime updates. Exploring feasibility or practicality
-- Life graph - all interactions mapping for Data Analysis in graph format. TBD
-- Further tools use by simulacra ie. Email access / X(Twitter) / Blueksy etc... web browsing.
-
 ## Table of Contents
 
 - [Simulacra States of Insanity: Understanding Erratic Behavior](#simulacra-states-of-insanity-understanding-erratic-behavior)
@@ -46,6 +11,7 @@ Update as of:
 - [Core Architecture: A Glimpse Under the Hood](#core-architecture-a-glimpse-under-the-hood)
 - [Getting Started](#getting-started)
 - [Running the Simulation](#running-the-simulation)
+- [Interactive Mode](#Interactive-Client)
 - [Configuration (`config.py` and `.env`)](#configuration-configpy-and-env)
 - Logs and Data Structure
 - Observing the Simulation
@@ -335,6 +301,69 @@ Below is a description of the main parameters defined in src/config.py. Many can
 - TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET, TWITTER_BEARER_TOKEN (Env): Twitter API credentials. Required if `ENABLE_TWITTER_POSTING` is true.
 - SOCIAL_POST_HASHTAGS (Env, Default: `"#TheSimulation #AI #DigitalTwin #ProceduralStorytelling"`): Hashtags for social media posts.
 - SOCIAL_POST_TEXT_LIMIT (Env, Default: `200`): Character limit for the text part of social posts (excluding image/hashtags).
+
+### Interactive Client
+
+TheSimulation includes a separate interactive client application that connects to the running simulation server, allowing you to monitor and interact with the simulation in real-time.
+
+#### Starting the Client
+
+To use the interactive client, first ensure the simulation is running (using `python main_async.py`), then start the client in a separate terminal:
+
+```bash
+python client.py
+```
+
+The client connects to the simulation's socket server (by default at 127.0.0.1:8765) and provides a menu-driven interface.
+
+#### Available Commands
+
+The client offers the following options through its main menu:
+
+1. **Inject narrative** - Add custom narrative text to the simulation
+2. **Send event to agent** - Direct a specific event to a particular Simulacrum
+3. **Update world info** - Modify world information like weather or news
+4. **Fix broken JSON** - Utility to repair malformed JSON from the simulation
+5. **View command history** - See a log of your previous commands and responses
+6. **Interactive mode with simulacra** - Directly interact with a Simulacrum in conversation
+7. **Teleport Simulacrum** - Move an agent to a different location
+8. **List Active Simulacra** - View all currently active agents and their statuses
+
+#### Interactive Mode
+
+The interactive mode (option 6) provides a real-time conversation interface with a selected Simulacrum. In this mode, you can:
+
+- Send text messages (`text: <message>`)
+- Make phone calls (`call: <message>`)
+- Speak directly to the agent (`voice: <message>`)
+- Create custom events (`event: <description>`)
+- Trigger doorbell events (`doorbell: <details>`)
+- Create ambient noises (`noise: <description>`)
+
+The client continuously polls for and displays the agent's responses, allowing for natural back-and-forth interaction.
+
+#### Example Usage
+
+```
+> 8  # List Active Simulacra
+Currently active simulacra:
+1. ID: sim_eleanor_vk39gj - Status: idle
+
+> 6  # Enter Interactive Mode
+Select agent for interactive mode: 1
+Interactive mode started with sim_eleanor_vk39gj
+
+You: voice: Hello Eleanor, can you hear me?
+Eleanor: I... I just heard a voice. That's strange, I don't see anyone here.
+
+You: text: This is a text message from your friend
+Eleanor: My phone just buzzed. Oh, it's a message from my friend.
+
+You: exit
+sim_eleanor_vk39gj has returned to the simulation
+```
+
+The client provides a powerful way to influence the simulation's narrative and create dynamic scenarios without interrupting the simulation's core execution.
 
 ### Random Seed:
 
