@@ -491,7 +491,19 @@ async def narration_task():
                         _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", "Idle, observing outcome.", logger)
                         logger.info(f"[NarrationTask] Updated last_observation for {actor_id} and set status to idle.")
                         # --- END NEW ---
+                    # Add after this line:
+                    final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
+                    state.setdefault("narrative_log", []).append(final_narrative_entry)
 
+                    # Add this code to log the narrative to the events file:
+                    _log_event(
+                        sim_time=completion_time,
+                        agent_id="Narrator",
+                        event_type="narration",
+                        data={"narrative": cleaned_narrative_text},
+                        logger_instance=logger,
+                        event_logger_global=event_logger_global
+                    )
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
                     fallback_narrative = f"{actor_name} completed an action, but the narrative could not be generated."

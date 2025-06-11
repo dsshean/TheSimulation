@@ -25,6 +25,10 @@ SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#TheSimulation #AI #Di
 # --- Bluesky API Client (initialized later if needed) ---
 bluesky_client = None
 
+# --- Google AI Clients (initialized later if needed) ---
+text_gen_client = None
+img_gen_client = None
+
 console = Console() # Initialize Rich console for script output
 
 def find_latest_file_in_dir(directory: str, pattern: str) -> Optional[str]:
@@ -340,7 +344,7 @@ def process_events_file(filepath):
                 console.print(f"[cyan]Narrative text:[/cyan] {text_to_post_content[:100]}...")
                 
                 # Check if AI clients are initialized
-                enable_image_generation = os.environ.get("ENABLE_ON_DEMAND_IMAGE_GENERATION", "false").lower() == "true"
+                enable_image_generation = os.environ.get("ENABLE_ON_DEMAND_IMAGE_GENERATION", "true").lower() == "true"
                 if enable_image_generation and not (text_gen_client and img_gen_client):
                     initialize_ai_clients()
                 
