@@ -10,6 +10,7 @@ from PIL import Image # For image compression
 from dotenv import load_dotenv
 from rich.console import Console # Added for console output in script
 from atproto import Client, models as atproto_models # Aliased import
+import google.generativeai as genai
 
 # --- Configuration ---
 WORLD_SIMULATION_UUID = None # Will be loaded dynamically
@@ -333,7 +334,39 @@ def process_events_file(filepath):
                 attached_image_path = image_data_to_use["path"]
                 attached_alt_text = image_data_to_use["alt"]
                 image_info_map[matched_image_key]["used"] = True
-        
+            else:
+                # No matching image found - ask if user wants to generate one
+                console.print("[yellow]No matching image found for this narrative.[/yellow]")
+                console.print(f"[cyan]Narrative text:[/cyan] {text_to_post_content[:100]}...")
+                
+                # Check if AI clients are initialized
+                enable_image_generation = os.environ.get("ENABLE_ON_DEMAND_IMAGE_GENERATION", "false").lower() == "true"
+                if enable_image_generation and not (text_gen_client and img_gen_client):
+                    initialize_ai_clients()
+                
+                if text_gen_client and img_gen_client:
+                    generate_img = input("Generate an image for this narrative? (y/n): ").lower().strip()
+                    if generate_img == 'y':
+                        # Extract weather if mentioned in text
+                        weather_match = re.search(r"(sunny|cloudy|rainy|snowy|clear|overcast|foggy|misty)", 
+                                                text_to_post_content.lower())
+                        weather = weather_match.group(1) if weather_match else "clear"
+                        
+                        # Generate the image
+                        attached_image_path, attached_alt_text = generate_image_for_narrative(
+                            narrative_text=text_to_post_content,
+                            sim_time=current_event_sim_time,
+                            weather=weather,
+                            world_mood="ordinary"  # Could extract from data if available
+                        )
+                        
+                        if attached_image_path:
+                            console.print(f"[green]Successfully generated image:[/green] {attached_image_path}")
+                        else:
+                            console.print("[red]Failed to generate image.[/red]")
+                else:
+                    console.print("[yellow]Image generation is not available. Enable it by setting ENABLE_ON_DEMAND_IMAGE_GENERATION=true in .env file.[/yellow]")
+
         words = text_to_post_content.split()
         if not words:
             continue
@@ -420,6 +453,173 @@ def process_events_file(filepath):
         print(f"Info: Total {unused_image_count} pre-processed images were not attached to any post.")
 
 
+# Initialize Google AI clients
+def initialize_ai_clients():
+    """Initialize Google AI clients for text and image generation."""
+    global img_gen_client, text_gen_client
+    
+    load_dotenv()  # Make sure we load .env variables
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        console.print("[red]Error:[/red] GOOGLE_API_KEY not found in .env file.")
+        return False
+    
+    try:
+        genai.configure(api_key=api_key)
+        img_gen_client = genai
+        text_gen_client = genai.GenerativeModel(
+            os.environ.get("MODEL_NAME", "gemini-2.0-flash")
+        )
+        console.print("[green]Successfully initialized AI clients.[/green]")
+        return True
+    except Exception as e:
+        console.print(f"[red]Error initializing AI clients:[/red] {e}")
+        return False
+
+def get_random_style_combination(num_general=0, num_lighting=1, num_color=1, 
+                                num_technique=1, num_composition=1, num_atmosphere=1):
+    """Generate a random style combination for image prompts."""
+    import random
+    
+    general_styles = ["dramatic", "cinematic", "photorealistic", "detailed", "vivid", "rich", "expressive", "artistic"]
+    lighting_styles = ["golden hour", "soft lighting", "morning light", "evening light", "natural lighting", "dramatic lighting", "diffused light", "ambient lighting", "warm lighting", "cool lighting"]
+    color_styles = ["vibrant colors", "muted colors", "warm tones", "cool tones", "high contrast", "low contrast", "monochromatic", "complementary colors", "analogous colors"]
+    techniques = ["depth of field", "bokeh", "shallow focus", "sharp focus", "tilt-shift", "high dynamic range", "low key", "high key"]
+    composition_styles = ["rule of thirds", "leading lines", "symmetrical", "asymmetrical", "centered composition", "negative space", "framing", "diagonal composition", "golden ratio"]
+    atmosphere_styles = ["serene", "melancholic", "nostalgic", "tense", "peaceful", "mysterious", "playful", "solemn", "ethereal", "dramatic atmosphere"]
+    
+    style_parts = []
+    if num_general > 0:
+        style_parts.extend(random.sample(general_styles, min(num_general, len(general_styles))))
+    if num_lighting > 0:
+        style_parts.extend(random.sample(lighting_styles, min(num_lighting, len(lighting_styles))))
+    if num_color > 0:
+        style_parts.extend(random.sample(color_styles, min(num_color, len(color_styles))))
+    if num_technique > 0:
+        style_parts.extend(random.sample(techniques, min(num_technique, len(techniques))))
+    if num_composition > 0:
+        style_parts.extend(random.sample(composition_styles, min(num_composition, len(composition_styles))))
+    if num_atmosphere > 0:
+        style_parts.extend(random.sample(atmosphere_styles, min(num_atmosphere, len(atmosphere_styles))))
+    
+    return ", ".join(style_parts)
+
+def generate_image_for_narrative(narrative_text, sim_time=None, weather="clear", world_mood="ordinary"):
+    """Generate an image for a narrative text using Google's image generation API."""
+    if not text_gen_client or not img_gen_client:
+        console.print("[yellow]AI clients not initialized. Cannot generate image.[/yellow]")
+        return None, None
+    
+    console.print("[blue]Generating image for narrative...[/blue]")
+    time_string = "afternoon" if not sim_time else f"{sim_time}"
+    
+    # Step 1: Refine the narrative into a concise image prompt
+    console.print("[dim]Refining narrative text into image prompt...[/dim]")
+    actor_name = "character"  # Extract from narrative if possible
+    
+    # Extract actor name with regex (optional)
+    import re
+    actor_match = re.search(r"([A-Z][a-z]+ [A-Z][a-z]+|[A-Z][a-z]+) (?:looks|walks|sits|stands|observes|examines)", narrative_text)
+    if actor_match:
+        actor_name = actor_match.group(1)
+    
+    prompt_for_refinement = f"""You are an expert at transforming narrative text into concise, visually descriptive prompts ideal for an image generation model. Your goal is to focus on a single, clear subject, potentially with a naturally blurred background.
+Original Narrative Context: "{narrative_text}"
+Current Time: "{time_string}"
+Current Weather: "{weather}"
+World Mood: "{world_mood}"
+Instructions for Refinement:
+1. Identify a single, compelling visual element or a very brief, static moment from the 'Original Narrative Context'.
+2. Describe this single subject clearly and vividly. Use descriptive language for the subject and its relationship to any implied background.
+3. If appropriate, suggest a composition that would naturally lead to a blurred background (e.g., "A close-up of...", "A detailed shot of...", "A lone figure with the background softly blurred...").
+4. Keep the refined description concise (preferably 1-2 sentences).
+5. The refined description should be purely visual and directly usable as an image prompt.
+6. Do NOT include any instructions for the image generation model itself (like "Generate an image of..."). Just provide the refined descriptive text.
+7. The "single subject" should be an object, a part of the environment, or an abstract concept from the narrative. DO NOT make the actor ({actor_name}) the primary subject of the visual description.
+Refined Visual Description:"""
+
+    try:
+        response = text_gen_client.generate_content(prompt_for_refinement)
+        refined_narrative = response.text.strip()
+        console.print(f"[green]Refined image prompt:[/green] {refined_narrative}")
+        
+        # Step 2: Generate the image using the refined prompt
+        console.print("[dim]Generating image...[/dim]")
+        
+        random_style = get_random_style_combination(
+            num_general=0, num_lighting=1, num_color=1, 
+            num_technique=1, num_composition=1, num_atmosphere=1
+        )
+        
+        prompt_for_image_gen = f"""Generate a high-quality, visually appealing, **photo-realistic** photograph depicting a scene or subject directly related to the following narrative context. The viewpoint should be observational, focusing on the environment or key elements described.
+Narrative Context: "{refined_narrative}"
+Style: "{random_style}"
+Instructions for the Image:
+The image should feature:
+- Time of Day: Reflect the lighting and atmosphere typical of "{time_string}".
+- Weather: Depict the conditions described by "{weather}".
+
+ABSOLUTELY CRUCIAL EXCLUSIONS: No digital overlays, UI elements, watermarks, or logos. The actor ({actor_name}) or ANY human figures MUST NOT be visible in the image. The focus is SOLELY on the described scene, objects, or atmosphere.
+Generate this image."""
+
+        # Generate the image
+        response = img_gen_client.GenerativeModel(
+            os.environ.get("IMAGE_GENERATION_MODEL_NAME", "imagen-3.0-generate-002")
+        ).generate_images(
+            prompt=prompt_for_image_gen,
+            # adjust parameters as needed
+        )
+        
+        # Save the image
+        if not response.images:
+            console.print("[yellow]No images were generated.[/yellow]")
+            return None, None
+            
+        # Create path and save image
+        if not WORLD_SIMULATION_UUID:
+            console.print("[yellow]No World UUID set. Using 'generated' as fallback.[/yellow]")
+            uuid_dir = "generated"
+        else:
+            uuid_dir = WORLD_SIMULATION_UUID
+            
+        # Make sure the image output directory exists
+        narrative_images_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                          "data", "narrative_images")
+        os.makedirs(narrative_images_dir, exist_ok=True)
+        
+        uuid_image_output_dir = os.path.join(narrative_images_dir, uuid_dir)
+        os.makedirs(uuid_image_output_dir, exist_ok=True)
+        
+        # Save image
+        from datetime import datetime
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        sim_time_str = f"T{int(sim_time) if sim_time else 0}"
+        image_filename = f"narrative_{sim_time_str}_{timestamp_str}.png"
+        full_image_path = os.path.join(uuid_image_output_dir, image_filename)
+        
+        # Convert base64 to image and save
+        from PIL import Image
+        import base64
+        
+        if response.images:
+            with open(full_image_path, "wb") as f:
+                # Assuming images are returned as base64 or PIL objects
+                # Modify this part according to the actual API response
+                f.write(response.images[0])
+                
+            console.print(f"[green]Image saved to:[/green] {full_image_path}")
+            
+            # Return relative path for event log and alt text
+            relative_path = os.path.join(uuid_dir, image_filename)
+            return relative_path, refined_narrative
+            
+    except Exception as e:
+        console.print(f"[red]Error generating image:[/red] {e}")
+        import traceback
+        traceback.print_exc()
+        
+    return None, None
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process simulation event logs and post to Bluesky.")
     parser.add_argument(
@@ -435,7 +635,7 @@ if __name__ == "__main__":
     if not target_jsonl_file_path:
         console.print("[yellow]No specific log file provided. Looking for the latest event log file...[/yellow]")
         # Default behavior: find the latest log file
-        events_log_directory = r"c:\Users\dshea\Desktop\TheSimulation\logs\events" # Default directory
+        events_log_directory = r".\logs\events" # Default directory
         events_file_pattern = "events_latest_*.jsonl"
         console.print(f"[blue]Looking in:[/blue] {events_log_directory} with pattern: {events_file_pattern}")
         target_jsonl_file_path = find_latest_file_in_dir(events_log_directory, events_file_pattern)
