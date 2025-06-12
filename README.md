@@ -19,9 +19,7 @@ Exploring Simulation Theory through Large Language Models
 
 ## Project Overview
 
-TheSimulation is an experiment exploring simulation theory utilizing Large Language Models (LLMs). This project investigates how LLMs, specifically through frameworks like the Google AI Developer Kit (ADK), can be used to create autonomous agents ("Simulacra") that perceive, reflect, and act within a simulated environment.
-
-The project aims to use LLMs to generate and analyze diverse simulated scenarios by giving agents with personas, goals, and a structured thinking process.
+TheSimulation is an experiment exploring simulation theory using Large Language Models (LLMs) as a proxy. This project investigates how LLMs can be used to create autonomous agents ("Simulacra") that perceive, reflect, and act within a simulated environment constructed via language.
 
 ## Practical Applications
 
@@ -33,7 +31,7 @@ This research has potential practical applications across various fields:
 4.  **Urban Planning:** Simulating city development, modeling traffic patterns.
 5.  **Educational Tools:** Developing immersive historical simulations, creating interactive learning environments.
 6.  **Psychological Research:** Simulating social interactions, exploring cognitive processes.
-7.  **Crisis Management:** Simulating disaster scenarios, modeling response strategies.
+7.  **Self Simulation:** Simulate yourself, living a parallel life in a digital environment.
 8.  **Entertainment Industry:** Developing rich fictional worlds, simulating audience reactions.
 9.  **Ethical Decision Making:** Creating complex moral dilemmas for analysis.
 
@@ -51,7 +49,11 @@ Because language is this compressed representation of reality, an LLM in theory 
 
 If LLMs learns this model, then LLMs could potentially be used to simulate aspects of that reality with some degree of fidelity. This project is to investigate the creation of a "digital twin" of the world and an individual to see what happens.
 
-Currently it gives interesting results with all the mundane activities we conduct in life, will be running the system 24/7 with integration to X and Bluesky for realtime live updates of the simulation.
+Currently its fully functional as a base to add on.
+
+Integrations with MCP to the simulacra to interact as anybody would: Browse the web, send emails, post on social media ~ integrations TBD when I find time.
+
+Fine Tuning - for Simulacra agents as digital twin of an individual. TBD
 
 ### Design
 

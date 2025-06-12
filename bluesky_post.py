@@ -1,16 +1,23 @@
-import json
-import uuid
-import re
-import os
+import argparse  # Import argparse for command-line arguments
 import glob
+import json
+import os
+import re
+import time
+import traceback
+import uuid
 from io import BytesIO
-import argparse # Import argparse for command-line arguments
-from typing import Optional, List, Dict, Any # Added import for Optional, List, Dict, Any type hints
-from PIL import Image # For image compression
-from dotenv import load_dotenv
-from rich.console import Console # Added for console output in script
-from atproto import Client, models as atproto_models # Aliased import
+from typing import (  # Added import for Optional, List, Dict, Any type hints
+    Any, Dict, List, Optional)
+
 import google.generativeai as genai
+from atproto import Client
+from atproto import models as atproto_models  # Aliased import
+from dotenv import load_dotenv
+from google import \
+    genai as genai_image  # Added for narrative_image_generation_task
+from PIL import Image  # For image compression
+from rich.console import Console  # Added for console output in script
 
 # --- Configuration ---
 WORLD_SIMULATION_UUID = None # Will be loaded dynamically
@@ -26,8 +33,8 @@ SOCIAL_POST_HASHTAGS = os.getenv("SOCIAL_POST_HASHTAGS", "#TheSimulation #AI #Di
 bluesky_client = None
 
 # --- Google AI Clients (initialized later if needed) ---
-text_gen_client = None
-img_gen_client = None
+text_gen_client = genai.GenerativeModel('gemini-2.0-flash') # Replace with your model name
+img_gen_client = genai_image.Client()
 
 console = Console() # Initialize Rich console for script output
 
@@ -341,7 +348,7 @@ def process_events_file(filepath):
             else:
                 # No matching image found - ask if user wants to generate one
                 console.print("[yellow]No matching image found for this narrative.[/yellow]")
-                console.print(f"[cyan]Narrative text:[/cyan] {text_to_post_content[:100]}...")
+                console.print(f"[cyan]Narrative text:[/cyan] {text_to_post_content}")
                 
                 # Check if AI clients are initialized
                 enable_image_generation = os.environ.get("ENABLE_ON_DEMAND_IMAGE_GENERATION", "true").lower() == "true"
@@ -510,6 +517,7 @@ def get_random_style_combination(num_general=0, num_lighting=1, num_color=1,
 
 def generate_image_for_narrative(narrative_text, sim_time=None, weather="clear", world_mood="ordinary"):
     """Generate an image for a narrative text using Google's image generation API."""
+    global text_gen_client, img_gen_client    
     if not text_gen_client or not img_gen_client:
         console.print("[yellow]AI clients not initialized. Cannot generate image.[/yellow]")
         return None, None
@@ -522,7 +530,6 @@ def generate_image_for_narrative(narrative_text, sim_time=None, weather="clear",
     actor_name = "character"  # Extract from narrative if possible
     
     # Extract actor name with regex (optional)
-    import re
     actor_match = re.search(r"([A-Z][a-z]+ [A-Z][a-z]+|[A-Z][a-z]+) (?:looks|walks|sits|stands|observes|examines)", narrative_text)
     if actor_match:
         actor_name = actor_match.group(1)
@@ -562,67 +569,76 @@ Instructions for the Image:
 The image should feature:
 - Time of Day: Reflect the lighting and atmosphere typical of "{time_string}".
 - Weather: Depict the conditions described by "{weather}".
-
-ABSOLUTELY CRUCIAL EXCLUSIONS: No digital overlays, UI elements, watermarks, or logos. The actor ({actor_name}) or ANY human figures MUST NOT be visible in the image. The focus is SOLELY on the described scene, objects, or atmosphere.
+- Season: Infer the season from the date in the time string and depict it.
+- A clear subject directly related to the Narrative Context.
+- Lighting, composition, and focus that give it the aesthetic of a professional, high-engagement social media photograph.
+- A composition that is balanced and aesthetically pleasing, with a strong emphasis on a clear, well-defined subject within a natural or slightly blurred background.
+Style: Modern, editorial-quality, photo-realistic photograph, authentic textures, natural colors. Aspect ratio: 4:5 (portrait) or 1:1 (square).
+ABSOLUTELY CRUCIAL EXCLUSIONS: No digital overlays, UI elements, watermarks, or logos. The actor or ANY human figures MUST NOT be visible in the image. The focus is SOLELY on the described scene, objects, or atmosphere.
 Generate this image."""
 
-        # Generate the image
-        response = img_gen_client.GenerativeModel(
-            os.environ.get("IMAGE_GENERATION_MODEL_NAME", "imagen-3.0-generate-002")
-        ).generate_images(
-            prompt=prompt_for_image_gen,
-            # adjust parameters as needed
-        )
+        console.print(f"[dim]Refined image prompt:[/dim] {refined_narrative}")
         
-        # Save the image
-        if not response.images:
-            console.print("[yellow]No images were generated.[/yellow]")
+        # Generate the image
+        try:
+            response = img_gen_client.models.generate_images(
+                model="imagen-3.0-generate-002",
+                prompt=prompt_for_image_gen,
+                config=genai_image.types.GenerateImagesConfig(number_of_images=1)
+            )
+            
+            # Save the image
+            if not response.generated_images:
+                console.print("[yellow]No images were generated.[/yellow]")
+                return None, None
+                
+            # Create path and save image
+            if not WORLD_SIMULATION_UUID:
+                console.print("[yellow]No World UUID set. Using 'generated' as fallback.[/yellow]")
+                uuid_dir = "generated"
+            else:
+                uuid_dir = WORLD_SIMULATION_UUID
+                
+            # Make sure the image output directory exists
+            narrative_images_dir = os.path.join("data", "narrative_images")
+            os.makedirs(narrative_images_dir, exist_ok=True)
+            
+            uuid_image_output_dir = os.path.join(narrative_images_dir, uuid_dir)
+            os.makedirs(uuid_image_output_dir, exist_ok=True)
+            
+            # Save image
+            timestamp_str = time.strftime("%Y%m%d_%H%M%S")
+            sim_time_str = f"T{int(sim_time) if sim_time else 0}"
+            image_filename = f"narrative_{sim_time_str}_{timestamp_str}.png"
+            full_image_path = os.path.join(uuid_image_output_dir, image_filename)
+            
+            for gen_img in response.generated_images:
+                try:
+                    pil_image = Image.open(BytesIO(gen_img.image.image_bytes))
+                    pil_image.save(full_image_path)
+                    console.print(f"[green]Image saved to:[/green] {full_image_path}")
+                    
+                    # Return the relative path and the refined narrative as alt text
+                    relative_image_path = os.path.join(uuid_dir, image_filename)
+                    return relative_image_path, refined_narrative
+                except Exception as e_img_proc:
+                    console.print(f"[red]Error processing image:[/red] {e_img_proc}")
+                    traceback.print_exc()
+            
+            console.print("[yellow]No image data could be processed.[/yellow]")
             return None, None
             
-        # Create path and save image
-        if not WORLD_SIMULATION_UUID:
-            console.print("[yellow]No World UUID set. Using 'generated' as fallback.[/yellow]")
-            uuid_dir = "generated"
-        else:
-            uuid_dir = WORLD_SIMULATION_UUID
-            
-        # Make sure the image output directory exists
-        narrative_images_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                                          "data", "narrative_images")
-        os.makedirs(narrative_images_dir, exist_ok=True)
-        
-        uuid_image_output_dir = os.path.join(narrative_images_dir, uuid_dir)
-        os.makedirs(uuid_image_output_dir, exist_ok=True)
-        
-        # Save image
-        from datetime import datetime
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        sim_time_str = f"T{int(sim_time) if sim_time else 0}"
-        image_filename = f"narrative_{sim_time_str}_{timestamp_str}.png"
-        full_image_path = os.path.join(uuid_image_output_dir, image_filename)
-        
-        # Convert base64 to image and save
-        from PIL import Image
-        import base64
-        
-        if response.images:
-            with open(full_image_path, "wb") as f:
-                # Assuming images are returned as base64 or PIL objects
-                # Modify this part according to the actual API response
-                f.write(response.images[0])
-                
-            console.print(f"[green]Image saved to:[/green] {full_image_path}")
-            
-            # Return relative path for event log and alt text
-            relative_path = os.path.join(uuid_dir, image_filename)
-            return relative_path, refined_narrative
+        except Exception as e_gen:
+            console.print(f"[red]Error generating image:[/red] {e_gen}")
+            traceback.print_exc()
+            console.print("[red]Failed to generate image.[/red]")
+            return None, None
             
     except Exception as e:
-        console.print(f"[red]Error generating image:[/red] {e}")
-        import traceback
+        console.print(f"[red]Error during image generation process:[/red] {e}")
         traceback.print_exc()
-        
-    return None, None
+        console.print("[red]Failed to generate image.[/red]")
+        return None, None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process simulation event logs and post to Bluesky.")

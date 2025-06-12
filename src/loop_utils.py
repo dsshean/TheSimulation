@@ -680,6 +680,17 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.debug(f"Brute-force closing failed: {e}")
 
+    # Final fallback: Try using demjson3 if available (much more lenient parser)
+    try:
+        import demjson3
+        result = demjson3.decode(json_text)
+        logger.debug("JSON parsing successful with demjson3")
+        return result
+    except ImportError:
+        logger.debug("demjson3 not installed, skipping this fallback option")
+    except Exception as e:
+        logger.debug(f"demjson3 parsing failed: {e}")
+
     logger.warning(f"All JSON parsing attempts failed. Original: {json_text[:100]}...")
     return None
 
