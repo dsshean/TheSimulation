@@ -170,10 +170,10 @@ async def perform_adk_search_via_components(
 
     search_helper_app_name = f"{APP_NAME}_SearchHelperSession_{uuid.uuid4().hex[:6]}"
     search_runner = Runner(agent=search_agent, session_service=session_service, app_name=search_helper_app_name)
-    search_session_id = session_service.create_session(
+    search_session_id = (await session_service.create_session(
         app_name=search_helper_app_name,
         user_id="search_helper_user"
-    ).id
+    )).id
     logger.info(f"Performing ADK Google Search for: '{search_query}' (using temp session: {search_session_id})")
 
     trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=search_query)])
@@ -213,7 +213,7 @@ async def perform_adk_search_via_components(
         return None
     finally:
         try:
-            session_service.delete_session(session_id=search_session_id, app_name=search_helper_app_name, user_id="search_helper_user")
+            await session_service.delete_session(session_id=search_session_id, app_name=search_helper_app_name, user_id="search_helper_user")
             logger.debug(f"Deleted temporary search session: {search_session_id}")
         except Exception as e_del:
             logger.warning(f"Could not delete temporary search session {search_session_id}: {e_del}")
@@ -481,7 +481,7 @@ Respond ONLY with valid JSON matching the PersonaDetailsResponse schema.
                 logger.error(f"Error during PersonaGeneratorAgent_ADK execution: {event.error_message} (Code: {event.error_code})")
                 break
 
-        retrieved_session_after_persona = session_service.get_session(
+        retrieved_session_after_persona = await session_service.get_session(
             session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id
         )
 
@@ -540,7 +540,7 @@ Respond ONLY with valid JSON.
                     logger.error(f"Error during InitialRelationshipsAgent_ADK execution: {event.error_message} (Code: {event.error_code})")
                     break
 
-            retrieved_session_after_relationships = session_service.get_session(
+            retrieved_session_after_relationships = await session_service.get_session(
                 session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id
             )
             if retrieved_session_after_relationships and retrieved_session_after_relationships.state:
@@ -598,7 +598,7 @@ Respond ONLY with valid JSON.
                             if event.is_final_response(): break
                             if event.error_message: logger.error(f"Error during relationships for fallback: {event.error_message}"); break
 
-                        retrieved_session_after_fallback_rel = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+                        retrieved_session_after_fallback_rel = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
                         if retrieved_session_after_fallback_rel and retrieved_session_after_fallback_rel.state:
                             relationships_output_dict_fallback = retrieved_session_after_fallback_rel.state.get(relationships_agent_fallback.output_key)
                             if relationships_output_dict_fallback and isinstance(relationships_output_dict_fallback, dict):
@@ -690,7 +690,7 @@ Respond ONLY with valid JSON.
 """
         yearly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=yearly_prompt_text)])
 
-        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
+        if not await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error("Session lost before yearly one-shot call. Aborting yearly summaries.")
         else:
             yearly_output_dict: Optional[Dict] = None
@@ -702,7 +702,7 @@ Respond ONLY with valid JSON.
                     logger.error(f"Error during YearlyIterationAgent_ADK execution: {event.error_message}")
                     break
 
-            session_after_yearly = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+            session_after_yearly = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
             if session_after_yearly and session_after_yearly.state:
                 yearly_output_dict = session_after_yearly.state.get(yearly_iteration_agent.output_key)
                 if yearly_output_dict and isinstance(yearly_output_dict, dict):
@@ -766,7 +766,7 @@ Respond ONLY with valid JSON.
             )
             if s_results_string: news_context_for_this_month_str = s_results_string
 
-        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
+        if not await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before monthly iteration for {target_year_for_months}-{target_month_for_loop_start}. Aborting.")
             break
 
@@ -798,7 +798,7 @@ Respond ONLY with valid JSON.
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in MonthlyIterationAgent: {event.error_message}"); break
 
-        session_after_iteration_m = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        session_after_iteration_m = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_iteration_m and session_after_iteration_m.state:
             iteration_output_dict_m = session_after_iteration_m.state.get(monthly_iteration_agent.output_key)
             if iteration_output_dict_m and isinstance(iteration_output_dict_m, dict):
@@ -843,7 +843,7 @@ Respond ONLY with valid JSON.
             )
             if s_res_d_string: news_str_d = s_res_d_string
 
-        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
+        if not await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before daily iteration for {target_date_for_daily.isoformat()}. Aborting.")
             break
 
@@ -878,7 +878,7 @@ Respond ONLY with valid JSON.
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in DailyIterationAgent for {target_date_for_daily.isoformat()}: {event.error_message}"); break
 
-        session_after_iteration_d = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        session_after_iteration_d = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_iteration_d and session_after_iteration_d.state:
             iteration_output_dict_d = session_after_iteration_d.state.get(daily_iteration_agent.output_key)
             if iteration_output_dict_d and isinstance(iteration_output_dict_d, dict):
@@ -926,7 +926,7 @@ Respond ONLY with valid JSON.
                 hourly_specific_news_str = "No specific hourly-relevant events found from daily search."
 
         # Single call for the entire day's hourly breakdown
-        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
+        if not await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before hourly generation for day {target_date_for_hourly.isoformat()}. Aborting day.")
             continue # Skip to next day if session is lost
 
@@ -962,7 +962,7 @@ Respond ONLY with valid JSON.
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in HourlyIterationAgent for day {target_date_for_hourly.isoformat()}: {event.error_message}"); break
 
-        session_after_hourly_day = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        session_after_hourly_day = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_hourly_day and session_after_hourly_day.state:
             all_day_hourly_activities_dict = session_after_hourly_day.state.get(hourly_iteration_agent.output_key)
 
@@ -1130,7 +1130,7 @@ async def generate_new_simulacra_background(
 
     if session_service_instance:
         try:
-            created_session = session_service_instance.create_session(
+            created_session = await session_service_instance.create_session(
                 app_name=app_name_for_session, user_id=user_id_for_session
             )
             main_workflow_session_id = created_session.id

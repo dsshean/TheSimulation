@@ -365,7 +365,7 @@ You: exit
 sim_eleanor_vk39gj has returned to the simulation
 ```
 
-The client provides a powerful way to influence the simulation's narrative and create dynamic scenarios without interrupting the simulation's core execution.
+The client provides a way to influence the simulation's narrative and create dynamic scenarios without interrupting the simulation's core execution.
 
 ### Random Seed:
 
