@@ -94,11 +94,13 @@ async def time_manager_task(
                                         logger_instance.debug(f"[TimeManager] Pruned memory log for {agent_id} to {MAX_MEMORY_LOG_ENTRIES} entries.")
                             _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.pending_results", {}, logger_instance)
                         # else: # This log can be noisy if pending_results is often empty after completion_results
-                            # logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.")
-                        # Clear interrupt probability. Agent status will be set to 'idle' by the narration_task after observation update.
+                            # logger_instance.debug(f"[TimeManager] No pending results found for completed action of {agent_id}.") # noqa: E501
+                        # Clear interrupt probability.
                         _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.current_interrupt_probability", None, logger_instance) # Clear probability
-                        # _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger_instance) # REMOVED: Narration task will set to idle
-                        logger_instance.info(f"[TimeManager] Action for {agent_id} mechanically completed. Effects applied. Narration will set to idle.")
+                        # Set status to 'pending_narration' to prevent TimeManager re-processing.
+                        # The NarrationTask will set it to 'idle' after generating narration and updating observation.
+                        _update_state_value(current_state, f"{SIMULACRA_KEY}.{agent_id}.status", "pending_narration", logger_instance)
+                        logger_instance.info(f"[TimeManager] Action for {agent_id} mechanically completed. Effects applied. Status set to 'pending_narration'.")
 
             await process_pending_simulation_events(current_state, logger_instance)
             
