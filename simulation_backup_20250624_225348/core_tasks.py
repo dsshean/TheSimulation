@@ -102,8 +102,7 @@ async def time_manager_task(
     event_bus_qsize_func, # Function to get event_bus.qsize()
     narration_qsize_func, # Function to get narration_queue.qsize()
     live_display: Any, # Rich Live object
-    logger_instance: logging.Logger,
-    dashboard_app: Optional[Any] = None # Dashboard app for live updates
+    logger_instance: logging.Logger
 ):
     """Advances time, applies completed action effects, and updates display."""
     logger_instance.info("[TimeManager] Task started.")
@@ -190,18 +189,6 @@ async def time_manager_task(
                 logger_instance.debug(f"[TimeManager] Error processing narration events: {e}")
             
             live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
-            
-            # Update dashboard with live simulation data
-            if dashboard_app and hasattr(dashboard_app, 'update_live_simulation_data'):
-                try:
-                    dashboard_app.update_live_simulation_data(
-                        current_state, 
-                        event_bus_qsize_func(), 
-                        narration_qsize_func()
-                    )
-                except Exception as e:
-                    logger_instance.debug(f"[TimeManager] Error updating dashboard: {e}")
-            
             await asyncio.sleep(UPDATE_INTERVAL)
 
     except asyncio.CancelledError:

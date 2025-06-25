@@ -3,7 +3,6 @@ import datetime # This is correct for datetime.datetime.now()
 import sys
 import os # Added for os.makedirs
 import json # Added for JSON operations
-from typing import Optional
  
 def setup_unique_logger(
     logger_name="TheSimulationApp",
@@ -115,58 +114,3 @@ def setup_event_logger(instance_uuid: str = None, log_dir: str = "logs/events"):
     fh.setFormatter(JsonFormatter())
     event_logger.addHandler(fh)
     return event_logger, file_path
-
-
-def setup_textual_logger(
-    logger_name="TheSimulationApp",
-    file_prefix="TheSimulation", 
-    file_level=logging.DEBUG,
-    console_level=logging.INFO,
-    file_formatter_str='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    textual_handler=None,
-    file_mode='a'
-):
-    """
-    Sets up a logger that writes to a file and optionally to a Textual dashboard.
-    Similar to setup_unique_logger but with Textual integration.
-    
-    Args:
-        logger_name (str): The name for the logger instance.
-        file_prefix (str): The prefix for the log filename.
-        file_level (int): Logging level for the file handler.
-        console_level (int): Logging level for the textual handler.
-        file_formatter_str (str): Format string for file logs.
-        textual_handler: Optional Textual log handler instance.
-        file_mode (str): File mode for the FileHandler.
-    
-    Returns:
-        tuple[logging.Logger, str]: The configured logger instance and the log filename.
-    """
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f"{file_prefix}_{timestamp}.log"
-
-    # Get the root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(min(file_level, console_level))
-
-    # Clear existing handlers to avoid duplicates
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-
-    # File Handler
-    file_handler = logging.FileHandler(log_filename, mode=file_mode, encoding='utf-8')
-    file_handler.setLevel(file_level)
-    file_formatter = logging.Formatter(file_formatter_str)
-    file_handler.setFormatter(file_formatter)
-    root_logger.addHandler(file_handler)
-
-    # Textual Handler (if provided)
-    if textual_handler:
-        textual_handler.setLevel(console_level)
-        root_logger.addHandler(textual_handler)
-    
-    # Log the initialization
-    init_logger = logging.getLogger(logger_name)
-    init_logger.info(f"Textual logger configured. Logging to file: {log_filename}")
-    
-    return logging.getLogger(logger_name), log_filename

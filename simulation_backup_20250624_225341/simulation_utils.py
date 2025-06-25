@@ -456,23 +456,14 @@ def get_time_string_for_prompt(
 def _log_event(sim_time: float, agent_id: str, event_type: str, data: Dict[str, Any], logger_instance: logging.Logger, event_logger_global: logging.Logger):
     """Logs a structured event to the dedicated event logger."""
     if event_logger_global:
-        agent_type = "system"
-        if agent_id.startswith("sim_"):
-            agent_type = "simulacra"
-        elif agent_id == "WorldEngine":
-            agent_type = "world_engine"
-        elif agent_id == "Narrator":
-            agent_type = "narrator"
-
         log_entry = {
-            "sim_time_s": round(sim_time, 2),
+            "sim_time_s": round(sim_time, 2), # Round time for cleaner logs
             "agent_id": agent_id,
             "event_type": event_type,
-            "data": data,
-            "agent_type": agent_type
+            "data": data
         }
         try:
-            event_logger_global.info(json.dumps(log_entry), extra={'data': log_entry})
+            event_logger_global.info(json.dumps(log_entry))
         except Exception as e:
             logger_instance.error(f"Failed to log event (type: {event_type}, agent: {agent_id}) to event log: {e}", exc_info=True)
 

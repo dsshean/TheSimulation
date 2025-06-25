@@ -2,6 +2,7 @@ google-adk==1.0.0
 google-generativeai
 python-dotenv
 rich
+textual
 pillow
 duckduckgo_search
 geopy
