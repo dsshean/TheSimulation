@@ -209,7 +209,12 @@ async def process_message(
                     "actor_current_location_id": "global",
                     "world_mood": world_mood
                 }
-                await narration_queue.put(narration_event)
+                # Use temporal ordering system
+                from .simulation_async import add_narration_event_with_ordering
+                if add_narration_event_with_ordering is not None:
+                    await add_narration_event_with_ordering(narration_event, task_name="SocketServer_ExternalNarrative")
+                else:
+                    await narration_queue.put(narration_event)  # Fallback
                 
                 # Log the event
                 logger.info(f"[SocketServer] Successfully injected narrative and updated {len(active_sim_ids)} agents")
@@ -493,7 +498,12 @@ async def process_message(
             }
             
             # Add to the narration queue - this will be displayed by the main narration loop
-            await narration_queue.put(display_narration_event)
+            # Use temporal ordering system
+            from .simulation_async import add_narration_event_with_ordering
+            if add_narration_event_with_ordering is not None:
+                await add_narration_event_with_ordering(display_narration_event, task_name="SocketServer_InteractiveEvent")
+            else:
+                await narration_queue.put(display_narration_event)  # Fallback
             
             # Still update the agent and add to narrative log as before
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", formatted_event, logger)

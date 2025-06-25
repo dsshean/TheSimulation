@@ -49,7 +49,6 @@ class SingleYearDataFromADK(BaseModel):
     year: int
     location: str
     summary: str
-    news_context_used: Optional[str] = None
 
 class SingleMonthDataFromADK(BaseModel):
     month: int
@@ -159,56 +158,6 @@ async def _call_llm_and_get_validated_data(
         logger.error(f"Exception calling LLMService or processing result for '{operation_description}': {e}", exc_info=True)
         return None
 
-# --- Fictional News Generation Helper (ADK context) ---
-async def _generate_fictional_news_llm_adk(
-    llm_service: LLMService,
-    time_period_str: str,
-    location: Optional[str],
-    world_type: str,
-    world_description: str,
-    sim_persona_details_json_str: Optional[str] = None
-) -> str:
-    """Generates plausible fictional news snippets using LLMService for a given period and world."""
-    fallback_news = f"No specific fictional news generated for {time_period_str} in {location or 'this region'}."
-    if not llm_service:
-        logger.warning("LLMService not available for ADK fictional news generation.")
-        return fallback_news
-
-    persona_context_str = f"Consider the general context of a persona described by the following JSON: {sim_persona_details_json_str}" if sim_persona_details_json_str else ""
-
-    prompt = f"""
-You are a creative news writer for a fictional world.
-World Type: {world_type}
-World Description: {world_description}
-Current Time Period: {time_period_str}
-Current Location: {location or 'Not specified, assume general relevance to the world description.'}
-{persona_context_str}
-
-Task: Generate 1-3 concise, plausible, and distinct fictional news headlines or very short news summaries (1 sentence each) that would be relevant for someone living in this world, at this location, during this time period.
-These news items should feel like they could appear in a local or regional news feed.
-Focus on events that are:
-- Consistent with the World Type and Description.
-- Plausible for the specified time period and location.
-- Varied in nature (e.g., local politics, community events, technological advancements (if scifi), cultural happenings, minor unusual occurrences, economic news, environmental observations).
-- NOT directly about the specific persona, but general news they might encounter.
-
-Respond ONLY with the news items, each on a new line. Do not include any other conversational text or labels.
-If you generate multiple, separate them with a newline.
-"""
-    try:
-        logger.info(f"Requesting LLM (ADK context) for fictional news for {time_period_str} in {location or world_type}...")
-        response_text = await asyncio.to_thread(llm_service.generate_content_text, prompt=prompt, temperature=0.8) # Slightly more creative
-        if response_text and not response_text.startswith("Error:"):
-            cleaned_news = re.sub(r"^(News:|Headlines?:?\s*)","", response_text.strip(), flags=re.IGNORECASE).strip()
-            if cleaned_news:
-                logger.info(f"LLM (ADK context) generated fictional news for {time_period_str}: {cleaned_news}")
-                return cleaned_news
-        logger.error(f"LLM (ADK context) failed to generate or returned empty/error for fictional news for {time_period_str}. Response: {response_text}")
-        return fallback_news
-    except Exception as e:
-        logger.error(f"Error generating fictional news via LLM (ADK context) for {time_period_str}: {e}", exc_info=True)
-        return fallback_news
-
 # --- ADK Google Search Helper ---
 async def perform_adk_search_via_components(
     search_agent: LlmAgent,
@@ -221,10 +170,10 @@ async def perform_adk_search_via_components(
 
     search_helper_app_name = f"{APP_NAME}_SearchHelperSession_{uuid.uuid4().hex[:6]}"
     search_runner = Runner(agent=search_agent, session_service=session_service, app_name=search_helper_app_name)
-    search_session_id = (await session_service.create_session(
+    search_session_id = session_service.create_session(
         app_name=search_helper_app_name,
         user_id="search_helper_user"
-    )).id
+    ).id
     logger.info(f"Performing ADK Google Search for: '{search_query}' (using temp session: {search_session_id})")
 
     trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=search_query)])
@@ -264,7 +213,7 @@ async def perform_adk_search_via_components(
         return None
     finally:
         try:
-            await session_service.delete_session(session_id=search_session_id, app_name=search_helper_app_name, user_id="search_helper_user")
+            session_service.delete_session(session_id=search_session_id, app_name=search_helper_app_name, user_id="search_helper_user")
             logger.debug(f"Deleted temporary search session: {search_session_id}")
         except Exception as e_del:
             logger.warning(f"Could not delete temporary search session {search_session_id}: {e_del}")
@@ -339,10 +288,8 @@ You will receive a detailed prompt containing:
     - **Impact of External Context:** Weave in the provided "News/External Context" for the year. Show how these events might have directly impacted the persona's life, decisions, or outlook, or how they served as a backdrop to their personal story. If no direct impact, describe how the persona might have perceived or reacted to these events.
 - Include the persona's primary location for that year and key life events (personal, professional, relationships), consistent with all provided context.
 - If generating birth year summary, include plausible birth month and day.
-- For each year's summary object in the "summaries" list, include a "news_context_used" field. This field should contain the specific news string for THAT year, extracted from the "News/External Context" JSON provided in your input prompt. If no specific context was available for a year in the input, use a placeholder like "No specific news context provided for this year."
 
-**Output Format:** Respond ONLY with JSON:
-`{{"birth_month": Optional[int], "birth_day": Optional[int], "summaries": [{{"year": int, "location": str, "summary": str, "news_context_used": str}}]}}`
+**Output Format:** Respond ONLY with JSON: {{"birth_month": int, "birth_day": int, "summaries": [{{"year": int, "location": str, "summary": str}}]}}
 """,
         output_schema=YearlySummariesADKResponse, # Output is now a list of summaries
         output_key="yearly_summaries_list_json"  # New output key
@@ -534,7 +481,7 @@ Respond ONLY with valid JSON matching the PersonaDetailsResponse schema.
                 logger.error(f"Error during PersonaGeneratorAgent_ADK execution: {event.error_message} (Code: {event.error_code})")
                 break
 
-        retrieved_session_after_persona = await session_service.get_session(
+        retrieved_session_after_persona = session_service.get_session(
             session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id
         )
 
@@ -593,7 +540,7 @@ Respond ONLY with valid JSON.
                     logger.error(f"Error during InitialRelationshipsAgent_ADK execution: {event.error_message} (Code: {event.error_code})")
                     break
 
-            retrieved_session_after_relationships = await session_service.get_session(
+            retrieved_session_after_relationships = session_service.get_session(
                 session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id
             )
             if retrieved_session_after_relationships and retrieved_session_after_relationships.state:
@@ -651,7 +598,7 @@ Respond ONLY with valid JSON.
                             if event.is_final_response(): break
                             if event.error_message: logger.error(f"Error during relationships for fallback: {event.error_message}"); break
 
-                        retrieved_session_after_fallback_rel = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+                        retrieved_session_after_fallback_rel = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
                         if retrieved_session_after_fallback_rel and retrieved_session_after_fallback_rel.state:
                             relationships_output_dict_fallback = retrieved_session_after_fallback_rel.state.get(relationships_agent_fallback.output_key)
                             if relationships_output_dict_fallback and isinstance(relationships_output_dict_fallback, dict):
@@ -694,29 +641,17 @@ Respond ONLY with valid JSON.
 
     console.print(Rule("Generating Yearly Summaries (One-Shot ADK Call)", style="bold yellow"))
     news_context_by_year_with_str_keys: Dict[str, str] = {} # Changed to Dict[str, str]
-
-    console.print(Panel("Pre-fetching/generating news context for all relevant years...", title="Yearly News Context Phase", style="dim"))
-    for year_to_search in range(birth_year, end_year_for_generation + 1):
-        year_str = str(year_to_search)
-        if allow_real_context and search_llm_agent:
+    if allow_real_context and search_llm_agent:
+        console.print(Panel("Pre-fetching news context for all relevant years...", title="News Search Phase", style="dim"))
+        for year_to_search in range(birth_year, end_year_for_generation + 1):
             search_query = f"major world events {year_to_search}"
             search_results_string = await perform_adk_search_via_components(
                 search_llm_agent, session_service, search_query
             )
             if search_results_string:
-                news_context_by_year_with_str_keys[year_str] = search_results_string
+                news_context_by_year_with_str_keys[str(year_to_search)] = search_results_string # Use string key
             else:
-                news_context_by_year_with_str_keys[year_str] = "No specific external events found or search failed."
-        else:
-            logger.info(f"Generating fictional news for year {year_to_search} (ADK Orchestration)...")
-            fictional_news = await _generate_fictional_news_llm_adk(
-                llm_service, f"the year {year_to_search}",
-                f"the world of {initial_user_input.get('world_type')}", # General location for yearly
-                initial_user_input.get("world_type"), initial_user_input.get("world_description"),
-                persona_details_json_str_for_loop
-            )
-            news_context_by_year_with_str_keys[year_str] = fictional_news
-            logger.info(f"Fictional news for ADK year {year_to_search}: {fictional_news[:200]}...")
+                news_context_by_year_with_str_keys[str(year_to_search)] = "No specific external events found or search failed." # Use string key
 
     world_details_json = json.dumps({
         "world_type": initial_user_input.get("world_type"),
@@ -734,9 +669,9 @@ Respond ONLY with valid JSON.
 
         context_instruction_for_yearly = ""
         if allow_real_context:
-            context_instruction_for_yearly = "Use the provided News Context (which may contain real-world events if applicable to the world type) and your internal knowledge for these years."
+            context_instruction_for_yearly = "Use the provided News Context and your internal knowledge of real-world events for these years."
         else:
-            context_instruction_for_yearly = f"Use the provided Fictional News Context (snippets like: '{str(list(news_context_by_year_with_str_keys.values())[0])[:100].replace('\n',' / ')}...') and your internal knowledge of the fictional world to detail the persona's life. The Fictional News Context was generated to be plausible for this world."
+            context_instruction_for_yearly = f"Invent plausible fictional events or details for these years, consistent with the world type and description provided. Do NOT use real-world events."
 
         yearly_prompt_text = f"""
 Persona Details (JSON): {persona_details_json_str_for_loop}
@@ -755,7 +690,7 @@ Respond ONLY with valid JSON.
 """
         yearly_trigger_content = genai_types.UserContent(parts=[genai_types.Part(text=yearly_prompt_text)])
 
-        if not await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error("Session lost before yearly one-shot call. Aborting yearly summaries.")
         else:
             yearly_output_dict: Optional[Dict] = None
@@ -767,7 +702,7 @@ Respond ONLY with valid JSON.
                     logger.error(f"Error during YearlyIterationAgent_ADK execution: {event.error_message}")
                     break
 
-            session_after_yearly = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+            session_after_yearly = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
             if session_after_yearly and session_after_yearly.state:
                 yearly_output_dict = session_after_yearly.state.get(yearly_iteration_agent.output_key)
                 if yearly_output_dict and isinstance(yearly_output_dict, dict):
@@ -824,26 +759,14 @@ Respond ONLY with valid JSON.
         yearly_summary_for_target_year_json = json.dumps(yearly_summary_for_target_year_dict)
         news_context_for_this_month_key = f"{target_year_for_months}-{target_month_for_loop_start:02d}"
         news_context_for_this_month_str = "No external context used."
-
         if allow_real_context and search_llm_agent:
             s_results_string = await perform_adk_search_via_components(
                 search_llm_agent, session_service,
                 f"major events {yearly_summary_for_target_year_dict.get('location', '')} {news_context_for_this_month_key}"
             )
             if s_results_string: news_context_for_this_month_str = s_results_string
-        else:
-            logger.info(f"Generating fictional news for month {news_context_for_this_month_key} (ADK Orchestration)...")
-            fictional_news_monthly = await _generate_fictional_news_llm_adk(
-                llm_service, f"the month of {news_context_for_this_month_key}",
-                yearly_summary_for_target_year_dict.get('location'),
-                initial_user_input.get("world_type"), initial_user_input.get("world_description"),
-                persona_details_json_str_for_loop
-            )
-            news_context_for_this_month_str = fictional_news_monthly
-            logger.info(f"Fictional news for ADK month {news_context_for_this_month_key}: {fictional_news_monthly[:200]}...")
 
-        current_session_check_m = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-        if not current_session_check_m:
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before monthly iteration for {target_year_for_months}-{target_month_for_loop_start}. Aborting.")
             break
 
@@ -851,7 +774,7 @@ Respond ONLY with valid JSON.
         if allow_real_context:
             monthly_context_instruction = "Use the provided News Context and your internal knowledge of real-world events for this month."
         else:
-            monthly_context_instruction = f"Use the provided Fictional News Context (snippets like: '{news_context_for_this_month_str[:100].replace('\n',' / ')}...') and your internal knowledge of the fictional world to detail the persona's life for this month. The Fictional News Context was generated to be plausible for this world."
+            monthly_context_instruction = f"Invent plausible fictional events or details for this month, consistent with the world type and description. Do NOT use real-world events."
 
         monthly_prompt_text = f"""
 Persona Details (JSON): {persona_details_json_str_for_loop}
@@ -875,7 +798,7 @@ Respond ONLY with valid JSON.
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in MonthlyIterationAgent: {event.error_message}"); break
 
-        session_after_iteration_m = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        session_after_iteration_m = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_iteration_m and session_after_iteration_m.state:
             iteration_output_dict_m = session_after_iteration_m.state.get(monthly_iteration_agent.output_key)
             if iteration_output_dict_m and isinstance(iteration_output_dict_m, dict):
@@ -913,26 +836,14 @@ Respond ONLY with valid JSON.
         monthly_summary_d_json = json.dumps(monthly_summary_d_dict)
         news_key_d = target_date_for_daily.isoformat()
         news_str_d = "No external context."
-
         if allow_real_context and search_llm_agent:
             s_res_d_string = await perform_adk_search_via_components(
                 search_llm_agent, session_service,
                 f"local events and news {monthly_summary_d_dict.get('location','')} {news_key_d}"
             )
             if s_res_d_string: news_str_d = s_res_d_string
-        else:
-            logger.info(f"Generating fictional news for day {news_key_d} (ADK Orchestration)...")
-            fictional_news_daily = await _generate_fictional_news_llm_adk(
-                llm_service, f"the day {news_key_d}",
-                monthly_summary_d_dict.get('location'),
-                initial_user_input.get("world_type"), initial_user_input.get("world_description"),
-                persona_details_json_str_for_loop
-            )
-            news_str_d = fictional_news_daily
-            logger.info(f"Fictional news for ADK day {news_key_d}: {fictional_news_daily[:200]}...")
 
-        current_session_check_d = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
-        if not current_session_check_d:
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before daily iteration for {target_date_for_daily.isoformat()}. Aborting.")
             break
 
@@ -940,7 +851,7 @@ Respond ONLY with valid JSON.
         if allow_real_context:
             daily_context_instruction = "Use the provided News Context and your internal knowledge of real-world events for this day."
         else:
-            daily_context_instruction = f"Use the provided Fictional News Context (snippets like: '{news_str_d[:100].replace('\n',' / ')}...') and your internal knowledge of the fictional world to detail the persona's life for this day. The Fictional News Context was generated to be plausible for this world."
+            daily_context_instruction = f"Invent plausible fictional events or details for this day, consistent with the world type and description. Do NOT use real-world events."
 
         yearly_summary_for_daily_context_json = json.dumps(life_summary["yearly_summaries"].get(yr_d, {}))
 
@@ -967,7 +878,7 @@ Respond ONLY with valid JSON.
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in DailyIterationAgent for {target_date_for_daily.isoformat()}: {event.error_message}"); break
 
-        session_after_iteration_d = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        session_after_iteration_d = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_iteration_d and session_after_iteration_d.state:
             iteration_output_dict_d = session_after_iteration_d.state.get(daily_iteration_agent.output_key)
             if iteration_output_dict_d and isinstance(iteration_output_dict_d, dict):
@@ -1003,30 +914,19 @@ Respond ONLY with valid JSON.
         
         # Fetch specific news for this day to be used for hourly generation
         hourly_specific_news_str = "No external hourly context used."
-        if target_date_for_hourly == character_current_sim_date_d: # Only fetch/generate for "today"
-            if allow_real_context and search_llm_agent:
-                hourly_search_query = f"immediate local news or events affecting {daily_summary_h.get('location', 'this area')} on {target_date_for_hourly.strftime('%B %d, %Y')}"
-                logger.info(f"Performing ADK Google Search for daily context for hourly generation (day {target_date_for_hourly.isoformat()}): '{hourly_search_query}'")
-                s_results_hourly_string = await perform_adk_search_via_components(
-                    search_llm_agent, session_service, hourly_search_query
-                )
-                if s_results_hourly_string:
-                    hourly_specific_news_str = s_results_hourly_string
-                else:
-                    hourly_specific_news_str = "No specific hourly-relevant events found from daily search."
+        if allow_real_context and search_llm_agent:
+            hourly_search_query = f"immediate local news or events affecting {daily_summary_h.get('location', 'this area')} on {target_date_for_hourly.strftime('%B %d, %Y')}"
+            logger.info(f"Performing ADK Google Search for daily context for hourly generation (day {target_date_for_hourly.isoformat()}): '{hourly_search_query}'")
+            s_results_hourly_string = await perform_adk_search_via_components(
+                search_llm_agent, session_service, hourly_search_query
+            )
+            if s_results_hourly_string:
+                hourly_specific_news_str = s_results_hourly_string
             else:
-                logger.info(f"Generating fictional news for hourly context for day {target_date_for_hourly.isoformat()} (ADK Orchestration)...")
-                fictional_news_hourly_day = await _generate_fictional_news_llm_adk(
-                    llm_service, f"local happenings on the day {target_date_for_hourly.isoformat()}",
-                    daily_summary_h.get('location'),
-                    initial_user_input.get("world_type"), initial_user_input.get("world_description"),
-                    persona_details_json_str_for_loop
-                )
-                hourly_specific_news_str = fictional_news_hourly_day
-                logger.info(f"Fictional news for ADK hourly context (day {target_date_for_hourly.isoformat()}): {fictional_news_hourly_day[:200]}...")
+                hourly_specific_news_str = "No specific hourly-relevant events found from daily search."
 
         # Single call for the entire day's hourly breakdown
-        if not await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id): # Check session before call
+        if not session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id):
             logger.error(f"Session lost before hourly generation for day {target_date_for_hourly.isoformat()}. Aborting day.")
             continue # Skip to next day if session is lost
 
@@ -1034,7 +934,7 @@ Respond ONLY with valid JSON.
         if allow_real_context:
             hourly_context_instruction_for_day = "Consider the provided local news context for the day. Invent plausible activities for each hour."
         else:
-            hourly_context_instruction_for_day = f"Use the provided Fictional Local Context for the day (snippets like: '{hourly_specific_news_str[:100].replace('\n',' / ')}...') and your internal knowledge of the fictional world to detail the persona's hourly activities. The Fictional Local Context was generated to be plausible for this world."
+            hourly_context_instruction_for_day = f"Invent plausible fictional activities for each hour of this day, consistent with the world type and description. Do NOT use real-world events."
 
         monthly_summary_for_hourly_context_json = json.dumps(life_summary["monthly_summaries"].get(yr_h, {}).get(m_h, {}))
         yearly_summary_for_hourly_context_json = json.dumps(life_summary["yearly_summaries"].get(yr_h, {}))
@@ -1062,7 +962,7 @@ Respond ONLY with valid JSON.
             if event.is_final_response(): break
             if event.error_message: logger.error(f"Error in HourlyIterationAgent for day {target_date_for_hourly.isoformat()}: {event.error_message}"); break
 
-        session_after_hourly_day = await session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
+        session_after_hourly_day = session_service.get_session(session_id=session_id_for_workflow, app_name=session_app_name, user_id=session_user_id)
         if session_after_hourly_day and session_after_hourly_day.state:
             all_day_hourly_activities_dict = session_after_hourly_day.state.get(hourly_iteration_agent.output_key)
 
@@ -1230,7 +1130,7 @@ async def generate_new_simulacra_background(
 
     if session_service_instance:
         try:
-            created_session = await session_service_instance.create_session(
+            created_session = session_service_instance.create_session(
                 app_name=app_name_for_session, user_id=user_id_for_session
             )
             main_workflow_session_id = created_session.id

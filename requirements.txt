@@ -7,3 +7,5 @@ duckduckgo_search
 geopy
 timezonefinder
 atproto
+pygame
+websockets

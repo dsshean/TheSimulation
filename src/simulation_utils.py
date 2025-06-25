@@ -26,7 +26,7 @@ from timezonefinder import TimezoneFinder
 # Import constants from the config module
 from .config import APP_NAME  # Added APP_NAME for geopy user_agent
 from .config import (  # PROB_INTERJECT_AS_NARRATIVE removed; SIMULACRA_KEY is imported from config and will now point to "simulacra_profiles"; Added SIMULACRA_KEY; Added WORLD_STATE_KEY, LOCATION_DETAILS_KEY
-    ACTIVE_SIMULACRA_IDS_KEY, LOCATION_DETAILS_KEY, LOCATION_KEY, MODEL_NAME,
+    ACTIVE_SIMULACRA_IDS_KEY, CURRENT_LOCATION_KEY, LOCATION_DETAILS_KEY, LOCATION_KEY, MODEL_NAME,
     SIMULACRA_KEY, WORLD_STATE_KEY,
     WORLD_TEMPLATE_DETAILS_KEY)
 from .loop_utils import \
@@ -95,7 +95,7 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
 
     for i, sim_id in enumerate(active_sim_ids):
         if i == 0: # Get location of the first active simulacra for object display
-            primary_actor_location_id = get_nested(current_state, SIMULACRA_KEY, sim_id, "location")
+            primary_actor_location_id = get_nested(current_state, SIMULACRA_KEY, sim_id, CURRENT_LOCATION_KEY)
 
         if i >= sim_limit and sim_limit > 0 : # Add check for sim_limit > 0
             table2.add_row(f"... ({len(active_sim_ids) - sim_limit} more)", "...")
@@ -103,7 +103,7 @@ def generate_table(current_state: Dict[str, Any], event_bus_qsize: int, narratio
         sim_state_data = get_nested(current_state, SIMULACRA_KEY, sim_id, default={})
         table2.add_row(Text(f"--- Sim: {get_nested(sim_state_data, 'persona_details', 'Name', default=sim_id)} ---", style="bold magenta"), Text("---", style="bold magenta"))
         table2.add_row(f"  Status", get_nested(sim_state_data, 'status', default="Unknown"))
-        table2.add_row(f"  Location", get_nested(sim_state_data, 'location', default="Unknown"))
+        table2.add_row(f"  Location", get_nested(sim_state_data, CURRENT_LOCATION_KEY, default="Unknown"))
         sim_goal = get_nested(sim_state_data, 'goal', default="Unknown")
         table2.add_row(f"  Goal", sim_goal[:35] + ("..." if len(sim_goal) > 35 else ""))
         table2.add_row(f"  Action End", f"{get_nested(sim_state_data, 'current_action_end_time', default=0.0):.2f}s" if get_nested(sim_state_data, 'status')=='busy' else "N/A")
@@ -641,6 +641,9 @@ def handle_action_interruption(state, target_id, interrupter_id, interrupter_nam
                         current_action_desc, logger)
     _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.interrupted_by", 
                         interrupter_name, logger)
+    
+    # Set flag to prevent further interruptions of this specific action
+    _update_state_value(state, f"{SIMULACRA_KEY}.{target_id}.action_interrupted_flag", True, logger)
     
     # Log the event for debugging and narrative purposes
     _log_event(state, "action_interrupted", 

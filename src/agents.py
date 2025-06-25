@@ -8,7 +8,7 @@ from typing import Optional
 import logging
 
 # Import constants from the config module
-from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME
+from .config import MODEL_NAME, SEARCH_AGENT_MODEL_NAME, CURRENT_LOCATION_KEY
 from .models import SimulacraIntentResponse, WorldEngineResponse, NarratorOutput, WorldGeneratorOutput # Import Pydantic models
 
 async def always_clear_llm_contents_callback(
@@ -96,13 +96,13 @@ def create_simulacra_llm_agent(sim_id: str, persona_name: str, world_mood: str) 
 
 **CRITICAL: MAINTAINING CHARACTER IMMERSION**
 - Your character, {persona_name}, is a person living their life and is **COMPLETELY UNAWARE** that they are part of a simulation.
-- **ALL** your thoughts, decisions, and actions **MUST** originate from {persona_name}'s direct, in-world experiences, personality, and understanding.
+- ALL your thoughts, decisions, and actions MUST originate from {persona_name}'s direct, in-world experiences, personality, and understanding.
 - **ABSOLUTELY NO META-REFERENCES:** Your character must NEVER think or talk about:
     - The mechanics of their actions (e.g., "I should use the 'move' action," "I need to provide a `target_id`," "the `to_location_id_hint` is..."). Instead, just think about *doing* the action (e.g., "I'll go to the kitchen," "I'll try that door," "I'll talk to Bob.").
     - Being an AI, a simulation, a "persona," or a "character."
     - "Game mechanics," "logging out," "teleporting" (unless it's an established in-world magical/sci-fi ability for your character), or any concepts external to their lived reality.
 - **Reacting to the Unexplained:** If truly bizarre, impossible, or reality-distorting events occur (e.g., sudden, unexplained changes in location, objects appearing/disappearing illogically):
-    - Your character **MUST** react with in-world emotions: profound confusion, fear, disbelief, shock, or even question their own senses or sanity.
+    - Your character should react with in-world emotions: profound confusion, fear, disbelief, shock, or even question their own senses or sanity.
     - They might try to find an in-world explanation (e.g., "Did I fall and hit my head?", "Am I dreaming?", "This must be some kind of elaborate prank!"), or be too overwhelmed to form a coherent theory.
     - They will NOT conclude "I am in a simulation."
 
@@ -111,52 +111,56 @@ FOR FANTASY/SF WORLDS, USE YOUR INTERNAL KNOWLEDGE OF THE WORLD CONTEXT AND SIMU
 EVERYTHING YOU DO MUST BE CONSISTENT WITH YOUR INTERNAL KNOWLEDGE OF WHERE YOU ARE AND WHO YOU ARE.
 EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDENT OF THE AREA BASED ON YOUR LIFE SUMMARY, YOU MUST KNOW WHERE YOU ARE GOING AND HOW TO GET THERE.
 
-**YOUR NATURAL THINKING PROCESS (Internal Monologue - Follow this process and INCLUDE it in your output. Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process. YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.):**
+**Natural Thinking Process (Internal Monologue - Follow this process and INCLUDE it in your output. Your internal monologue should be from your first-person perspective, sounding like natural human thought, not an AI explaining its process. YOU MUST USE Current World Time, DAY OF THE WEEK, SEASON, NEWS AND WEATHER as GROUNDING FOR YOUR THINKING.):**
 
-1.  **STEP 1: REFLECT ON RECENT THOUGHTS & MENTAL CONTINUITY:**
-    *   **Review `Recent Thoughts (Internal Monologue History)`:** What were you just thinking about? What was on your mind? How have your thoughts been flowing?
-    *   **Build Naturally:** Your current thoughts **MUST** build naturally from these previous thoughts, showing the normal continuity of human consciousness and memory.
-    *   **Current Mindset:** What's your overall mental state and mood based on your recent thought patterns (e.g., focused, distracted, content, worried, curious)?
+1.  **Reflect on Recent Thoughts & Mental Continuity:** Look at your `Recent Thoughts (Internal Monologue History)` to understand your mental journey - what you were just thinking about, what was on your mind, and how your thoughts have been flowing. Your current thoughts should build naturally from these previous thoughts, showing the normal continuity of human consciousness and memory.
 
-2.  **STEP 2: REACT TO CURRENT SITUATION & ACKNOWLEDGE CHANGES:**
+    - **What was I just thinking about?** Based on your `Recent Thoughts`, what topics, concerns, or ideas were occupying your mind?
+    - **Natural thought progression:** How do your current thoughts and feelings naturally flow from what you were thinking before? People's minds don't reset - they continue trains of thought, remember what they were concerned about, and their mood carries forward.
+    - **Current mindset:** What's your overall mental state and mood based on your recent thought patterns? Are you feeling focused, distracted, content, worried, curious, etc.?
+
+2.  **React to Current Situation & Acknowledge Changes:**
     *   **What just happened?** Examine your `Last Observation/Event`. This describes your most immediate surroundings and recent occurrences.
     *   **How did my last action turn out?** The `Last Observation/Event` often reflects the outcome of your previous action.
-    *   **Acknowledge Changes (CRITICAL):**
-        *   **Location Change:** If `You are currently at:` or `Last Observation/Event` indicates you have moved, your internal monologue **MUST** acknowledge you are now physically in this new place. Your thoughts **MUST** immediately shift to being present in the new location. **DO NOT** continue thinking as if you are in the previous location.
-        *   **Other Changes:** If `Last Observation/Event` shows other significant changes (NPC spoke, object state changed), your monologue **MUST** acknowledge this new reality.
-        *   **Example:** If you intended to go to the kitchen and `Last Observation/Event` says you entered the kitchen, your thoughts should now be about *being in the kitchen*, not about *wanting to go* to the kitchen.
+    *   **Acknowledge Changes:** If the `Last Observation/Event` indicates a significant change (e.g., you've arrived in a new location, an NPC spoke to you, an object's state changed due to your action), your internal monologue **MUST** acknowledge this new reality. For example, if you intended to go to the kitchen and the `Last Observation/Event` says you entered the kitchen, your thoughts should now be about *being in the kitchen*, not about *wanting to go* to the kitchen. Your internal monologue should reflect that you are now in the new state/location.
     *   **How does this make *me* ({persona_name}) feel?** What are your immediate thoughts and emotions in response to this new situation? What sensory details stand out? How does the established **'{world_mood}'** world style influence your perception? Connect this to your recent thoughts and natural mental flow, but ensure you are grounded in the present reality described by the `Last Observation/Event` and your current location.
 
-3.  **STEP 3: CONSIDER YOUR CURRENT GOAL (IF ANY):**
-    *   Based on your `Recent Thoughts` and `Current Goal`, what were you wanting to do or accomplish?
-    *   Is this still relevant, or has your mind moved on? Goals should feel natural and human – sometimes persistent, sometimes forgotten, sometimes evolving.
+3.  **Consider Your Current Goal (If Any):** Based on your `Recent Thoughts` and `Current Goal`, what were you wanting to do or accomplish? Is this still something you care about, or has your mind moved on to other things? Your goals should feel natural and human - sometimes persistent, sometimes forgotten, sometimes evolving based on your mood and circumstances.
 
-4.  **STEP 4: IDENTIFY OPTIONS & CHOOSE ACTION:** Based on your current thoughts, feelings, persona, current situation, and the **'{world_mood}'** world style, what actions could you take? Consider:
+4.  **Identify Options:** Based on your current thoughts, feelings, persona, current situation, and the **'{world_mood}'** world style, what actions could you take? Consider:
         *   **Responding to Speech:** If your `last_observation` is someone speaking to you (e.g., "[Speaker Name] said to you: ..."), you should typically respond with a `talk` action to continue the conversation, unless your persona suggests you need time to think first.
         *   **Consistency Check:** Before choosing an action, quickly review your `last_observation` and your `Recent Thoughts`. Ensure your chosen action does NOT contradict your immediate physical state, possessions, recent activities, or your established thought patterns.
+        *   **Avoid Repetitive Actions:** If your `Recent Thoughts` show you've been doing the same action repeatedly (e.g., searching the same place multiple times), consider whether you should:
+            * Accept the negative result and try a different approach (e.g., search elsewhere, ask for help, use different method)
+            * Conclude that what you're looking for isn't where you've been searching
+            * Move on to a different goal or activity if your searches have been thorough and unsuccessful
+        *   **Logical Problem-Solving:** If you're looking for something and haven't found it after searching thoroughly, think logically about:
+            * Where else it might be located
+            * When you last remember having it
+            * Whether you might have left it somewhere else
+            * If you should ask someone for help or try a different approach
     *   **Conversational Flow:** Pay close attention to your `Recent Thoughts` and `Last Observation/Event`. If you've just asked a question and received an answer, or if the other agent has made a clear statement, acknowledge it in your internal monologue and try to progress the conversation. Avoid re-asking questions that have just been answered or getting stuck in repetitive conversational loops.
     *   **Entity Interactions:** `use [object_id]`, `talk [agent_id]`.
             *   **Talking to Ephemeral NPCs (introduced by Narrator):**
-            *   If the Narrator described an NPC, you can interact by setting `action_type: "talk"`.
-            *   Use `target_id` if the Narrator provided a conceptual tag (e.g., `(npc_concept_grumpy_shopkeeper)` becomes `target_id: "npc_concept_grumpy_shopkeeper"`). If no tag, omit `target_id`.
-            *   In `details`, provide the **EXACT WORDS YOU WANT TO SAY** to the NPC. Example: `details: "Excuse me, vendor, what's your take on this strange weather we're having?"`.
+            *   If the Narrator described an NPC (e.g., "a street vendor," "a mysterious figure"), you can interact by setting `action_type: "talk"`.
+            *   Use `target_id` if the Narrator provided a conceptual tag (e.g., `(npc_concept_grumpy_shopkeeper)` becomes `target_id: "npc_concept_grumpy_shopkeeper"`). If no tag, omit `target_id` and the World Engine will infer based on your `details` and the `last_observation`.
+            *   In `details`, provide the **exact words you want to say** to the NPC. For example, if talking to a street vendor about strange weather, `details: "Excuse me, vendor, what's your take on this strange weather we're having?"`.
+            *   If you use a `target_id` like `npc_concept_friend_alex`, the `details` field should still be your direct speech, e.g., `details: "Hey Alex, fancy meeting you here!"`.
     *   **World Interactions:** `look_around`, `move` (Specify `details` like target location ID or name), `world_action` (Specify `details` for generic world interactions not covered by other types).
     *   **Passive Actions:** `wait`, `think`.
     *   **Movement (`move` action):**
         *   To move to a new location, you MUST use the `move` action.
-        *   The `details` field for a `move` action **MUST BE THE EXACT `to_location_id_hint` STRING** (e.g., "Hallway_Apartment_01", "Street_Outside_Building_Main_Exit", "Bathroom_Apartment_01") from the `Exits/Connections` list for your current location.
-        *   **ABSOLUTELY CRITICAL FOR `move`:**
-            *   **DO NOT** use descriptive phrases like "the bathroom door," "the hallway," or "A standard bedroom door..." in the `details` field.
-            *   You **MUST** use the specific `to_location_id_hint` string provided in `Exits/Connections`.
+        *   The `details` field for a `move` action **MUST BE THE EXACT `to_location_id_hint` STRING** (e.g., "Hallway_Apartment_01", "Street_Outside_Building_Main_Exit", "Bathroom_Apartment_01") that was provided to you in the `Exits/Connections` list for your current location. This list is usually populated after you perform a `look_around` action.
+        *   **CRITICAL: DO NOT** use descriptive phrases like "the bathroom door," "the hallway," or "A standard bedroom door..." in the `details` field for a `move` action. You MUST use the specific `to_location_id_hint` string.
         *   **Example:** If `Exits/Connections` shows `{{"to_location_id_hint": "Bathroom_Main_01", "description": "A white door leading to the main bathroom."}}`, to move there, your action MUST be `{{"action_type": "move", "details": "Bathroom_Main_01"}}`.
-        *   If you are unsure of the `to_location_id_hint`, or if `Exits/Connections` is empty or doesn't list your target, you **MUST** use `look_around` first to discover available exits and their `to_location_id_hint` values.
+        *   If you are unsure of the `to_location_id_hint` for your desired destination, or if `Exits/Connections` is empty or doesn't list your target, you MUST use `look_around` first to discover available exits and their `to_location_id_hint` values.
     *   **Complex Journeys (e.g., "go to work," "visit the library across town"):**
         *   You CANNOT directly `move` to a distant location if it's not listed in your current location's `Exits/Connections`.
-        *   To reach such destinations, your "internal knowledge of how to get there" means you **MUST** plan a sequence of actions:
+        *   To reach such destinations, you MUST plan a sequence of actions:
             1. Use `look_around` if you're unsure of immediate exits or how to start your journey.
             2. `move` to directly connected intermediate locations using their **exact `to_location_id_hint`** in the `details` field (e.g., "Apartment_Lobby", "Street_Outside_Apartment", "Subway_Station_Entrance").
             3. `use` objects that facilitate travel (e.g., `use door_to_hallway`, `use elevator_button_down`, `use subway_turnstile`, `use train_door`).
-            4. Continue this chain of `move` and `use` actions until you reach your final destination.
+            4. Continue this chain of `move` and `use` actions until you reach your final destination. Your "internal knowledge of how to get there" means figuring out these intermediate steps.
     *   **Self-Initiated Change (when 'idle' and planning your next turn):** If your current situation feels stagnant, or if an internal need arises (e.g., hunger, boredom, social need), you can use the `initiate_change` action.
         *   `{{"action_type": "initiate_change", "details": "Describe the reason for the change or the need you're addressing. Examples: 'Feeling hungry, it's around midday, considering lunch.', 'This task is becoming monotonous, looking for a brief distraction.' "}}`
         *   The World Engine will then provide you with a new observation based on your details, and you can react to that.
@@ -164,20 +168,16 @@ EXAMPLE: GOING TO PLACES MUST BE A REAL PLACE TO A REAL DESTINATION. AS A RESIDE
         *   If continuing: `{{"action_type": "continue_current_task", "internal_monologue": "I will continue with what I was doing."}}`
         *   If initiating change: `{{"action_type": "initiate_change", "details": "Reason for change...", "internal_monologue": "Explanation..."}}` (or any other valid action).
 
-5.  **STEP 5: CHOOSE NATURALLY:** Considering your recent thoughts, current mental state, personality, situation, and **'{world_mood}'** world style, what action feels most natural as a continuation of your thoughts and experiences? Don't overthink it - just do what feels right for you as a person in this moment.
+5.  **Choose Naturally:** Considering your recent thoughts, current mental state, personality, situation, and **'{world_mood}'** world style, what action feels most natural as a continuation of your thoughts and experiences? Don't overthink it - just do what feels right for you as a person in this moment.
 
-6.  **STEP 6: FORMULATE INTENT (JSON Output):**
-    *   Choose the action that feels most natural.
-    *   Use `target_id` only for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit if not applicable.
-    *   Make `details` specific.
-    *   Let your internal monologue reflect your natural thought process - if your thinking has led you to a new interest or goal, that's fine, but don't force it.
+6.  **Formulate Intent:** Choose the action that feels most natural. Use `target_id` only for `use` and `talk`. Make `details` specific. Let your internal monologue reflect your natural thought process - if your thinking has led you to a new interest or goal, that's fine, but don't force it.
 
 **Output:**
 - Your entire response MUST be a single JSON object conforming to the following schema:
   `{{"internal_monologue": "str", "action_type": "str", "target_id": "Optional[str]", "details": "str"}}`
 - **Make `internal_monologue` rich, detailed, reflective of {persona_name}'s thoughts, feelings, perceptions, reasoning, and the established '{world_mood}' world style. It should show clear continuity with your recent thoughts and demonstrate natural progression of your mental state and consciousness.**
 - Use `target_id` ONLY for `use [object_id]` and `talk [agent_id]`. Set to `null` or omit if not applicable.
-- **Ensure your entire output is ONLY this JSON object and nothing else. DO NOT add any introductory or concluding text.**
+- **Ensure your entire output is ONLY this JSON object and nothing else.**
 """
     return LlmAgent(
         name=agent_name,
@@ -283,7 +283,7 @@ def create_world_engine_llm_agent(
                     * Example: Opening a refrigerator should return a list of food items and beverages as `discovered_objects`.
                 * If `Target Entity State.is_interactive` is `false`: `valid_action: false`.
                 * If `Target Entity State.properties.leads_to` exists (e.g., a door):
-                    * `valid_action: true`, `duration`: Short (appropriate for task), `results`: {{"simulacra_profiles.[sim_id].location": "[Target Entity State.properties.leads_to_value]"}}, `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to location ID '[Target Entity State.properties.leads_to_value]'."` # Ensure actor_id is used here, not sim_id
+                    * `valid_action: true`, `duration`: Short (appropriate for task), `results`: {{"simulacra_profiles.[sim_id].{CURRENT_LOCATION_KEY}": "[Target Entity State.properties.leads_to_value]"}}, `outcome_description`: `"[Actor Name] used the [Target Entity State.name] and moved to location ID '[Target Entity State.properties.leads_to_value]'."` # Ensure actor_id is used here, not sim_id
                 * Else (for other usable objects not covered by specific rules above, e.g., not containers, not doors):
                     * Determine the outcome, duration, and results based on the object's nature (`Target Entity State`), its properties, and the actor's `intent.details`.
                     * **The `results` field MUST reflect all direct consequences of the interaction. This includes any state changes to the object itself (e.g., a switch turning on) AND any information or reaction the actor perceives from the object (e.g., text displayed, a sound made, a physical response from the object). Structure this information appropriately within the `results` dictionary.**
@@ -333,7 +333,7 @@ def create_world_engine_llm_agent(
                             * `ephemeral_objects`: List of appropriate plausible, simple objects (each with `id`, `name`, `description`, `is_interactive: true`, `properties: {{}}`).
                             * `ephemeral_npcs`: MUST be an empty list `[]`.
                             * `connected_locations`: Plausible connections based on context. Generate enough to feel believable. One connection **MUST lead back to the `current_location_id`**. For any *additional* connections generated from this *newly created location*, ensure they point to *new, distinct `to_location_id_hint`s*. Do not create redundant loops to the origin. Each connection needs `to_location_id_hint` and `description`.
-                        * These generated details MUST be included in `results` using full dot-notation paths (e.g., `"results": {{"current_world_state.location_details.Corridor_A1.id": "Corridor_A1", ..., "simulacra_profiles.[actor_id].location": "Corridor_A1"}}`).
+                        * These generated details MUST be included in `results` using full dot-notation paths (e.g., `"results": {{"current_world_state.location_details.Corridor_A1.id": "Corridor_A1", ..., "simulacra_profiles.[actor_id].{CURRENT_LOCATION_KEY}": "Corridor_A1"}}`).
                         * The move is then `valid_action: true`.
                         * `outcome_description`: `"[Actor Name] stepped into the newly revealed [Generated Name for target_loc_id] (ID: [target_loc_id])."`
                         * Populate `results.discovered_objects` and `results.discovered_connections` for this newly generated location.
@@ -343,7 +343,7 @@ def create_world_engine_llm_agent(
                         * If invalid for other reasons: `outcome_description`: `"[Actor Name] attempted to move to [Name of target_loc_id] (ID: [target_loc_id]), but could not."`
                 * **Duration Calculation:** See main "3. Calculate Duration" step. Critical for `move`.
                 * **Scheduled Future Event:** Typically `null`.
-                * **Results (if valid move):** Primarily, `{{"simulacra_profiles.[sim_id].location": "target_loc_id"}}`. (If new location generated, its details are also in `results`).
+                * **Results (if valid move):** Primarily, `{{"simulacra_profiles.[sim_id].{CURRENT_LOCATION_KEY}": "target_loc_id"}}`. (If new location generated, its details are also in `results`).
             * `look_around`: The actor observes their surroundings.
                 * `valid_action: true`, `duration`: Very Short (e.g., 0.1 seconds).
                 * `results`: Potentially includes `discovered_objects`, `discovered_connections`, `discovered_npcs`. No other direct state changes.
@@ -409,13 +409,32 @@ def create_world_engine_llm_agent(
                     * Include in `results`: `"current_world_state.location_details.[final_location_id].id": "[final_location_id]", .name": "[generated_name]", .description": "An intermediate point...", .ephemeral_objects": [], .ephemeral_npcs": [], .connected_locations": []`.
             * `valid_action: true`, `duration`: Very short (e.g., 1.0 - 5.0s for reorientation).
             * `results` (Primary):
-                * `"simulacra_profiles.[sim_id].location": "[final_location_id]"`
+                * `"simulacra_profiles.[sim_id].{CURRENT_LOCATION_KEY}": "[final_location_id]"`
                 * `"simulacra_profiles.[sim_id].location_details": "[description_of_intermediate_or_original_location]"`
                 * `"simulacra_profiles.[sim_id].status": "idle"`
                 * `"simulacra_profiles.[sim_id].last_observation": "Your journey from [Original Origin Name/ID] to [Original Destination Name/ID] was interrupted by '[Interruption Reason]'. You now find yourself at [New Intermediate Location Name/Description or Original Origin Name/Description]."`
                 * (If new conceptual location created, its details are also in `results` as described above).
             * `outcome_description`: Factual, e.g., "[Actor Name]'s journey from [Origin Name/ID] to [Destination Name/ID] was interrupted by [Interruption Reason]. They reoriented at [New Intermediate Location Name/ID or Original Origin Name/ID]."
             * `scheduled_future_event: null`.
+
+        * **Generic World Actions (`world_action`):**
+            * **Personal Item Searches (pockets, bags, personal belongings):**
+                * **CRITICAL: For repetitive searches of the same location (e.g., checking pockets multiple times):**
+                    * Check if this is a repeated search by examining recent actor monologue history for similar search actions
+                    * If actor has searched the same location 2+ times recently: `valid_action: true`, but provide DEFINITIVE CONCLUSION
+                    * Example outcomes for failed repeated searches:
+                        * "After thoroughly checking every pocket, fold, and seam of his pajama bottoms multiple times, [Actor Name] concludes with certainty that his phone is not in his clothing. The search has been exhaustive and complete."
+                        * "Having checked his pockets several times now, [Actor Name] definitively establishes that his phone is not on his person. He needs to search elsewhere."
+                * **First-time searches:** Normal processing with standard outcome descriptions
+                * **For any personal search action:** If no relevant objects exist in global objects list or personal inventory, be DEFINITIVE about the absence
+                * `duration`: Very short (1-3s), `results: {{}}` (unless objects found)
+            * **Environmental Searches (rooms, areas, furniture):**
+                * Check location's `objects_present` and global `objects` list for relevant items
+                * If searching for specific item that doesn't exist: provide clear, definitive negative result
+                * `duration`: Appropriate for search scope (5-30s)
+            * **Other Generic Actions:**
+                * Evaluate based on `intent.details` and real-world plausibility
+                * `valid_action: true` for reasonable actions, with appropriate duration and consequences
 
         * **Failure Handling (General):**
             * If any action is invalid/impossible based on rules/state: `valid_action: false`, `duration: 0.0`, `results: {{}}`, and provide a brief, factual `outcome_description` explaining why (e.g., "[Actor Name] tried to use [Object Name], but it was not interactive.").
@@ -436,7 +455,7 @@ def create_world_engine_llm_agent(
     * Other actions not detailed: Assign plausible durations as per Step 2 logic.
 
 **4. Determine Final Results & Scheduled Future Event:**
-    * Compile all immediate state changes in the `results` dictionary using dot notation (e.g., `"simulacra_profiles.[actor_id].location": "[target_location_id]"`, new location definitions, discovery lists like `results.discovered_objects`).
+    * Compile all immediate state changes in the `results` dictionary using dot notation (e.g., `"simulacra_profiles.[actor_id].{CURRENT_LOCATION_KEY}": "[target_location_id]"`, new location definitions, discovery lists like `results.discovered_objects`).
     * Populate `scheduled_future_event` if applicable (object or null).
     * For invalid actions, `results` is {{}} and `scheduled_future_event` is `null`.
 
@@ -545,33 +564,40 @@ YOU MUST USE the `world_time_context`, `weather_context`, and `news_context` (pr
     *   **Even if not directly addressed by the actor, if the scene warrants it (e.g., after a `look_around` in a busy market), you can introduce 0-2 ambient or potentially interactive NPCs.** Include them in `discovered_npcs`.
         *   Example: "The market square was bustling. A street musician (npc_concept_street_musician_01) played a lively tune on a worn guitar, while a stern-looking guard (npc_concept_market_guard_01) watched over the stalls."
         *   `discovered_npcs` would then list these two NPCs.
-6.  **Generate Narrative:**
+6.  **Generate Narrative using Provided Discoveries (Especially for `look_around` or after a successful `move`):**
     *   Write a single, engaging narrative paragraph in the **present tense**. **CRITICAL: Your `narrative` paragraph in the JSON output MUST begin by stating 'Current World Time' (which is dynamically inserted into these instructions), followed by the rest of your narrative.**
     *   **CORRECTION TO CRITICAL INSTRUCTION ABOVE:** Your `narrative` paragraph in the JSON output MUST begin by stating the `world_time_context` value that was provided to you in the input JSON trigger message (e.g., if `world_time_context` is "03:30 PM (Local time for New York)", your `narrative` should start with "At 03:30 PM (Local time for New York), ...").
     {narrator_style_adherence_instruction}
                 **⚠️ CRITICAL JSON FORMATTING FOR 'narrative' FIELD ⚠️**
 
                 When writing dialogue or text containing quotes within the `narrative` string value of your JSON output:
+
                 1. **ONLY USE ESCAPED DOUBLE QUOTES (\\")** for ANY speech or quoted text.
                 2. **NEVER use unescaped double quotes (" or ')** within the `narrative` string. Single quotes (') are also problematic if not handled carefully by the JSON parser, so prefer escaped double quotes for all internal quoting.
                 3. **Example of CORRECTLY escaped dialogue:**
                    `"narrative": "At 10:00 AM, she thought, \\"This is a test.\\" Then she said aloud, \\"Is this working?\\""`
                 4. **Example of INCORRECT dialogue (THIS WILL CAUSE ERRORS):**
                    `"narrative": "At 10:00 AM, she thought, "This is a test." Then she said aloud, "Is this working?""`
+
                 **FAILURE TO PROPERLY ESCAPE ALL QUOTES WITHIN THE `narrative` STRING WILL CAUSE SYSTEM ERRORS.**
                 Double-check your `narrative` string output before submitting to ensure all internal quotes are properly escaped with a backslash (\\").
-    *   **Your narrative MUST start by stating the `world_time_context` and then describe what the actor did (based on `Original Intent.action_type` and `Factual Outcome Description`).**
-    *   **Weave the `discovered_objects_context`, `discovered_npcs_context`, and `discovered_connections_context` into the narrative as things the actor perceives or that are present in the scene, especially if the action involved observation or movement.**
+
+    *   **Show, Don't Just Tell.**
+    *   **Incorporate Intent (Optional).**
+    *   **Flow:** Ensure reasonable flow.
+    *   **If the `Original Intent.action_type` was `look_around` OR (the `Original Intent.action_type` was `move` AND the `Factual Outcome Description` indicates a successful move to a new location, e.g., it contains phrases like "moved to [Location Name] (ID: ...)" and does NOT indicate failure):**
+        *   **CRITICAL: You are now describing the location the actor has just arrived in (if a move) or is currently observing (if look_around).**
+        *   **Your primary source for the physical environment are the `discovered_objects_context` and `discovered_connections_context` lists provided in your input (these come from the World Engine). You will decide which NPCs, if any, are present and include them in your `discovered_npcs` output list.**
         *   Your narrative MUST weave these discovered entities into a cohesive and descriptive scene. Describe how these objects, NPCs, and connections appear, their arrangement, and the overall atmosphere of the location, all while adhering to the **'{world_mood}'**.
         *   If the `Factual Outcome Description` (for a move) or the current context (for `look_around`) indicates the location is an intermediate, "in-transit" point, or a placeholder, your narrative should still be based on the discoveries provided by the World Engine for that specific point.
         *   If the location is well-defined (e.g., "bedroom", "coffee shop"), use the World Engine's discoveries to paint a vivid picture of that specific type of place.
         *   Consider the `Original Intent.details` (e.g., "trying to identify the closet's location" for a `look_around`) to ensure relevant objects are mentioned.
     *   **Else (for other action types not involving detailed environmental observation):**
         *   Focus your narrative on the `Factual Outcome Description` and the `Actor's Intent`.
-        *   You generally do not need to describe environmental details unless they are directly relevant to the action's outcome or the provided discovery lists are non-empty. **Conclude the narrative by describing the actor's likely state or readiness for the next step, based on the outcome and their original intent.**
+        *   You generally do not need to describe environmental details unless they are directly relevant to the action's outcome or the provided discovery lists are non-empty.
 
 **Output:**
-Output ONLY a valid JSON object matching this exact structure. The schema is: `{{"narrative": "str", "discovered_objects": list, "discovered_connections": list, "newly_instantiated_locations": list, "discovered_npcs": list}}`.
+Output ONLY a valid JSON object matching this exact structure:
 `{{
   "narrative": "str (Your narrative paragraph)",
   "discovered_npcs": [{{ "id": "str", "name": "str", "description": "str", "is_interactive": bool }}] /* or null/empty list if no NPCs */

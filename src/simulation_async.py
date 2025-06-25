@@ -7,6 +7,7 @@ import os
 import random
 import re
 import sys
+import uuid
 from types import SimpleNamespace 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,7 +29,7 @@ from rich.table import Table
 from .socket_server import socket_server_task
 
 console = Console() # Keep a global console for direct prints if needed by run_simulation
-from .core_tasks import dynamic_interruption_task, narrative_image_generation_task
+from .core_tasks import dynamic_interruption_task, narrative_image_generation_task, visualization_websocket_task
 
 from .agents import create_narration_llm_agent  # Agent creation functions
 from .agents import (create_search_llm_agent, create_simulacra_llm_agent,
@@ -41,10 +42,11 @@ from .config import (  # For run_simulation; For self-reflection; New constants 
     INTERJECTION_COOLDOWN_SIM_SECONDS,
     LOCATION_DETAILS_KEY, LOCATION_KEY,
     LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS, 
+    MAX_CONSECUTIVE_CONTINUES, # Added circuit breaker config
     MEMORY_LOG_CONTEXT_LENGTH,
     PROB_INTERJECT_AS_SELF_REFLECTION, RANDOM_SEED, 
     SIMULACRA_KEY, STATE_DIR, UPDATE_INTERVAL, # CONFIG_MODEL_NAME removed
-    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY)
+    USER_ID, WORLD_STATE_KEY, WORLD_TEMPLATE_DETAILS_KEY, ENABLE_WEB_VISUALIZATION)
 from .core_tasks import time_manager_task, world_info_gatherer_task
 from .loop_utils import (get_nested, load_json_file,
                          load_or_initialize_simulation, parse_json_output_last,
@@ -63,6 +65,8 @@ logger = logging.getLogger(__name__) # Use logger from main entry point setup
 # These are the "globals" that will be managed here and passed around or accessed directly by tasks in this file.
 event_bus = asyncio.Queue()
 narration_queue = asyncio.Queue()
+narration_event_buffer = []  # Buffer to hold narration events for temporal ordering
+narration_buffer_lock = asyncio.Lock()  # Lock for thread-safe access to buffer
 perception_manager_global: Optional['PerceptionManager'] = None # Forward declaration
 state: Dict[str, Any] = {} # Global state dictionary
 event_logger_global: Optional[logging.Logger] = None # Global variable for the event logger
@@ -166,6 +170,93 @@ async def queue_health_monitor():
 
 def get_current_sim_time():
     return state.get("world_time", 0.0)
+
+async def add_narration_event_with_ordering(narration_event: Dict[str, Any], task_name: str = "Unknown"):
+    """
+    Add a narration event to the buffer, maintaining chronological order by completion_time.
+    This ensures narration events are processed in the correct temporal sequence.
+    """
+    async with narration_buffer_lock:
+        # Skip empty events (used for triggering processing only)
+        if not narration_event or not narration_event.get("actor_id"):
+            await process_ready_narration_events()
+            return
+            
+        completion_time = narration_event.get("completion_time", 0.0)
+        
+        # Insert event in chronological order
+        insert_pos = 0
+        for i, existing_event in enumerate(narration_event_buffer):
+            existing_time = existing_event.get("completion_time", 0.0)
+            if completion_time < existing_time:
+                insert_pos = i
+                break
+            insert_pos = i + 1
+        
+        narration_event_buffer.insert(insert_pos, narration_event)
+        
+        logger.info(f"[NarrationOrdering] Added event at position {insert_pos} with completion_time {completion_time:.1f}s from {task_name}")
+        logger.debug(f"[NarrationOrdering] Buffer now has {len(narration_event_buffer)} events")
+        
+        # Process any events that are ready (completion_time <= current sim time)
+        await process_ready_narration_events()
+
+async def process_ready_narration_events():
+    """
+    Process narration events from the buffer that are ready (completion_time <= current sim time).
+    This is called from within the lock in add_narration_event_with_ordering.
+    """
+    current_sim_time = get_current_sim_time()
+    events_to_process = []
+    remaining_events = []
+    
+    # Split events into ready and not-ready
+    for event in narration_event_buffer:
+        event_completion_time = event.get("completion_time", 0.0)
+        if event_completion_time <= current_sim_time:
+            events_to_process.append(event)
+        else:
+            remaining_events.append(event)
+    
+    # Update buffer with remaining events
+    narration_event_buffer[:] = remaining_events
+    
+    # Queue ready events to narration queue in chronological order
+    for event in events_to_process:
+        completion_time = event.get("completion_time", 0.0)
+        actor_id = event.get("actor_id", "Unknown")
+        success = await safe_queue_put(narration_queue, event, timeout=5.0, task_name=f"NarrationOrdering_{actor_id}")
+        if success:
+            logger.info(f"[NarrationOrdering] Queued event for actor {actor_id} with completion_time {completion_time:.1f}s")
+        else:
+            logger.error(f"[NarrationOrdering] Failed to queue event for actor {actor_id} with completion_time {completion_time:.1f}s")
+
+async def flush_overdue_narration_events():
+    """
+    Force process narration events that are significantly overdue to prevent indefinite delays.
+    Called periodically to handle edge cases where events might get stuck.
+    """
+    async with narration_buffer_lock:
+        current_sim_time = get_current_sim_time()
+        overdue_threshold = 5.0  # 5 seconds overdue
+        
+        events_to_flush = []
+        remaining_events = []
+        
+        for event in narration_event_buffer:
+            event_completion_time = event.get("completion_time", 0.0)
+            if (current_sim_time - event_completion_time) > overdue_threshold:
+                events_to_flush.append(event)
+                logger.warning(f"[NarrationOrdering] Flushing overdue event: completion_time={event_completion_time:.1f}s, current_time={current_sim_time:.1f}s")
+            else:
+                remaining_events.append(event)
+        
+        # Update buffer
+        narration_event_buffer[:] = remaining_events
+        
+        # Queue overdue events
+        for event in events_to_flush:
+            await safe_queue_put(narration_queue, event, timeout=5.0, task_name="NarrationOrdering_Overdue")
 
 # ENHANCED CONNECTION MERGING FOR ALL ACTIONS
 def merge_connections_safely(existing_connections, new_connections, location_id, logger):
@@ -394,7 +485,15 @@ async def narration_task():
             discovered_npcs_for_narration_ctx = action_event.get("discovered_npcs_for_narration", [])
             discovered_connections_for_narration_ctx = action_event.get("discovered_connections_for_narration", [])
 
-            completion_time = get_nested(action_event, "completion_time", default=state.get("world_time", 0.0))
+            # Get completion_time with proper fallback to current simulation time
+            completion_time = get_nested(action_event, "completion_time")
+            current_sim_time = state.get("world_time", 0.0)
+            if completion_time is None:
+                # Use current simulation time as fallback, not stale state
+                completion_time = current_sim_time
+                logger.warning(f"[NarrationTask] Missing completion_time in action_event, using current sim_time: {completion_time}")
+            else:
+                logger.info(f"[NarrationTask] Processing narration for action completion_time: {completion_time:.1f}s (current sim_time: {current_sim_time:.1f}s)")
             actor_location_at_action_time = get_nested(action_event, "actor_current_location_id")
 
             actor_name = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
@@ -485,25 +584,8 @@ async def narration_task():
 
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                         _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", cleaned_narrative_text, logger)
-                        
-                        # --- NEW: Set agent to idle and update action description after narration ---
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", "Idle, observing outcome.", logger)
-                        logger.info(f"[NarrationTask] Updated last_observation for {actor_id} and set status to idle.")
-                        # --- END NEW ---
-                    # Add after this line:
-                    final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
-                    state.setdefault("narrative_log", []).append(final_narrative_entry)
+                        logger.info(f"[NarrationTask] Updated last_observation for {actor_id}.")
 
-                    # Add this code to log the narrative to the events file:
-                    _log_event(
-                        sim_time=completion_time,
-                        agent_id="Narrator",
-                        event_type="narration",
-                        data={"narrative": cleaned_narrative_text},
-                        logger_instance=logger,
-                        event_logger_global=event_logger_global
-                    )
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
                     fallback_narrative = f"{actor_name} completed an action, but the narrative could not be generated."
@@ -610,7 +692,7 @@ async def world_engine_task_llm():
             actor_state_we = get_nested(state, SIMULACRA_KEY, actor_id, default={})
             actor_name = get_nested(actor_state_we, "persona_details", "Name", default=actor_id)
             current_sim_time = state.get("world_time", 0.0)
-            actor_location_id = get_nested(actor_state_we, "location")
+            actor_location_id = get_nested(actor_state_we, CURRENT_LOCATION_KEY)
             location_state_data = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, actor_location_id, default={})
             world_rules = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'rules', default={})
             
@@ -664,7 +746,6 @@ async def world_engine_task_llm():
                 # ADD YOUR UNIVERSAL INTERRUPTION CODE HERE - before any action-specific handling
                 # Check if target is another Simulacra and handle interruption if needed
                 if target_id_we and target_id_we in get_nested(state, SIMULACRA_KEY, default={}):
-                # NOTE: The following block applies to any action targeting another Simulacra, not just "talk"
                     # Check if target is busy (in the middle of an action)
                     target_status = get_nested(state, f"{SIMULACRA_KEY}.{target_id_we}.status", default="idle")
                     target_name = get_nested(state, f"{SIMULACRA_KEY}.{target_id_we}.name", default=target_id_we)
@@ -681,7 +762,6 @@ async def world_engine_task_llm():
                                        completion_time, logger)
                 
                 # --- ADD TALK ACTION HANDLING ---
-                skip_immediate_narration_queue = False # Initialize default
                 if action_type == "talk":
                     target_id_we = get_nested(intent, "target_id")
                     speech_content = get_nested(intent, "details", default="")
@@ -755,6 +835,20 @@ async def world_engine_task_llm():
 
                 # --- Get results and extract discoveries from INSIDE results ---
                 pending_results_dict = _to_dict(getattr(validated_data, 'results', {}))
+                
+                # FIX: Substitute template placeholders in LLM results and clean malformed keys
+                cleaned_results_dict = {}
+                for key, value in pending_results_dict.items():
+                    # Replace template placeholders
+                    cleaned_key = key.replace('[actor_id]', actor_id).replace('[sim_id]', actor_id)
+                    # Remove parentheses that LLM might add incorrectly
+                    cleaned_key = cleaned_key.replace(f'({actor_id})', actor_id)
+                    # Remove any duplicate agent entries created by malformed keys
+                    if cleaned_key != key:
+                        logger.info(f"[WorldEngineLLM] Fixed malformed result key: '{key}' → '{cleaned_key}'")
+                    cleaned_results_dict[cleaned_key] = value
+                
+                pending_results_dict = cleaned_results_dict
                 action_completion_results_dict = {}
 
                 # Extract discoveries from INSIDE the results
@@ -767,10 +861,16 @@ async def world_engine_task_llm():
 
                 if action_type == "move":
                     # For move actions, discoveries apply to the DESTINATION
-                    destination_location_id = pending_results_dict.get(f"{SIMULACRA_KEY}.{actor_id}.location")
+                    location_key = f"{SIMULACRA_KEY}.{actor_id}.{CURRENT_LOCATION_KEY}"
+                    destination_location_id = pending_results_dict.get(location_key)
+                    logger.info(f"[WorldEngineLLM] DEBUG: Move action processing. Location key: {location_key}")
+                    logger.info(f"[WorldEngineLLM] DEBUG: Pending results keys: {list(pending_results_dict.keys())}")
+                    logger.info(f"[WorldEngineLLM] DEBUG: Destination location from results: {destination_location_id}")
                     if destination_location_id:
                         effective_location_id_for_discoveries = destination_location_id
                         logger.info(f"[WorldEngineLLM] Move action: discoveries will apply to destination {destination_location_id}")
+                    else:
+                        logger.warning(f"[WorldEngineLLM] CRITICAL: Move action but no location update found in results!")
                         
                         # Check if connection back to origin already exists
                         origin_connection_exists = any(
@@ -789,8 +889,10 @@ async def world_engine_task_llm():
                             logger.info(f"[WorldEngineLLM] Added bidirectional connection from {destination_location_id} back to {actor_location_id}")
                     
                     # Defer location change to completion if action has duration
-                    if getattr(validated_data, 'duration', 0.0) > 0.1:
-                        location_change_key = f"{SIMULACRA_KEY}.{actor_id}.location"
+                    move_duration = getattr(validated_data, 'duration', 0.0)
+                    logger.info(f"[WorldEngineLLM] DEBUG: Move duration: {move_duration}")
+                    if move_duration > 0.1:
+                        location_change_key = f"{SIMULACRA_KEY}.{actor_id}.{CURRENT_LOCATION_KEY}"
                         location_details_key = f"{SIMULACRA_KEY}.{actor_id}.location_details"
                         
                         if location_change_key in pending_results_dict:
@@ -799,6 +901,10 @@ async def world_engine_task_llm():
                             new_location_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
                             action_completion_results_dict[location_details_key] = f"You are now in {new_location_name}."
                             logger.info(f"[WorldEngineLLM] Deferred location change for {actor_id} to action completion")
+                        else:
+                            logger.warning(f"[WorldEngineLLM] CRITICAL: Move duration > 0.1 but no location update in pending_results!")
+                    else:
+                        logger.info(f"[WorldEngineLLM] DEBUG: Move duration ≤ 0.1, location update should be applied immediately")
 
                 # --- IMMEDIATE DISCOVERY UPDATES TO STATE ---
                 # Handle discovered objects and add them to location
@@ -839,24 +945,34 @@ async def world_engine_task_llm():
                     # "target_entity_info": target_state_data if action_type == "talk" else None,
                 }
 
+                # Special handling for newly generated locations
+                # REMOVE THIS ENTIRE BLOCK - it references undefined variables from WorldGenerator
+                # if action_type == "move" and target_location_id_from_intent and not is_target_defined:
+                #     loc_name_for_narration = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, target_location_id_from_intent, "name", default=target_location_id_from_intent)
+                #     narration_event["outcome_description"] = f"{actor_name} moved into the newly revealed area: {loc_name_for_narration} (ID: {target_location_id_from_intent})."
+
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
+                    # Generate unique action ID to track interruptions
+                    action_id = str(uuid.uuid4())
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_id", action_id, logger)
+                    
+                    # Set agent status to busy
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "busy", logger)
+                    
+                    # Initialize action interrupted flag - prevents multiple interrupts per action
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_interrupted_flag", False, logger)
+                    
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", pending_results_dict, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_completion_results", action_completion_results_dict, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_end_time", completion_time, logger)
-
+                    
                     # Refine action description for listening
                     action_desc_for_state = narration_event["current_action_description"]
                     if action_type == "wait" and "listened attentively to" in outcome_description:
                         action_desc_for_state = outcome_description
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_description", action_desc_for_state, logger)
-
-                    action_duration = getattr(validated_data, 'duration', 0.0)
-
-                    # Delay narration for actions with duration.
-                    # 'talk' actions with skip_immediate_narration_queue=True are handled first.
-                    # Then, other actions with duration > 0.1s.
-                    # Otherwise, queue narration immediately.
+                    
+                    # Queue narration event - but delay it for talk actions until completion
                     if action_type == "talk" and skip_immediate_narration_queue:
                         # Schedule narration to be queued at completion time
                         delayed_narration_event = {
@@ -867,24 +983,11 @@ async def world_engine_task_llm():
                         }
                         state.setdefault("pending_simulation_events", []).append(delayed_narration_event)
                         state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
-                        logger.info(f"[WorldEngineLLM] Scheduled narration for talk action (Simulacra target) to trigger at {completion_time:.1f}s")
-                    elif action_duration > 0.1: # For other actions with duration (e.g., move, use, talk to NPC with duration)
-                        delayed_narration_event = {
-                            "event_type": "delayed_narration",
-                            "narration_data": narration_event,
-                            "trigger_sim_time": completion_time,
-                            "source_actor_id": actor_id
-                        }
-                        state.setdefault("pending_simulation_events", []).append(delayed_narration_event)
-                        state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
-                        logger.info(f"[WorldEngineLLM] Scheduled narration for action '{action_type}' (duration: {action_duration:.1f}s) to trigger at {completion_time:.1f}s")
-                    else: # For actions with very short/zero duration
-                        narration_success = await safe_queue_put(narration_queue, narration_event, timeout=5.0, task_name=f"WorldEngineLLM_{actor_id}")
-                        if not narration_success:
-                            logger.error(f"[WorldEngineLLM] Failed to queue narration for {actor_id}")
-                            _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", outcome_description, logger)
-                        else:
-                            logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state, set end time {completion_time:.1f}s. Queued narration immediately for short/zero duration action.")
+                        logger.info(f"[WorldEngineLLM] Scheduled narration for talk action to trigger at {completion_time:.1f}s")
+                    else:
+                        # Use temporal ordering system instead of direct queue
+                        await add_narration_event_with_ordering(narration_event, task_name=f"WorldEngineLLM_{actor_id}")
+                        logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state immediately, set end time {completion_time:.1f}s")
                 else:
                     logger.error(f"[WorldEngineLLM] Actor {actor_id} not found in state after valid action resolution.")
             else: 
@@ -902,6 +1005,9 @@ async def world_engine_task_llm():
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", final_outcome_desc, logger)
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
+                    # Reset action interrupt tracking on error
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_interrupted_flag", False, logger)
+                    _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_id", None, logger)
                 
                 actor_name_for_log = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
                 resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc}
@@ -929,6 +1035,9 @@ async def world_engine_task_llm():
                  _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.status", "idle", logger)
                  _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.pending_results", {}, logger)
                  _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", f"Action failed unexpectedly: {e}", logger)
+                 # Reset action interrupt tracking on exception
+                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.action_interrupted_flag", False, logger)
+                 _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.current_action_id", None, logger)
             if request_event and event_bus._unfinished_tasks > 0: 
                 try: 
                     event_bus.task_done()
@@ -956,7 +1065,6 @@ def _build_simulacra_prompt(
     """Builds the detailed prompt for the Simulacra agent - reads from consolidated state."""
     
     # All agents now read from the same state source
-    # PerceptionManager will get location details internally from the global state reference
     fresh_percepts = perception_manager_instance.get_percepts_for_simulacrum(agent_id)
     logger.debug(f"[{agent_name}] Built percepts from consolidated state: {json.dumps(fresh_percepts, sort_keys=True)[:250]}...")
 
@@ -1011,8 +1119,8 @@ def _build_simulacra_prompt(
         )
 
     # Get location data from consolidated state
-    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME) # Still needed for "You are at:" and connections
-    agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.") # This is the agent's memory/understanding
+    agent_current_location_id = agent_state_data.get(CURRENT_LOCATION_KEY, DEFAULT_HOME_LOCATION_NAME) # Use CURRENT_LOCATION_KEY
+    agent_personal_location_details = agent_state_data.get(LOCATION_DETAILS_KEY, "You are unsure of your exact surroundings.")
     current_location_name = get_nested(global_state_ref, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, agent_current_location_id, "name", default=agent_current_location_id)
     
     # Get connections from consolidated state (single source of truth)
@@ -1170,9 +1278,39 @@ async def simulacra_agent_task_llm(agent_id: str):
                 await asyncio.sleep(failure_backoff_time)
                 consecutive_failures = 0 # Reset after backoff
                 
-            await asyncio.sleep(AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS)
+            # Get current agent state first
             current_sim_time_busy_loop = state.get("world_time", 0.0)
             agent_state_busy_loop = get_nested(state, SIMULACRA_KEY, agent_id, default={})
+            
+            # Adaptive polling based on agent status and action duration
+            poll_interval = AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS  # Default fallback
+            
+            # Calculate adaptive polling interval
+            if agent_state_busy_loop:
+                current_status = agent_state_busy_loop.get("status")
+                
+                if current_status == "idle":
+                    # Fast polling for idle agents - they need new actions
+                    poll_interval = 0.5
+                elif current_status in ["thinking", "reflecting"]:
+                    # Moderate polling for AI processing states
+                    poll_interval = 1.0
+                elif current_status == "busy":
+                    # Adaptive polling based on remaining action duration
+                    current_action_end_time = agent_state_busy_loop.get("current_action_end_time", 0.0)
+                    remaining_duration = current_action_end_time - current_sim_time_busy_loop
+                    
+                    if remaining_duration <= 30.0:
+                        # Short actions - moderate polling
+                        poll_interval = 1.0
+                    elif remaining_duration <= 300.0:
+                        # Medium actions (5 minutes) - slower polling  
+                        poll_interval = 3.0
+                    else:
+                        # Long actions (>5 minutes) - very slow polling, rely on dynamic interruptions
+                        poll_interval = 8.0
+            
+            await asyncio.sleep(poll_interval)
             
             if not agent_state_busy_loop:
                 logger.error(f"[{agent_name}] Agent state disappeared from global state. Stopping task.")
@@ -1244,6 +1382,7 @@ async def simulacra_agent_task_llm(agent_id: str):
 
             # Busy Action Interjection Logic - RETAINED FOR SELF-REFLECTION ONLY
             if current_status_busy_loop == "busy" and current_sim_time_busy_loop >= next_interjection_check_sim_time:
+                # Only advance check time if simulation time has actually progressed
                 next_interjection_check_sim_time = current_sim_time_busy_loop + AGENT_INTERJECTION_CHECK_INTERVAL_SIM_SECONDS
                 remaining_duration = agent_state_busy_loop.get("current_action_end_time", 0.0) - current_sim_time_busy_loop
                 last_interjection_time_busy = agent_state_busy_loop.get("last_interjection_sim_time", 0.0) 
@@ -1251,9 +1390,10 @@ async def simulacra_agent_task_llm(agent_id: str):
 
                 if remaining_duration > LONG_ACTION_INTERJECTION_THRESHOLD_SECONDS and cooldown_passed_busy:
                     logger.info(f"[{agent_name}] Busy with long task (rem: {remaining_duration:.1f}s). Checking for self-reflection.")
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_interjection_sim_time", current_sim_time_busy_loop, logger)
 
-                    if random.random() < PROB_INTERJECT_AS_SELF_REFLECTION: 
+                    if random.random() < PROB_INTERJECT_AS_SELF_REFLECTION:
+                        # Only update cooldown when self-reflection actually happens
+                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_interjection_sim_time", current_sim_time_busy_loop, logger) 
                         original_status_before_reflection = agent_state_busy_loop.get("status")
                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "reflecting", logger)
                         current_action_desc_for_prompt = agent_state_busy_loop.get("current_action_description", "your current task")
@@ -1297,10 +1437,46 @@ Output ONLY the JSON: `{{"internal_monologue": "...", "action_type": "...", "tar
                                 _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", current_monologue_history_reflect, logger)
                             
                             if action_type_reflect == "continue_current_task":
-                                logger.info(f"[{agent_name}] Reflection: Chose to continue. Monologue: {monologue_reflect[:50]}...")
-                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
-                                consecutive_failures = 0
+                                # Circuit breaker: Track consecutive continue_current_task uses
+                                consecutive_continues = get_nested(state, f"{SIMULACRA_KEY}.{agent_id}.consecutive_continues", default=0)
+                                consecutive_continues += 1
+                                
+                                # Circuit breaker threshold (configurable via config)
+                                
+                                if consecutive_continues >= MAX_CONSECUTIVE_CONTINUES:
+                                    logger.warning(f"[{agent_name}] Circuit breaker triggered: {consecutive_continues} consecutive continue_current_task actions. Forcing initiate_change.")
+                                    
+                                    # Force an initiate_change action instead
+                                    forced_change_intent = {
+                                        "action_type": "initiate_change", 
+                                        "details": "Taking a break due to prolonged focus on the same task.",
+                                        "target_id": None
+                                    }
+                                    
+                                    success = await safe_queue_put(
+                                        event_bus, 
+                                        {"type": "intent_declared", "actor_id": agent_id, "intent": forced_change_intent},
+                                        timeout=5.0,
+                                        task_name=f"Simulacra_{agent_name}_CircuitBreaker"
+                                    )
+                                    
+                                    if success:
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.consecutive_continues", 0, logger)
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "thinking", logger)
+                                        consecutive_failures = 0
+                                    else:
+                                        logger.error(f"[{agent_name}] Failed to queue circuit breaker intent")
+                                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
+                                        consecutive_failures += 1
+                                else:
+                                    # Normal continue_current_task processing
+                                    logger.info(f"[{agent_name}] Reflection: Chose to continue ({consecutive_continues}/{MAX_CONSECUTIVE_CONTINUES}). Monologue: {monologue_reflect[:50]}...")
+                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.consecutive_continues", consecutive_continues, logger)
+                                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", original_status_before_reflection, logger)
+                                    consecutive_failures = 0
                             else:
+                                # Reset counter when agent chooses a different action
+                                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.consecutive_continues", 0, logger)
                                 logger.info(f"[{agent_name}] Reflection: Chose to '{action_type_reflect}'. Monologue: {monologue_reflect[:50]}...")
                                 success = await safe_queue_put(
                                     event_bus, 
@@ -1537,6 +1713,14 @@ async def run_simulation(
                 ), 
                 name="SocketServer"
             ))
+            if ENABLE_WEB_VISUALIZATION:
+                tasks.append(asyncio.create_task(
+                    visualization_websocket_task(
+                        state=state,
+                        logger_instance=logger
+                    ),
+                    name="VisualizationWebSocket"
+                ))
             tasks.append(asyncio.create_task(time_manager_task(
                 current_state=state, 
                 event_bus_qsize_func=lambda: event_bus.qsize(), 

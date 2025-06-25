@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheSimulation - Real-time Visualizer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .visualization-panel {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        }
+
+        .info-panel {
+            width: 350px;
+            background: rgba(42, 42, 42, 0.95);
+            border-left: 1px solid #555;
+            padding: 20px;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 2px solid #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #4CAF50;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.6);
+            border-bottom: 1px solid #444;
+            font-size: 12px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #4CAF50;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section h3 {
+            margin: 0 0 15px 0;
+            color: #4CAF50;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.3);
+            padding-bottom: 5px;
+        }
+
+        .agent-item, .location-item {
+            margin: 8px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 5px;
+            border-left: 3px solid;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .agent-item {
+            border-left-color: #ff6b6b;
+        }
+
+        .agent-item:hover {
+            background: rgba(255, 107, 107, 0.2);
+            transform: translateX(5px);
+        }
+
+        .location-item {
+            border-left-color: #69b3a2;
+        }
+
+        .location-item:hover {
+            background: rgba(105, 179, 162, 0.2);
+            transform: translateX(5px);
+        }
+
+        .item-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .item-details {
+            font-size: 12px;
+            opacity: 0.8;
+            line-height: 1.4;
+        }
+
+        .narrative-item {
+            margin: 5px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            font-size: 11px;
+            line-height: 1.3;
+            border-left: 2px solid #4ecdc4;
+        }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+        }
+
+        .control-button {
+            background: rgba(76, 175, 80, 0.8);
+            border: none;
+            padding: 8px 12px;
+            margin: 2px;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            background: rgba(76, 175, 80, 1);
+            transform: scale(1.05);
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* D3 visualization styles */
+        .node-location {
+            fill: #69b3a2;
+            stroke: #ffffff;
+            stroke-width: 2px;
+            cursor: pointer;
+        }
+
+        .node-agent {
+            fill: #ff6b6b;
+            stroke: #ffffff;
+            stroke-width: 2px;
+            cursor: pointer;
+        }
+
+        .node-object {
+            fill: #4ecdc4;
+            stroke: #ffffff;
+            stroke-width: 1px;
+            cursor: pointer;
+        }
+
+        .link {
+            stroke: rgba(255, 255, 255, 0.3);
+            stroke-width: 1px;
+        }
+
+        .link-agent {
+            stroke: #ff6b6b;
+            stroke-width: 2px;
+            stroke-dasharray: 5,5;
+        }
+
+        .node-text {
+            fill: #ffffff;
+            font-size: 10px;
+            text-anchor: middle;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+            border: 1px solid #4CAF50;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 18px;
+            color: #4CAF50;
+        }
+
+        .spinner {
+            border: 3px solid rgba(76, 175, 80, 0.3);
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="visualization-panel">
+            <div class="status-bar">
+                <div class="connection-status">
+                    <div class="status-dot" id="connectionStatus"></div>
+                    <span id="connectionText">Connecting...</span>
+                </div>
+                <div id="simTime">Sim Time: 0s</div>
+                <div id="realTime">--:--:--</div>
+            </div>
+
+            <div class="controls">
+                <button class="control-button" onclick="resetView()">Reset View</button>
+                <button class="control-button" onclick="togglePause()">Pause/Resume</button>
+                <button class="control-button" onclick="centerOnAgents()">Center on Agents</button>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #69b3a2;"></div>
+                    <span>Locations</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>Agents</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4ecdc4;"></div>
+                    <span>Objects</span>
+                </div>
+            </div>
+
+            <svg id="visualization"></svg>
+            
+            <div class="loading" id="loadingIndicator">
+                <div class="spinner"></div>
+                <div>Connecting to simulation...</div>
+            </div>
+
+            <div class="tooltip" id="tooltip" style="display: none;"></div>
+        </div>
+
+        <div class="info-panel">
+            <div class="header">
+                <h1>Simulation Monitor</h1>
+            </div>
+
+            <div class="section">
+                <h3>Active Agents</h3>
+                <div id="agentsList"></div>
+            </div>
+
+            <div class="section">
+                <h3>Locations</h3>
+                <div id="locationsList"></div>
+            </div>
+
+            <div class="section">
+                <h3>Recent Events</h3>
+                <div id="narrativeList"></div>
+            </div>
+
+            <div class="section">
+                <h3>World Status</h3>
+                <div id="worldStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="simulation_viz.js"></script>
+</body>
+</html>

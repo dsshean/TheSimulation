@@ -195,7 +195,7 @@ def create_blank_simulation_state(
         state["active_simulacra_ids"].append(sim_id)
         sim_profile = copy.deepcopy(DEFAULT_SIMULACRUM_RUNTIME_STATE)
         sim_profile["persona_details"] = summary_data.get("persona_details", {})
-        sim_profile["location"] = sim_profile["current_location"] # Ensure 'location' matches 'current_location' initially
+        # sim_profile["location"] = sim_profile["current_location"] # REMOVED: Legacy field, causes confusion with current_location
         state["simulacra_profiles"][sim_id] = sim_profile
     return state
 
@@ -553,6 +553,8 @@ def load_or_initialize_simulation(instance_uuid_arg: str | None) -> tuple[dict |
 
     return loaded_state_data, state_file_path
 
+
+
 def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
     """
     Try direct JSON parse first, then fallback to robust extraction and cleanup.
@@ -561,21 +563,9 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
         return None
 
     # Try direct parse (strip markdown fence if present)
-    # Improved regex pattern to better handle code blocks with or without language specifier
-    fence_pattern = r'```(?:json)?\s*([\s\S]*?)```'
-    fence_match = re.search(fence_pattern, text, re.DOTALL)
-    
-    # More robust handling of the match
-    if fence_match:
-        try:
-            json_text = fence_match.group(1).strip()
-            logger.debug(f"Found JSON in code block: {json_text[:50]}...")
-        except (IndexError, AttributeError):
-            logger.debug("Code block regex matched but couldn't extract content")
-            json_text = text.strip()
-    else:
-        json_text = text.strip()
-        logger.debug("No code block found, using entire text")
+    fence_pattern = r'```(?:json)?\s*\n?(.*?)```'
+    fence_match = re.search(fence_pattern, text, re.DOTALL | re.IGNORECASE)
+    json_text = fence_match.group(1).strip() if fence_match else text.strip()
 
     try:
         # Try direct parse
@@ -592,13 +582,6 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
         json_str = re.sub(r']\s*\n\s*,\s*\n', '],\n', json_str)
         # Fix missing commas between array elements and object properties
         json_str = re.sub(r'}\s*\n\s*,\s*\n\s*"', '},\n    "', json_str)
-
-        # --- NEW: Fix for missing comma between a closing brace } and a new key " ---
-        # e.g. "results": { ... } "discovered_connections": [ ... ]
-        # becomes "results": { ... }, "discovered_connections": [ ... ]
-        json_str = re.sub(r'(})\s*(")', r'\1,\2', json_str)
-        # --- END NEW ---
-
         # Remove trailing commas before closing brackets/braces
         json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
         # Fix common LLM mistake: array closed with ] instead of }]
@@ -680,20 +663,8 @@ def parse_json_output_last(text: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.debug(f"Brute-force closing failed: {e}")
 
-    # Final fallback: Try using demjson3 if available (much more lenient parser)
-    try:
-        import demjson3
-        result = demjson3.decode(json_text)
-        logger.debug("JSON parsing successful with demjson3")
-        return result
-    except ImportError:
-        logger.debug("demjson3 not installed, skipping this fallback option")
-    except Exception as e:
-        logger.debug(f"demjson3 parsing failed: {e}")
-
     logger.warning(f"All JSON parsing attempts failed. Original: {json_text[:100]}...")
     return None
-
 def get_nested(data: Dict, *keys: str, default: Any = None) -> Any:
     """Safely retrieve nested dictionary values."""
     current = data
