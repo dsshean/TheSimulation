@@ -7,10 +7,17 @@ class SimulationVisualizer {
         this.isConnected = false;
         this.isPaused = false;
         this.currentData = null;
+        this.commandHistory = [];
+        this.selectedAgent = null;
+        this.interactiveMode = false;
+        this.chatMessages = [];
+        this.lastCheckTime = 0;
+        this.lastNarrativeCount = 0;
+        this.commandResponses = [];
         
         // D3 setup
         this.svg = d3.select("#visualization");
-        this.width = window.innerWidth - 350; // Subtract info panel width
+        this.width = window.innerWidth - 420; // Subtract info panel width
         this.height = window.innerHeight - 50; // Subtract status bar height
         
         this.svg
@@ -69,8 +76,20 @@ class SimulationVisualizer {
             };
             
             this.websocket.onmessage = (event) => {
-                if (!this.isPaused) {
-                    const data = JSON.parse(event.data);
+                const data = JSON.parse(event.data);
+                
+                // Debug logging
+                if (data.type === 'command_response' || data.type === 'chat_response') {
+                    console.log('WebSocket message received:', data.type, data);
+                }
+                
+                // Handle different message types
+                if (data.type === 'command_response') {
+                    this.handleCommandResponse(data);
+                } else if (data.type === 'chat_response') {
+                    this.handleChatResponse(data);
+                } else if (!this.isPaused) {
+                    // Regular simulation update
                     this.handleSimulationUpdate(data);
                 }
             };
@@ -124,9 +143,10 @@ class SimulationVisualizer {
         
         // Update info panels
         this.updateAgentsList(data.simulacra);
-        this.updateLocationsList(data.locations);
+        this.updateLocationsList(data.locations || {});
         this.updateNarrativeList(data.recent_narrative);
         this.updateWorldStatus(data);
+        this.updateFeedPanels(data);
     }
     
     updateVisualization(data) {
@@ -134,8 +154,11 @@ class SimulationVisualizer {
         const nodes = [];
         const links = [];
         
+        // Extract locations from the correct state structure
+        const locations = data.locations || {};
+        
         // Add location nodes
-        Object.values(data.locations).forEach(location => {
+        Object.values(locations).forEach(location => {
             nodes.push({
                 id: location.id,
                 type: 'location',
@@ -153,8 +176,8 @@ class SimulationVisualizer {
             let agentY = Math.random() * this.height;
             
             // Try to position agent near their current location if it exists
-            if (agent.current_location && data.locations[agent.current_location]) {
-                const location = data.locations[agent.current_location];
+            if (agent.current_location && locations[agent.current_location]) {
+                const location = locations[agent.current_location];
                 if (location.x !== undefined && location.y !== undefined) {
                     // Position agent slightly offset from location center
                     agentX = location.x + (Math.random() - 0.5) * 40;
@@ -172,7 +195,7 @@ class SimulationVisualizer {
             });
             
             // Link agent to current location with dotted line
-            if (agent.current_location && data.locations[agent.current_location]) {
+            if (agent.current_location && locations[agent.current_location]) {
                 links.push({
                     source: agent.id,
                     target: agent.current_location,
@@ -182,25 +205,26 @@ class SimulationVisualizer {
         });
         
         // Add location connections
-        Object.values(data.locations).forEach(location => {
-            if (location.connections && Array.isArray(location.connections)) {
-                location.connections.forEach(connection => {
+        Object.values(locations).forEach(location => {
+            // Check for connections field (as provided by WebSocket server)
+            const connections = location.connections || [];
+            if (Array.isArray(connections)) {
+                connections.forEach(connection => {
                     // Handle both string IDs and connection objects
                     const targetId = typeof connection === 'string' 
                         ? connection 
-                        : connection.to_location_id_hint || connection.target_id;
+                        : connection.to_location_id_hint || connection.target_id || connection.id;
                     
-                    if (targetId && data.locations[targetId]) {
+                    if (targetId && locations[targetId]) {
                         // Avoid duplicate bidirectional links
-                        const linkId = location.id < targetId 
-                            ? `${location.id}-${targetId}` 
-                            : `${targetId}-${location.id}`;
-                        
-                        // Check if this link already exists
-                        if (!links.some(link => 
-                            `${link.source}-${link.target}` === linkId || 
-                            `${link.target}-${link.source}` === linkId
-                        )) {
+                        const linkExists = links.some(l => {
+                            const sourceId = l.source.id || l.source;
+                            const targetId_l = l.target.id || l.target;
+                            return (sourceId === location.id && targetId_l === targetId) ||
+                                   (sourceId === targetId && targetId_l === location.id);
+                        });
+
+                        if (!linkExists) {
                             links.push({
                                 source: location.id,
                                 target: targetId,
@@ -474,7 +498,7 @@ class SimulationVisualizer {
         } else if (d.type === 'location') {
             content += `Objects: ${d.data.object_count}<br>`;
             content += `NPCs: ${d.data.npc_count}<br>`;
-            content += `Connections: ${d.data.connections.length}<br>`;
+            content += `Connections: ${(d.data.connections || []).length}<br>`;
             
             // Show agents currently at this location
             if (this.currentData && this.currentData.simulacra) {
@@ -557,9 +581,9 @@ class SimulationVisualizer {
             item.innerHTML = `
                 <div class="item-title">${location.name}</div>
                 <div class="item-details">
-                    Objects: ${location.object_count}<br>
-                    NPCs: ${location.npc_count}<br>
-                    Connections: ${location.connections.length}
+                    Objects: ${location.object_count || 0}<br>
+                    NPCs: ${location.npc_count || 0}<br>
+                    Connections: ${(location.connections || []).length}
                 </div>
             `;
             
@@ -569,14 +593,85 @@ class SimulationVisualizer {
     
     updateNarrativeList(narrative) {
         const container = document.getElementById('narrativeList');
+        
+        // Check if we have new narrative entries
+        const hasNewEntries = narrative.length > this.lastNarrativeCount;
+        const newEntriesCount = hasNewEntries ? narrative.length - this.lastNarrativeCount : 0;
+        
+        // Clear existing content
         container.innerHTML = '';
         
-        narrative.slice(-5).forEach(entry => {
+        // Show recent narrative entries (last 8 entries)
+        const recentEntries = narrative.slice(-8);
+        
+        recentEntries.forEach((entry, index) => {
             const item = document.createElement('div');
-            item.className = 'narrative-item';
-            item.textContent = entry.length > 200 ? entry.substring(0, 200) + '...' : entry;
+            
+            // Mark new entries with special styling
+            const isNewEntry = hasNewEntries && index >= recentEntries.length - newEntriesCount;
+            item.className = `narrative-item ${isNewEntry ? 'new' : ''}`;
+            
+            // Parse and format the narrative entry
+            const formattedEntry = this.formatNarrativeEntry(entry);
+            item.innerHTML = formattedEntry;
+            
             container.appendChild(item);
         });
+        
+        // Update our tracking
+        this.lastNarrativeCount = narrative.length;
+        
+        // Auto-scroll to bottom to show newest entries
+        container.scrollTop = container.scrollHeight;
+    }
+
+    formatNarrativeEntry(entry) {
+        // Parse timestamp and content from entries like "[T123.4] Some content"
+        const timeMatch = entry.match(/^\[T([\d.]+)\]\s*(.+)$/);
+        if (timeMatch) {
+            const simTime = parseFloat(timeMatch[1]);
+            const content = timeMatch[2];
+            
+            // Format different types of content
+            let formattedContent = content;
+            
+            // Highlight agent names and actions
+            formattedContent = formattedContent.replace(
+                /(sim_\w+|Agent \w+)/g, 
+                '<strong style="color: #ff6b6b;">$1</strong>'
+            );
+            
+            // Highlight action verbs
+            formattedContent = formattedContent.replace(
+                /\b(decides to|says|thinks|moves to|enters|exits|picks up|drops|looks at)\b/gi,
+                '<em style="color: #007bff;">$1</em>'
+            );
+            
+            // Highlight locations
+            formattedContent = formattedContent.replace(
+                /\b([A-Z][a-zA-Z]*_\d+|Home|Office|Park|Kitchen|Bedroom)\b/g,
+                '<span style="color: #69b3a2; font-weight: 500;">$1</span>'
+            );
+            
+            // Special formatting for different event types
+            if (content.includes('[InteractionMode]')) {
+                formattedContent = formattedContent.replace('[InteractionMode]', 
+                    '<span style="background: #fff3cd; padding: 2px 4px; border-radius: 3px; font-size: 10px;">[INTERACTIVE]</span>');
+            }
+            
+            if (content.includes('[System Teleport]')) {
+                formattedContent = formattedContent.replace('[System Teleport]', 
+                    '<span style="background: #d4edda; padding: 2px 4px; border-radius: 3px; font-size: 10px;">[TELEPORT]</span>');
+            }
+            
+            return `
+                <div style="font-size: 10px; color: #666; margin-bottom: 3px;">T${simTime.toFixed(1)}s</div>
+                <div>${formattedContent}</div>
+            `;
+        } else {
+            // Fallback for entries without timestamp
+            return entry.length > 200 ? entry.substring(0, 200) + '...' : entry;
+        }
     }
     
     updateWorldStatus(data) {
@@ -601,7 +696,7 @@ class SimulationVisualizer {
     }
     
     handleResize() {
-        this.width = window.innerWidth - 350;
+        this.width = window.innerWidth - 420;
         this.height = window.innerHeight - 50;
         
         this.svg
@@ -633,7 +728,509 @@ class SimulationVisualizer {
         d.fx = null;
         d.fy = null;
     }
+
+    // Command handling methods
+    sendCommand(command) {
+        if (this.websocket && this.isConnected) {
+            // Add timestamp to command
+            command.timestamp = Date.now();
+            console.log('Sending command:', command);
+            this.websocket.send(JSON.stringify(command));
+            
+            // Add to history
+            this.commandHistory.push({
+                command: command,
+                timestamp: new Date().toLocaleTimeString(),
+                status: 'pending'
+            });
+            
+            this.showNotification('Command sent...', false);
+        } else {
+            alert('Not connected to simulation server');
+        }
+    }
+
+    handleCommandResponse(data) {
+        console.log('Received command response:', data);
+        
+        // Find the corresponding command in history and update its status
+        const historyItem = this.commandHistory.find(item => 
+            item.status === 'pending'
+        );
+        
+        if (historyItem) {
+            historyItem.response = data;
+            historyItem.status = data.success ? 'success' : 'error';
+        }
+
+        // Add to command responses display
+        this.addCommandResponse(data, historyItem?.command);
+
+        // Show response notification with more details
+        let message = data.success ? 
+            'Command executed successfully' : 
+            `Command failed: ${data.message || 'Unknown error'}`;
+        
+        // Add specific success details for different command types
+        if (data.success && historyItem?.command) {
+            const commandType = historyItem.command.command;
+            switch (commandType) {
+                case 'narrate':
+                    message = 'Narrative injected - agents will respond to the new event';
+                    break;
+                case 'inject_event':
+                    message = `Event sent to ${historyItem.command.agent_id} - check narrative feed for response`;
+                    break;
+                case 'teleport_agent':
+                    message = `${historyItem.command.agent_id} teleported to ${historyItem.command.new_location_id}`;
+                    break;
+                case 'world_info':
+                    message = `World ${historyItem.command.category} updated - agents may notice changes`;
+                    break;
+            }
+        }
+        
+        this.showNotification(message, !data.success);
+        
+        // Log response for debugging
+        if (data.success) {
+            console.log('Command successful:', data.message);
+        } else {
+            console.error('Command failed:', data.message);
+        }
+    }
+
+    handleChatResponse(data) {
+        if (this.interactiveMode && data.agent_id === this.selectedAgent) {
+            this.addChatMessage('agent', data.content);
+        }
+    }
+
+    showNotification(message, isError = false) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${isError ? '#dc3545' : '#28a745'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            z-index: 3000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 14px;
+            font-weight: 500;
+            max-width: 300px;
+            word-wrap: break-word;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        // Trigger animation
+        setTimeout(() => {
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateX(0)';
+        }, 10);
+        
+        // Remove after delay
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    populateAgentList(containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        if (!this.currentData || !this.currentData.simulacra) {
+            container.innerHTML = '<div style="padding: 10px; color: #666;">No agents available</div>';
+            return;
+        }
+
+        Object.values(this.currentData.simulacra).forEach(agent => {
+            const option = document.createElement('div');
+            option.className = 'agent-option';
+            option.innerHTML = `
+                <div style="font-weight: bold;">${agent.name}</div>
+                <div style="font-size: 11px; color: #666;">Status: ${agent.status} | Location: ${agent.current_location}</div>
+            `;
+            option.onclick = () => {
+                // Remove selection from other options
+                container.querySelectorAll('.agent-option').forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+                this.selectedAgent = agent.id;
+            };
+            container.appendChild(option);
+        });
+    }
+
+    addChatMessage(type, content) {
+        const messagesContainer = document.getElementById('chatMessages');
+        const message = document.createElement('div');
+        message.className = `chat-message ${type}`;
+        message.textContent = content;
+        messagesContainer.appendChild(message);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    addCommandResponse(responseData, command) {
+        const container = document.getElementById('responseList');
+        const responseItem = document.createElement('div');
+        responseItem.className = `response-item ${responseData.success ? 'success' : 'error'}`;
+        
+        const commandName = command ? command.command : 'Unknown';
+        const timestamp = new Date().toLocaleTimeString();
+        
+        let responseContent = responseData.message || 'No message';
+        let detailsHtml = '';
+        
+        // Add specific content based on command type
+        if (responseData.success && command) {
+            switch (command.command) {
+                case 'narrate':
+                    responseContent = `Narrative "${command.text.substring(0, 50)}..." was injected into simulation`;
+                    break;
+                case 'inject_event':
+                    responseContent = `Event "${command.description.substring(0, 50)}..." sent to ${command.agent_id}`;
+                    break;
+                case 'teleport_agent':
+                    responseContent = `${command.agent_id} teleported to ${command.new_location_id}`;
+                    if (command.location_description) {
+                        detailsHtml = `<div class="response-details">Location: ${command.location_description}</div>`;
+                    }
+                    break;
+                case 'world_info':
+                    responseContent = `${command.category} updated: "${command.info.substring(0, 100)}..."`;
+                    break;
+            }
+        }
+        
+        // Show response data if available
+        if (responseData.data && Object.keys(responseData.data).length > 0) {
+            detailsHtml += `<div class="response-details">Response data: ${JSON.stringify(responseData.data, null, 2)}</div>`;
+        }
+        
+        responseItem.innerHTML = `
+            <div class="response-time">${timestamp}</div>
+            <div class="response-header">${commandName.toUpperCase()}</div>
+            <div class="response-content">${responseContent}</div>
+            ${detailsHtml}
+        `;
+        
+        container.insertBefore(responseItem, container.firstChild);
+        
+        // Keep only last 10 responses
+        while (container.children.length > 10) {
+            container.removeChild(container.lastChild);
+        }
+        
+        // Add to internal array
+        this.commandResponses.unshift({
+            timestamp: timestamp,
+            command: command,
+            response: responseData
+        });
+        
+        if (this.commandResponses.length > 20) {
+            this.commandResponses = this.commandResponses.slice(0, 20);
+        }
+    }
+
+    updateFeedPanels(data) {
+        // Update Latest Simulacra
+        const simulacraElement = document.getElementById('latestSimulacra');
+        if (data.simulacra && Object.keys(data.simulacra).length > 0) {
+            const agents = Object.values(data.simulacra);
+            // Find most recently active agent or first one
+            const latestAgent = agents.find(agent => agent.status === 'busy') || agents[0];
+            const simulacraText = `${latestAgent.name}: ${latestAgent.status}\n${latestAgent.current_action || 'No current action'}`;
+            if (simulacraElement.textContent !== simulacraText) {
+                simulacraElement.textContent = simulacraText;
+                simulacraElement.classList.add('updated');
+                setTimeout(() => simulacraElement.classList.remove('updated'), 500);
+            }
+        } else {
+            simulacraElement.textContent = 'No agents active';
+        }
+
+        // Update World Engine
+        const worldEngineElement = document.getElementById('latestWorldEngine');
+        const worldEngineText = data.world_engine_activity || 'No recent activity';
+        if (worldEngineElement.textContent !== worldEngineText) {
+            worldEngineElement.textContent = worldEngineText;
+            worldEngineElement.classList.add('updated');
+            setTimeout(() => worldEngineElement.classList.remove('updated'), 500);
+        }
+
+        // Update Narrative
+        const narrativeElement = document.getElementById('latestNarrative');
+        if (data.recent_narrative && data.recent_narrative.length > 0) {
+            const latestNarrative = data.recent_narrative[data.recent_narrative.length - 1];
+            const narrativeText = typeof latestNarrative === 'string' ? latestNarrative : latestNarrative.text || 'No narrative';
+            if (narrativeElement.textContent !== narrativeText) {
+                narrativeElement.textContent = narrativeText;
+                narrativeElement.classList.add('updated');
+                setTimeout(() => narrativeElement.classList.remove('updated'), 500);
+            }
+        } else {
+            narrativeElement.textContent = 'No recent narrative';
+        }
+    }
 }
+
+// Modal and command functions
+function showModal(modalId) {
+    document.getElementById(modalId).style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function showNarrativeModal() {
+    showModal('narrativeModal');
+    document.getElementById('narrativeText').focus();
+}
+
+function sendNarrative() {
+    const text = document.getElementById('narrativeText').value;
+    if (!text.trim()) {
+        alert('Please enter narrative text');
+        return;
+    }
+    
+    visualizer.sendCommand({
+        command: 'narrate',
+        text: text
+    });
+    
+    closeModal('narrativeModal');
+    document.getElementById('narrativeText').value = '';
+}
+
+function showAgentEventModal() {
+    visualizer.populateAgentList('agentEventList');
+    showModal('agentEventModal');
+}
+
+function sendAgentEvent() {
+    if (!visualizer.selectedAgent) {
+        alert('Please select an agent');
+        return;
+    }
+    
+    const description = document.getElementById('eventDescription').value;
+    if (!description.trim()) {
+        alert('Please enter event description');
+        return;
+    }
+    
+    visualizer.sendCommand({
+        command: 'inject_event',
+        agent_id: visualizer.selectedAgent,
+        description: description
+    });
+    
+    closeModal('agentEventModal');
+    document.getElementById('eventDescription').value = '';
+    visualizer.selectedAgent = null;
+}
+
+function showWorldInfoModal() {
+    showModal('worldInfoModal');
+    document.getElementById('worldInfoText').focus();
+}
+
+function sendWorldInfo() {
+    const category = document.getElementById('worldInfoCategory').value;
+    const info = document.getElementById('worldInfoText').value;
+    
+    if (!info.trim()) {
+        alert('Please enter world information');
+        return;
+    }
+    
+    visualizer.sendCommand({
+        command: 'world_info',
+        category: category,
+        info: info
+    });
+    
+    closeModal('worldInfoModal');
+    document.getElementById('worldInfoText').value = '';
+}
+
+function showTeleportModal() {
+    visualizer.populateAgentList('teleportAgentList');
+    showModal('teleportModal');
+}
+
+function sendTeleport() {
+    if (!visualizer.selectedAgent) {
+        alert('Please select an agent');
+        return;
+    }
+    
+    const location = document.getElementById('teleportLocation').value;
+    if (!location.trim()) {
+        alert('Please enter a location ID');
+        return;
+    }
+    
+    const description = document.getElementById('teleportDescription').value;
+    
+    visualizer.sendCommand({
+        command: 'teleport_agent',
+        agent_id: visualizer.selectedAgent,
+        new_location_id: location,
+        location_description: description || 'No specific description provided'
+    });
+    
+    closeModal('teleportModal');
+    document.getElementById('teleportLocation').value = '';
+    document.getElementById('teleportDescription').value = '';
+    visualizer.selectedAgent = null;
+}
+
+function showInteractiveChatModal() {
+    visualizer.populateAgentList('chatAgentList');
+    showModal('interactiveChatModal');
+    document.getElementById('chatMessages').innerHTML = '';
+    visualizer.chatMessages = [];
+}
+
+function startInteractiveChat() {
+    if (!visualizer.selectedAgent) {
+        alert('Please select an agent first');
+        return;
+    }
+    
+    visualizer.interactiveMode = true;
+    visualizer.sendCommand({
+        command: 'start_interaction_mode',
+        agent_id: visualizer.selectedAgent
+    });
+    
+    visualizer.addChatMessage('system', `Started interactive chat with ${visualizer.selectedAgent}`);
+    document.getElementById('chatInput').focus();
+}
+
+function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    if (!visualizer.interactiveMode) {
+        startInteractiveChat();
+        return;
+    }
+    
+    // Parse message type and content
+    let eventType = 'text_message';
+    let content = message;
+    
+    if (message.startsWith('text:')) {
+        eventType = 'text_message';
+        content = message.substring(5).trim();
+    } else if (message.startsWith('call:')) {
+        eventType = 'phone_call';
+        content = message.substring(5).trim();
+    } else if (message.startsWith('voice:')) {
+        eventType = 'voice';
+        content = message.substring(6).trim();
+    } else if (message.startsWith('event:')) {
+        eventType = 'custom';
+        content = message.substring(6).trim();
+    } else if (message.startsWith('doorbell:')) {
+        eventType = 'doorbell';
+        content = message.substring(9).trim();
+    } else if (message.startsWith('noise:')) {
+        eventType = 'noise';
+        content = message.substring(6).trim();
+    }
+    
+    visualizer.sendCommand({
+        command: 'interaction_event',
+        agent_id: visualizer.selectedAgent,
+        event_type: eventType,
+        content: content
+    });
+    
+    visualizer.addChatMessage('user', content);
+    input.value = '';
+}
+
+function closeInteractiveChat() {
+    if (visualizer.interactiveMode) {
+        visualizer.sendCommand({
+            command: 'end_interaction_mode',
+            agent_id: visualizer.selectedAgent
+        });
+        visualizer.interactiveMode = false;
+    }
+    
+    closeModal('interactiveChatModal');
+    visualizer.selectedAgent = null;
+}
+
+function showHistoryModal() {
+    updateHistoryDisplay();
+    showModal('historyModal');
+}
+
+function updateHistoryDisplay() {
+    const container = document.getElementById('historyList');
+    container.innerHTML = '';
+    
+    if (visualizer.commandHistory.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No commands executed yet</div>';
+        return;
+    }
+    
+    visualizer.commandHistory.slice().reverse().forEach((item, index) => {
+        const historyItem = document.createElement('div');
+        historyItem.className = `history-item ${item.status}`;
+        historyItem.innerHTML = `
+            <div style="font-weight: bold;">${item.command.command}</div>
+            <div style="margin: 5px 0; font-size: 10px; color: #666;">
+                ${item.timestamp} - Status: ${item.status}
+            </div>
+            ${item.response ? `<div style="font-size: 11px;">${JSON.stringify(item.response, null, 2)}</div>` : ''}
+        `;
+        container.appendChild(historyItem);
+    });
+}
+
+function clearHistory() {
+    if (confirm('Are you sure you want to clear the command history?')) {
+        visualizer.commandHistory = [];
+        updateHistoryDisplay();
+    }
+}
+
+
+// Enhanced chat input handler
+document.addEventListener('DOMContentLoaded', () => {
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+    }
+});
 
 // Global control functions
 function resetView() {

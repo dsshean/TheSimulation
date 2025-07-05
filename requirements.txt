@@ -10,3 +10,8 @@ timezonefinder
 atproto
 pygame
 websockets
+alembic
+fastapi
+uvicorn
+sqlalchemy
+pydantic

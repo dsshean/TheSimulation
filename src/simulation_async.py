@@ -879,10 +879,8 @@ async def world_engine_task_llm():
                     if destination_location_id:
                         effective_location_id_for_discoveries = destination_location_id
                         logger.info(f"[WorldEngineLLM] Move action: discoveries will apply to destination {destination_location_id}")
-                    else:
-                        logger.warning(f"[WorldEngineLLM] CRITICAL: Move action but no location update found in results!")
                         
-                        # Check if connection back to origin already exists
+                        # Check if connection back to origin already exists in the discovered connections
                         origin_connection_exists = any(
                             conn.get('to_location_id_hint') == actor_location_id 
                             for conn in discovered_connections_list
@@ -897,6 +895,8 @@ async def world_engine_task_llm():
                             }
                             discovered_connections_list.append(back_connection)
                             logger.info(f"[WorldEngineLLM] Added bidirectional connection from {destination_location_id} back to {actor_location_id}")
+                    else:
+                        logger.warning(f"[WorldEngineLLM] CRITICAL: Move action but no location update found in results!")
                     
                     # Defer location change to completion if action has duration
                     move_duration = getattr(validated_data, 'duration', 0.0)
@@ -1716,14 +1716,17 @@ async def run_simulation(
                 ), 
                 name="SocketServer"
             ))
-            if ENABLE_WEB_VISUALIZATION:
-                tasks.append(asyncio.create_task(
-                    visualization_websocket_task(
-                        state=state,
-                        logger_instance=logger
-                    ),
-                    name="VisualizationWebSocket"
-                ))
+        if ENABLE_WEB_VISUALIZATION:
+            tasks.append(asyncio.create_task(
+                visualization_websocket_task(
+                    state=state,
+                    logger_instance=logger,
+                    narration_queue=narration_queue,
+                    world_mood=world_mood_global,
+                    simulation_time_getter=get_current_sim_time
+                ),
+                name="VisualizationWebSocket"
+            ))
             tasks.append(asyncio.create_task(time_manager_task(
                 current_state=state, 
                 event_bus_qsize_func=lambda: event_bus.qsize(), 

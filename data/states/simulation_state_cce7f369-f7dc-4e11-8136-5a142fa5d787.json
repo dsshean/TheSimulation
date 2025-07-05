@@ -3,7 +3,7 @@
   "active_simulacra_ids": [
     "sim_sustdj"
   ],
-  "world_time": 1.176936163999926,
+  "world_time": 0.0,
   "narrative_log": [],
   "world_template_details": {
     "description": "A new world is beginning.",
@@ -73,9 +73,7 @@
         "Pet_Peeves": "Loud chewing, people being late, disorganized code.",
         "Dreams": "To create software that makes a positive impact on the world, to own a small cabin in the mountains.",
         "Past_Traumas": null
-      },
-      "current_interrupt_probability": null,
-      "monologue_history": []
+      }
     }
   },
   "objects": [],

@@ -5,7 +5,7 @@ import json
 import logging
 import random # Added for dynamic_interruption_task
 import re # Added for narrative_image_generation_task
-import time # For time_manager_task
+import time # For time_manager_task and chat responses
 import os # Added for narrative_image_generation_task
 from io import BytesIO # Added for narrative_image_generation_task
 from typing import Any, Dict, Optional, List
@@ -721,7 +721,10 @@ async def process_pending_simulation_events(current_state: Dict[str, Any], logge
 
 # --- WebSocket Visualization Server ---
 
-async def visualization_websocket_task(state: Dict[str, Any], logger_instance: logging.Logger):
+async def visualization_websocket_task(state: Dict[str, Any], logger_instance: logging.Logger, 
+                                      narration_queue: Optional[asyncio.Queue] = None,
+                                      world_mood: str = "normal",
+                                      simulation_time_getter: Optional[callable] = None):
     """
     WebSocket server that streams real-time simulation state to web visualizer.
     Replaces the pygame visualization with a modern web-based interface.
@@ -743,9 +746,39 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
             # Keep connection alive and handle any client messages
             async for message in websocket:
                 try:
-                    # Handle client requests (e.g., zoom to agent, get details)
+                    # Handle client requests (e.g., zoom to agent, get details, commands)
                     client_request = json.loads(message)
-                    response = _handle_client_request(client_request, state)
+                    
+                    # Check if this is a command (has 'command' field) or a request (has 'type' field)
+                    if 'command' in client_request:
+                        # This is a command from the integrated client functionality
+                        logger_instance.info(f"[WebSocketViz] Processing command: {client_request.get('command')}")
+                        
+                        try:
+                            from .socket_server import process_message
+                            response = await process_message(
+                                json.dumps(client_request),
+                                state,
+                                narration_queue or asyncio.Queue(),
+                                world_mood,
+                                simulation_time_getter or (lambda: state.get('world_time', 0))
+                            )
+                            # Add response type for web client
+                            response['type'] = 'command_response'
+                            response['timestamp'] = client_request.get('timestamp')
+                            logger_instance.info(f"[WebSocketViz] Command response: {response}")
+                        except Exception as e:
+                            logger_instance.error(f"[WebSocketViz] Error processing command: {e}")
+                            response = {
+                                'type': 'command_response',
+                                'success': False,
+                                'message': f'Error processing command: {str(e)}',
+                                'timestamp': client_request.get('timestamp')
+                            }
+                    else:
+                        # This is a visualization request
+                        response = _handle_client_request(client_request, state)
+                    
                     await websocket.send(json.dumps(response))
                 except json.JSONDecodeError:
                     logger_instance.warning(f"[WebSocketViz] Invalid JSON from client: {message}")
@@ -763,13 +796,20 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
     async def broadcast_updates():
         """Continuously broadcast state updates to all connected clients"""
         last_world_time = 0
+        last_narrative_count = 0
         
         while True:
             try:
                 current_world_time = state.get('world_time', 0)
+                current_narrative_count = len(state.get('narrative_log', []))
                 
-                # Only broadcast if simulation time has advanced and we have clients
-                if current_world_time != last_world_time and len(connected_clients) > 0:
+                # Check if we should broadcast (time advanced, new narrative, or have clients)
+                should_broadcast = (
+                    (current_world_time != last_world_time or current_narrative_count != last_narrative_count) 
+                    and len(connected_clients) > 0
+                )
+                
+                if should_broadcast:
                     viz_data = _prepare_visualization_data(state)
                     logger_instance.debug(f"[WebSocketViz] Broadcasting update: time={current_world_time:.1f}, agents={len(viz_data.get('simulacra', {}))}, locations={len(viz_data.get('locations', {}))}")
                     
@@ -795,6 +835,11 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
                             logger_instance.info(f"[WebSocketViz] Active clients: {len(connected_clients)}")
                     
                     last_world_time = current_world_time
+                    last_narrative_count = current_narrative_count
+                
+                # Also check for new chat responses for interactive mode
+                if connected_clients:
+                    await _check_and_send_chat_responses(connected_clients, state, logger_instance)
                 
                 await asyncio.sleep(0.5)  # Update rate: 2Hz for smooth visualization
                 
@@ -840,6 +885,17 @@ def _prepare_visualization_data(state: Dict[str, Any]) -> Dict[str, Any]:
             'age': agent_data.get('persona_details', {}).get('Age'),
             'occupation': agent_data.get('persona_details', {}).get('Occupation')
         }
+    
+    # Generate world engine activity summary
+    world_engine_activity = "No recent activity"
+    if simulacra_data:
+        busy_agents = [agent for agent in simulacra_data.values() if agent.get('status') == 'busy']
+        if busy_agents:
+            world_engine_activity = f"Processing {len(busy_agents)} agent action(s)"
+        else:
+            idle_agents = [agent for agent in simulacra_data.values() if agent.get('status') == 'idle']
+            if idle_agents:
+                world_engine_activity = f"{len(idle_agents)} agent(s) awaiting actions"
     
     # Extract location data
     locations_data = {}
@@ -896,6 +952,7 @@ def _prepare_visualization_data(state: Dict[str, Any]) -> Dict[str, Any]:
         'objects': objects_data,
         'recent_narrative': recent_narrative,
         'world_feeds': state.get('world_feeds', {}),
+        'world_engine_activity': world_engine_activity,
         'active_simulacra_count': len(simulacra_data),
         'total_locations': len(locations_data),
         'total_objects': len(objects_data)
@@ -937,3 +994,49 @@ def _handle_client_request(request: Dict[str, Any], state: Dict[str, Any]) -> Di
             }
     
     return {'type': 'error', 'message': f'Unknown request type: {request_type}'}
+
+
+async def _check_and_send_chat_responses(connected_clients, state, logger_instance):
+    """Check for new agent responses in interactive mode and send them to clients"""
+    try:
+        # This is a simplified version - in a full implementation, 
+        # we'd track which clients are in interactive mode with which agents
+        # and send targeted responses. For now, we'll let the client filter.
+        
+        narrative_log = state.get('narrative_log', [])
+        if not narrative_log:
+            return
+            
+        # Get the most recent narrative entry
+        latest_entry = narrative_log[-1]
+        
+        # Check if this looks like an agent response that should be sent to chat
+        if '[InteractionMode]' in latest_entry:
+            # Parse agent ID and content from the entry
+            # Format: "[T123.4] [InteractionMode] agent_id experiences: some event"
+            
+            # Send chat response to all connected clients
+            # The client will filter based on their active interactive session
+            chat_response = {
+                'type': 'chat_response',
+                'content': latest_entry,
+                'timestamp': time.time()
+            }
+            
+            disconnected_clients = []
+            for client in connected_clients[:]:
+                try:
+                    await client.send(json.dumps(chat_response))
+                except websockets.exceptions.ConnectionClosed:
+                    disconnected_clients.append(client)
+                except Exception as e:
+                    logger_instance.warning(f"[WebSocketViz] Error sending chat response: {e}")
+                    disconnected_clients.append(client)
+            
+            # Clean up disconnected clients
+            for client in disconnected_clients:
+                if client in connected_clients:
+                    connected_clients.remove(client)
+                    
+    except Exception as e:
+        logger_instance.error(f"[WebSocketViz] Error in chat response check: {e}")

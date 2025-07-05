@@ -206,7 +206,31 @@ TheSimulation operates through a series of asynchronous components, orchestrated
 
 ## Running the Simulation
 
-Once the setup is complete and your `.env` file is configured, you can start the simulation using the `main_async.py` script:
+### Web Visualizer (Recommended)
+
+For an interactive, real-time visualization of the simulation, use the web-based visualizer. This provides a force-directed graph that shows agent movements, locations, and status updates in your browser.
+
+**1. Start the Simulation Backend:**
+
+First, ensure the main simulation is running. This process streams the necessary data to the visualizer.
+
+```bash
+python main_async.py
+```
+
+**2. Start the Web Visualizer Server:**
+
+In a **separate terminal**, start the simple Python HTTP server that serves the visualizer's web interface.
+
+```bash
+python start_visualizer.py
+```
+
+This will automatically open the visualizer in your default web browser at **http://localhost:8080**.
+
+### Command-Line Output
+
+If you prefer a text-based view or are not using a graphical environment, you can observe the simulation directly in your terminal. The `main_async.py` script uses the `rich` library to print a live, updating table with key simulation metrics.
 
 ```bash
 python main_async.py
