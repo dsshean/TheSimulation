@@ -181,10 +181,52 @@ TheSimulation operates through a series of asynchronous components, orchestrated
 
 Once the setup is complete and your `.env` file is configured, you can start the simulation using the `main_async.py` script:
 
-```bash
-python main_async.py
-python start_vizualizer.py
-```
+The simulation requires two components to run simultaneously: the main simulation backend (`main_async.py`) and the web visualizer server (`start_visualizer.py`).
+
+!Console View
+
+### Option 1: Two Terminals (Recommended)
+
+!Interactive Web View
+
+1.  In your first terminal, start the main simulation backend:
+
+    ```bash
+    python main_async.py
+    ```
+
+2.  In a second, separate terminal, start the visualizer server:
+    ```bash
+    python start_visualizer.py
+    ```
+
+### Option 2: Single Command Line
+
+If you prefer to use a single command, you can launch both processes concurrently. The command depends on your operating system:
+
+- **On Windows (Command Prompt):**
+  ```batch
+  start "Simulation" python main_async.py && start "Visualizer" python start_visualizer.py
+  ```
+- **On Windows (PowerShell):**
+  ```powershell
+  Start-Process python -ArgumentList "main_async.py"; Start-Process python -ArgumentList "start_visualizer.py"
+  ```
+- **On macOS or Linux (Bash/Zsh):**
+  ```bash
+  python main_async.py & python start_visualizer.py
+  ```
+
+### Option 3: Use CLI client without visualization
+
+    ```bash
+    python main_async.py
+    ```
+
+- **CLI client for interaction with Simulacra**
+  ```bash
+  python client.py
+  ```
 
 ![Console View](console_image.png)
 
