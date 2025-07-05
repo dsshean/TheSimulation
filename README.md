@@ -10,33 +10,6 @@ Update as of:
 * Code migrated to ADK V1.0
 * Agent Isolation to address uncontrolled Contents growth.
 
-5/22/2025
-
-- All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
-- Interactive mode is functional also - use client.py and select a simulacra to interact with.
-- Next steps - code is bloated and very messy - since all major features are functioning correctly, most of the code will be refactored to be cleaner and more modular. Tackling global states also to be more in line with ADK patters for deployment in GCP in cloudrun environment to running 24/7.
-- Further enhancements - as in better async handling ops for multi agent interactiton and other interaces for say game design to use patterns in Unity/Unreal to create fully immersive NPCs or Research Purposus.
-
-5/21/2025
-
-- fixed condition that drove simulacra insane due to the inability to move from an unknown location. see race_condition_log for details
-
-5/20/2025
-
-- setup_simulation.py migrated to use ADK - use setup_simulation_adk.py for more robust simulacra generation.
-- Input mode: The code is there to interact with the simulated world and simulacra, but cannot be accessed due to rich console. Thinking of migrating the interface to streamlit or other webui to enable this mode.
-
-5/19/2025
-
-- Current state - Fully functional - Needs enhancements and contributions welcomed.
-- World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
-- Image generation moved to Imagen 3 - Bluesky integration live
-- To DO:
-- Rework of life_generation.py using ADK - migrataion in progress and option to post entire life generation sequence to Bluesky
-- Posting of interactions to Bluesky - possibly to keep up with realtime updates. Exploring feasibility or practicality
-- Life graph - all interactions mapping for Data Analysis in graph format. TBD
-- Further tools use by simulacra ie. Email access / X(Twitter) / Blueksy etc... web browsing.
-
 ## Table of Contents
 
 - [Simulacra States of Insanity: Understanding Erratic Behavior](#simulacra-states-of-insanity-understanding-erratic-behavior)
@@ -206,35 +179,16 @@ TheSimulation operates through a series of asynchronous components, orchestrated
 
 ## Running the Simulation
 
-### Web Visualizer (Recommended)
-
-For an interactive, real-time visualization of the simulation, use the web-based visualizer. This provides a force-directed graph that shows agent movements, locations, and status updates in your browser.
-
-**1. Start the Simulation Backend:**
-
-First, ensure the main simulation is running. This process streams the necessary data to the visualizer.
+Once the setup is complete and your `.env` file is configured, you can start the simulation using the `main_async.py` script:
 
 ```bash
 python main_async.py
+python start_vizualizer.py
 ```
 
-**2. Start the Web Visualizer Server:**
+![Console View](console_image.png)
 
-In a **separate terminal**, start the simple Python HTTP server that serves the visualizer's web interface.
-
-```bash
-python start_visualizer.py
-```
-
-This will automatically open the visualizer in your default web browser at **http://localhost:8080**.
-
-### Command-Line Output
-
-If you prefer a text-based view or are not using a graphical environment, you can observe the simulation directly in your terminal. The `main_async.py` script uses the `rich` library to print a live, updating table with key simulation metrics.
-
-```bash
-python main_async.py
-```
+![Interactive Web View](web_system.png)
 
 ## Important Notes for Running:
 
@@ -425,7 +379,7 @@ While the core loop is functional, several areas need development:
   - Current State: All interactions with NPCS exists and works - NPCs are defined as non world objects, it can be people or say a computer. A mountain wouldnt be considered an NPC.
   - Next Steps: Test multi-agent communication and collaboration/conflict. This includes refining how agents perceive and react to each other's actions, manage shared resources, and form social relationships.
 
-- Real-World Sync & Dynamic Environments:
+- Real-world Sync & Dynamic Environments:
 
   - Current State: The simulation runs on its own accelerated or decelerated clock (SIMULATION_SPEED_FACTOR), also supports real world time sync so the world run in parallel to ours. The world_info_gatherer_task provides periodic updates for simulated news/weather, with an option for real-time search.
   - Next Steps & Considerations:
@@ -442,6 +396,31 @@ While the core loop is functional, several areas need development:
     - Simulated Communication Systems: Implement tools for agents to send/receive emails or messages, enabling more complex inter-agent or agent-to-outside-world communication. (To Be Determined)
     - Broader API Access: Connect to a wider range of external APIs (e.g., more detailed weather services, stock market data, translation tools, scientific knowledge bases) to enrich the simulation's data sources and agent capabilities. (To Be Determined)
     - These integrations will likely leverage robust communication patterns (A2A and MCP).
+
+### Web-Based Visualizer
+
+The project includes a real-time, web-based visualizer that provides a dynamic graph of the simulation state.
+
+**Features:**
+
+- **Live Graph:** Displays locations, agents, and their connections.
+- **Real-time Updates:** Automatically updates as the simulation progresses.
+- **Interactive:** Pan, zoom, and click on nodes to get more details.
+- **Information Panels:** Shows lists of active agents, locations, recent events, and world status.
+
+**How to Use:**
+
+1.  **Start the main simulation:**
+    ```bash
+    python main_async.py
+    ```
+2.  **In a separate terminal, start the visualizer server:**
+    ```bash
+    python start_visualizer.py
+    ```
+3.  **Open your browser:** The script will automatically open a new tab to `http://localhost:8080`.
+
+The visualizer connects to the simulation via a WebSocket on port `8766`. Ensure this port is not blocked.
 
 ## Simulacra States of Insanity: Understanding Erratic Behavior
 
