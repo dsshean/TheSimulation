@@ -3,7 +3,9 @@ import logging
 import asyncio
 import socket
 import re
+from types import SimpleNamespace
 from typing import Dict, Any, Optional, Union
+import uuid # Import uuid for generating action_id
 
 from .simulation_utils import _update_state_value
 from .loop_utils import get_nested # Keep this
@@ -210,7 +212,7 @@ async def process_message(
                     "world_mood": world_mood
                 }
                 # Use temporal ordering system
-                from .simulation_async import add_narration_event_with_ordering
+                from .simulation_async import add_narration_event_with_ordering # Moved import
                 if add_narration_event_with_ordering is not None:
                     await add_narration_event_with_ordering(narration_event, task_name="SocketServer_ExternalNarrative")
                 else:
@@ -322,32 +324,24 @@ async def process_message(
                 logger.warning(f"[SocketServer] Teleporting agent {agent_id} to new location '{new_location_id}' which is not yet defined in world_state.location_details. Agent might perceive an undescribed place until look_around.")
 
             old_location_id = get_nested(state, SIMULACRA_KEY, agent_id, CURRENT_LOCATION_KEY, default="Unknown")
-            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.{CURRENT_LOCATION_KEY}", new_location_id, logger)
-            
+            agent_name_for_log = get_nested(state, SIMULACRA_KEY, agent_id, "persona_details", "Name", default=agent_id)
             new_loc_name = get_nested(state, WORLD_STATE_KEY, LOCATION_DETAILS_KEY, new_location_id, "name", default=new_location_id)
-            agent_loc_details_update = f"You are now in {new_loc_name}."
-            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.location_details", agent_loc_details_update, logger)
-            
-            # Also update the deprecated 'location' field for broader compatibility if it exists
-            if "location" in get_nested(state, SIMULACRA_KEY, agent_id, default={}):
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.location", new_location_id, logger)
 
-            # Set agent to idle and update last_observation
+            # Update agent's location and set teleport_triggered flag
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.{CURRENT_LOCATION_KEY}", new_location_id, logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.teleport_triggered", True, logger)
+
+            # Update last_observation to reflect the teleport for the agent's next prompt
             teleport_observation = f"You have been instantly teleported from {old_location_id} to {new_location_id} ({new_loc_name})."
             _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.last_observation", teleport_observation, logger)
-            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger)
+            _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.status", "idle", logger) # Set to idle to trigger immediate re-evaluation
 
-            # Add to narrative log
-            agent_name_for_log = get_nested(state, SIMULACRA_KEY, agent_id, "persona_details", "Name", default=agent_id)
-            narrative_teleport_entry = f"[T{current_sim_time:.1f}] [System Teleport] {agent_name_for_log} vanished from {old_location_id} and instantly reappeared in {new_location_id} ({new_loc_name})."
-            state.setdefault("narrative_log", []).append(narrative_teleport_entry)
-
-            logger.info(f"[SocketServer] Teleported agent {agent_id} from {old_location_id} to {new_location_id} via dedicated command.")
+            logger.info(f"[SocketServer] Teleport command received for {agent_id}. Location updated to {new_location_id}. Teleport triggered flag set.")
             return {
                 "success": True, 
-                "message": f"Agent {agent_id} teleported to {new_location_id}.",
+                "message": f"Agent {agent_id} teleported to {new_location_id}. Agent will re-evaluate its state.",
                 "data": {
-                    "agent_id": agent_id, "new_location_id": new_location_id # Include this in data for client
+                    "agent_id": agent_id, "new_location_id": new_location_id
                 }
             }
         
@@ -435,8 +429,9 @@ async def process_message(
         
         elif command == "interaction_event":
             agent_id = message.get("agent_id")
-            event_type = message.get("event_type", "text_message")
+            event_type = message.get("event_type", "telepathy")  # Default to telepathic communication
             content = message.get("content", "")
+            custom_medium = message.get("custom_medium", "")  # Allow custom communication medium
             
             # Add validation
             if not agent_id:
@@ -449,25 +444,34 @@ async def process_message(
             if agent_id not in get_nested(state, SIMULACRA_KEY, default={}):
                 return {"success": False, "message": f"Agent {agent_id} not found in simulation"}
             
-            # Format the event based on the communication channel
-            formatted_event = ""
+            # Format all communication as direct speech to trigger consistent responses
+            # The pattern "[Someone] said to you [via medium]: 'content'" is what agents recognize and respond to
             
+            # Handle predefined communication types
             if event_type == "text_message":
-                formatted_event = f"You receive a text message: \"{content}\""
+                formatted_event = f"Someone said to you via text: \"{content}\""
             elif event_type == "phone_call":
-                formatted_event = f"You receive a phone call. The caller says: \"{content}\""
+                formatted_event = f"Someone said to you over the phone: \"{content}\""
             elif event_type == "voice":
-                formatted_event = f"A voice speaks to you: \"{content}\""
+                formatted_event = f"A voice said to you: \"{content}\""
+            elif event_type == "telepathy":
+                formatted_event = f"Someone said to you telepathically: \"{content}\""
             elif event_type == "doorbell":
-                formatted_event = f"The doorbell rings. {content}"
+                formatted_event = f"Someone at the door said: \"{content}\""
             elif event_type == "knock":
-                formatted_event = f"There's a knock at the door. {content}"
+                formatted_event = f"Someone knocking said: \"{content}\""
             elif event_type == "noise":
-                formatted_event = f"You hear a noise. {content}"
-            elif event_type == "custom":
-                formatted_event = content
+                formatted_event = f"A sound conveyed to you: \"{content}\""
+            elif custom_medium:
+                # Use custom medium in the message
+                formatted_event = f"Someone said to you via {custom_medium}: \"{content}\""
+            elif event_type not in ["text_message", "phone_call", "voice", "telepathy", "doorbell", "knock", "noise"]:
+                # Treat any unrecognized event_type as a custom medium
+                medium_name = event_type.replace("_", " ")
+                formatted_event = f"Someone said to you via {medium_name}: \"{content}\""
             else:
-                formatted_event = f"Something happens: {content}"
+                # Fallback
+                formatted_event = f"Someone said to you: \"{content}\""
 
             logger.info(f"[SocketServer] Sending '{event_type}' event to {agent_id}: {formatted_event[:50]}...")
             

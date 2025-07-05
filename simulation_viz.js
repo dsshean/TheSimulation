@@ -14,6 +14,7 @@ class SimulationVisualizer {
         this.lastCheckTime = 0;
         this.lastNarrativeCount = 0;
         this.commandResponses = [];
+        this.responsePollingInterval = null;
         
         // D3 setup
         this.svg = d3.select("#visualization");
@@ -85,7 +86,12 @@ class SimulationVisualizer {
                 
                 // Handle different message types
                 if (data.type === 'command_response') {
-                    this.handleCommandResponse(data);
+                    // Check if this is a response to get_agent_responses
+                    if (data.original_command && data.original_command.command === 'get_agent_responses') {
+                        this.handleAgentResponse(data);
+                    } else {
+                        this.handleCommandResponse(data);
+                    }
                 } else if (data.type === 'chat_response') {
                     this.handleChatResponse(data);
                 } else if (!this.isPaused) {
@@ -986,6 +992,88 @@ class SimulationVisualizer {
             narrativeElement.textContent = 'No recent narrative';
         }
     }
+
+    startResponsePolling(agentId) {
+        if (this.responsePollingInterval) {
+            clearInterval(this.responsePollingInterval);
+        }
+        
+        console.log(`Starting response polling for agent: ${agentId}`);
+        
+        this.responsePollingInterval = setInterval(() => {
+            if (this.websocket && this.isConnected && this.interactiveMode) {
+                const pollCommand = {
+                    command: 'get_agent_responses',
+                    since_timestamp: this.lastCheckTime,
+                    agent_id: agentId,
+                    timestamp: Date.now()
+                };
+                
+                console.log('Polling for agent responses:', pollCommand);
+                this.websocket.send(JSON.stringify(pollCommand));
+            }
+        }, 1000); // Poll every second like client.py
+    }
+
+    stopResponsePolling() {
+        if (this.responsePollingInterval) {
+            clearInterval(this.responsePollingInterval);
+            this.responsePollingInterval = null;
+            console.log('Stopped response polling');
+        }
+    }
+
+    handleAgentResponse(data) {
+        console.log('Processing agent responses:', data);
+        
+        if (data.success && data.data && data.data.responses) {
+            const responses = data.data.responses;
+            
+            responses.forEach(response => {
+                const content = response.content || '';
+                console.log('Response content:', content);
+                
+                // Skip interaction mode system messages
+                if (content.includes('[InteractionMode]')) {
+                    return;
+                }
+                
+                // Extract agent speech/responses like client.py does
+                if (this.selectedAgent && content.includes(this.selectedAgent)) {
+                    let agentResponse = '';
+                    
+                    if (content.includes('says') && content.split('says')[0].includes(this.selectedAgent)) {
+                        const parts = content.split('says', 1);
+                        agentResponse = parts[1] ? parts[1].trim() : content;
+                    } else if (content.includes('responds') && content.split('responds')[0].includes(this.selectedAgent)) {
+                        const parts = content.split('responds', 1);
+                        let secondPart = parts[1] ? parts[1].trim() : content;
+                        if (secondPart.includes('"')) {
+                            const quoteParts = secondPart.split('"');
+                            agentResponse = quoteParts[1] || secondPart;
+                        } else {
+                            agentResponse = secondPart;
+                        }
+                    } else if (content.includes(':') && content.indexOf(':') > content.indexOf(this.selectedAgent)) {
+                        const parts = content.split(':', 1);
+                        agentResponse = parts[1] ? parts[1].trim() : content;
+                    } else if (content.includes('decides to')) {
+                        const parts = content.split('decides to', 1);
+                        agentResponse = parts[1] ? parts[1].trim() : content;
+                    }
+                    
+                    if (agentResponse) {
+                        this.addChatMessage('agent', agentResponse);
+                    }
+                }
+            });
+            
+            // Update last check time
+            if (data.data.current_time) {
+                this.lastCheckTime = data.data.current_time;
+            }
+        }
+    }
 }
 
 // Modal and command functions
@@ -1121,6 +1209,9 @@ function startInteractiveChat() {
         agent_id: visualizer.selectedAgent
     });
     
+    // Start polling for agent responses
+    visualizer.startResponsePolling(visualizer.selectedAgent);
+    
     visualizer.addChatMessage('system', `Started interactive chat with ${visualizer.selectedAgent}`);
     document.getElementById('chatInput').focus();
 }
@@ -1137,9 +1228,11 @@ function sendChatMessage() {
     }
     
     // Parse message type and content
-    let eventType = 'text_message';
+    let eventType = 'telepathy'; // Default to telepathy as requested
     let content = message;
+    let customMedium = '';
     
+    // Check for predefined communication types
     if (message.startsWith('text:')) {
         eventType = 'text_message';
         content = message.substring(5).trim();
@@ -1158,16 +1251,42 @@ function sendChatMessage() {
     } else if (message.startsWith('noise:')) {
         eventType = 'noise';
         content = message.substring(6).trim();
+    } else {
+        // Check for custom medium format: "medium: message"
+        const colonIndex = message.indexOf(':');
+        if (colonIndex > 0 && colonIndex < message.length - 1) {
+            const potentialMedium = message.substring(0, colonIndex).trim();
+            const potentialContent = message.substring(colonIndex + 1).trim();
+            
+            // Only treat as custom medium if it's not a predefined type and has content
+            if (potentialContent && 
+                !['text', 'call', 'voice', 'event', 'doorbell', 'noise'].includes(potentialMedium.toLowerCase())) {
+                customMedium = potentialMedium;
+                content = potentialContent;
+                eventType = 'custom_medium'; // Use a special event type for custom mediums
+            }
+        }
+        // If no colon or no valid custom medium format, default to telepathy with full message as content
     }
     
-    visualizer.sendCommand({
+    // Build command object
+    const commandObj = {
         command: 'interaction_event',
         agent_id: visualizer.selectedAgent,
         event_type: eventType,
         content: content
-    });
+    };
     
-    visualizer.addChatMessage('user', content);
+    // Add custom medium if specified
+    if (customMedium) {
+        commandObj.custom_medium = customMedium;
+    }
+    
+    visualizer.sendCommand(commandObj);
+    
+    // Display the message in chat with medium indication
+    const displayMessage = customMedium ? `via ${customMedium}: ${content}` : content;
+    visualizer.addChatMessage('user', displayMessage);
     input.value = '';
 }
 
@@ -1179,6 +1298,9 @@ function closeInteractiveChat() {
         });
         visualizer.interactiveMode = false;
     }
+    
+    // Stop polling for agent responses
+    visualizer.stopResponsePolling();
     
     closeModal('interactiveChatModal');
     visualizer.selectedAgent = null;

@@ -1181,9 +1181,19 @@ def _build_simulacra_prompt(
         f"- Your Recent Thoughts (Internal Monologue History):\n{monologue_history_str}",
         f"- Recent Activity Context (What happened recently):\n{recent_narrative_context}",
         f"- Exits/Connections from this location: {json.dumps(connected_locations) if connected_locations else 'None observed.'}",
+    ]
+
+    # Add specific instruction if the agent was just teleported
+    last_observation = agent_state_data.get('last_observation', '')
+    if "instantly teleported" in last_observation.lower():
+        prompt_text_parts.append(
+            "\n**CRITICAL: You have just been instantly teleported to a new location. Your previous context and goals may no longer be relevant. Re-evaluate your surroundings and current situation to form a new, appropriate goal and action.**"
+        )
+
+    prompt_text_parts.append(
         "\n**General Instructions:**"
         "Follow your thinking process and provide your response ONLY in the specified JSON format."
-    ]
+    )
     return "\n".join(prompt_text_parts)
 
 async def simulacra_agent_task_llm(agent_id: str):
@@ -1295,7 +1305,38 @@ async def simulacra_agent_task_llm(agent_id: str):
             # Get current agent state first
             current_sim_time_busy_loop = state.get("world_time", 0.0)
             agent_state_busy_loop = get_nested(state, SIMULACRA_KEY, agent_id, default={})
-            
+
+            # --- Handle Teleport Override ---
+            if agent_state_busy_loop.get("teleport_triggered", False):
+                logger.info(f"[{agent_name}] Teleport triggered. Overriding current action and re-orienting.")
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.teleport_triggered", False, logger) # Reset flag
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_action_id", None, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.pending_results", {}, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.action_completion_results", {}, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_action_end_time", current_sim_time_busy_loop, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.current_action_description", "Teleported and re-orienting.", logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.action_interrupted_flag", False, logger)
+                _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.goal", None, logger) # Clear goal
+
+                old_location_id_for_narration = get_nested(state, SIMULACRA_KEY, agent_id, CURRENT_LOCATION_KEY, default="Unknown")
+                teleport_observation = agent_state_busy_loop.get("last_observation", f"{agent_name} was teleported.")
+
+                narration_event = {
+                    "type": "action_complete",
+                    "actor_id": agent_id,
+                    "action": {"action_type": "teleport", "details": "System teleportation"},
+                    "results_for_narration_context": {},
+                    "outcome_description": teleport_observation,
+                    "completion_time": current_sim_time_busy_loop,
+                    "current_action_description": "Teleported and re-orienting.",
+                    "actor_current_location_id": old_location_id_for_narration,
+                    "world_mood": world_mood_global
+                }
+                await add_narration_event_with_ordering(narration_event, task_name=f"Simulacra_{agent_name}_Teleport")
+                logger.info(f"[{agent_name}] Teleport handled. Agent status set to idle for re-evaluation.")
+                current_status_busy_loop = "idle" # Force re-evaluation
+                continue # Skip rest of this loop iteration to immediately re-evaluate
+
             # Adaptive polling based on agent status and action duration
             poll_interval = AGENT_BUSY_POLL_INTERVAL_REAL_SECONDS  # Default fallback
             
