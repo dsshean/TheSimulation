@@ -219,9 +219,11 @@ If you prefer to use a single command, you can launch both processes concurrentl
 
 ### Option 3: Use CLI client without visualization
 
-    ```bash
-    python main_async.py
-    ```
+- **Run Main program**
+
+  ```bash
+  python main_async.py
+  ```
 
 - **CLI client for interaction with Simulacra**
   ```bash
@@ -234,10 +236,16 @@ If you prefer to use a single command, you can launch both processes concurrentl
 
 ## Important Notes for Running:
 
-    - Agent Count: While the architecture is designed for multiple agents, multi-agent interactions are still under active development and refinement. For initial runs and stability, it's recommended to start with a single Simulacrum.
-    - Resuming/Resetting:
-        - The simulation saves its full state periodically to a simulation_state_[uuid].json file in data/states/. If this file exists for a given world UUID, the simulation will attempt to resume from it.
-        - To reset a world to its initial conditions (as defined by world_config_[uuid].json and the life summaries), delete the corresponding simulation_state_[uuid].json file from data/states/. The world_config_[uuid].json itself contains the initial setup and is not the running state.
+Agent Count: While the architecture is designed for multiple agents, multi-agent interactions are still under active development and refinement. For initial runs and stability, it's recommended to start with a single Simulacrum.
+
+Resuming/Resetting:
+
+- The simulation saves its full state periodically to a simulation*state*[uuid].json file in data/states/. If this file exists for a given world UUID, the simulation will attempt to resume from it.
+- To reset a world to its initial conditions (as defined by world*config*[uuid].json and the life summaries), delete the corresponding simulation*state*[uuid].json file from data/states/. The world*config*[uuid].json itself contains the initial setup and is not the running state.
+
+Cost Considerations: Currently the World Engine prompt is extremely large - working on prompt caching and other techniques to reduce token usage. Prolonged runs > 20 min is extremely clostly - please be adviced and use with caution.
+
+Privacy: For simulating yourself note that there is no secure system to protect your PII. Again use with caution, looking for implementations and integrations to Fully Homomorphic encryption for interactions against LLMs. Some of these techology components exists but needs extensive testing.
 
 ### Configuration (`config.py` and `.env`)
 
