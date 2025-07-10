@@ -3,47 +3,47 @@
 Exploring Simulation Theory through Large Language Models
 
 Update as of:
-5/27/2025
+7/10/2025
 
-- Release V1
+- **Major UI Update: Tauri Dashboard V2**
 
-* Code migrated to ADK V1.0
-* Agent Isolation to address uncontrolled Contents growth.
+* Complete React/Tauri desktop dashboard implementation
+* Real-time simulation monitoring with Redis integration
+* Interactive visualization with D3.js force-directed graphs
+* Narrative image gallery with navigation
+* Agent filtering and live event feeds
+* Interactive commands interface for simulation control
 
-5/22/2025
+![Dashboard Overview](UI1.png)
+![Visualization View](UI2.png)
 
-- All major components have been implemented. Multi Simulacra interaction is working as you can run the current default world and see the interactions.
-- Interactive mode is functional also - use client.py and select a simulacra to interact with.
-- Next steps - code is bloated and very messy - since all major features are functioning correctly, most of the code will be refactored to be cleaner and more modular. Tackling global states also to be more in line with ADK patters for deployment in GCP in cloudrun environment to running 24/7.
-- Further enhancements - as in better async handling ops for multi agent interactiton and other interaces for say game design to use patterns in Unity/Unreal to create fully immersive NPCs or Research Purposus.
+**Key Features:**
+- **Real-time Monitoring**: Live simulation state updates via Redis pub/sub
+- **Interactive Visualization**: D3.js graph showing locations (blue) and agents (green) with object/NPC counts
+- **Narrative Images**: Gallery viewer with navigation arrows for generated images
+- **Agent Filtering**: Filter events by specific simulacra for focused monitoring
+- **Multi-tab Interface**: Separate views for simulacra thoughts, observations, narrative, and world engine events
+- **Interactive Commands**: Inject narratives, send agent events, update world info, and teleport agents
+- **Desktop Application**: Cross-platform Tauri app with native performance
 
-5/21/2025
+**Usage:**
+```bash
+# Start the dashboard
+cd simulation-dashboard
+npm run tauri:dev
 
-- fixed condition that drove simulacra insane due to the inability to move from an unknown location. see race_condition_log for details
+# Start simulation with Redis
+python main_async.py
+```
 
-5/20/2025
-
-- setup_simulation.py migrated to use ADK - use setup_simulation_adk.py for more robust simulacra generation.
-- Input mode: The code is there to interact with the simulated world and simulacra, but cannot be accessed due to rich console. Thinking of migrating the interface to streamlit or other webui to enable this mode.
-
-5/19/2025
-
-- Current state - Fully functional - Needs enhancements and contributions welcomed.
-- World Generation Fixed - missing models.py - temporary, full world creation will be migrated to ADK.
-- Image generation moved to Imagen 3 - Bluesky integration live
-- To DO:
-- Rework of life_generation.py using ADK - migrataion in progress and option to post entire life generation sequence to Bluesky
-- Posting of interactions to Bluesky - possibly to keep up with realtime updates. Exploring feasibility or practicality
-- Life graph - all interactions mapping for Data Analysis in graph format. TBD
-- Further tools use by simulacra ie. Email access / X(Twitter) / Blueksy etc... web browsing.
 
 ## Table of Contents
 
 - [Simulacra States of Insanity: Understanding Erratic Behavior](#simulacra-states-of-insanity-understanding-erratic-behavior)
 - [Project Overview](#project-overview)
 - [Practical Applications](#practical-applications)
-- [Conceptual Framework](#conceptual-framework)
-- [Core Architecture: A Glimpse Under the Hood](#core-architecture-a-glimpse-under-the-hood)
+- [Framework](#framework)
+- [Architecture](#architecture)
 - [Getting Started](#getting-started)
 - [Running the Simulation](#running-the-simulation)
 - [Configuration (`config.py` and `.env`)](#configuration-configpy-and-env)
@@ -160,12 +160,48 @@ TheSimulation operates through a series of asynchronous components, orchestrated
     - ADK's tool-calling capabilities are leveraged, for example, by the Search Agent to use a `google_search` tool.
     - Each core LLM agent (Simulacra, World Engine, Narrator, World Generator, Search Agent) is initialized with its own dedicated ADK `Runner` and `Session` to maintain separate conversation contexts and manage state isolation.
 
+## Quick Start
+
+For users who want to get up and running immediately:
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/dsshean/TheSimulation.git
+cd TheSimulation
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 2. Install and start Redis
+sudo apt install redis-server  # Ubuntu/Debian
+# OR: brew install redis && brew services start redis  # macOS
+# OR: docker run -d -p 6379:6379 redis:latest  # Docker
+
+# 3. Configure
+cp .env.sample .env
+# Edit .env and add your GOOGLE_API_KEY
+
+# 4. Generate world and agents
+python setup_simulation_adk.py
+
+# 5. Start simulation
+python main_async.py
+
+# 6. Launch dashboard (separate terminal)
+cd simulation-dashboard
+npm install
+npm run tauri:dev
+```
+
 ## Getting Started
 
 ### Prerequisites
 
 - Python 3.11+
 - Git
+- Redis Server (for real-time communication)
+- Node.js (v16 or higher) - for dashboard
+- Rust - for Tauri desktop app
 
 ### Setup
 
@@ -174,67 +210,196 @@ TheSimulation operates through a series of asynchronous components, orchestrated
     git clone https://github.com/dsshean/TheSimulation.git
     cd TheSimulation
     ```
+
 2.  **Set up a virtual environment (recommended):**
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
-3.  **Install dependencies:**
+
+3.  **Install Python dependencies:**
     ```bash
     pip install -r requirements.txt
-    # Dependencies include: google-adk, google-generativeai, python-dotenv, rich, etc.
+    # Dependencies include: google-adk, google-generativeai, python-dotenv, rich, redis, etc.
     ```
-4.  **Set up Configuration (API Key & Settings):**
 
-    - Create a `.env` file in the project root directory (you can copy `.env.sample` if it exists and rename it to `.env`).
-    - Add your Google API Key to this `.env` file. This is essential for the LLMs to function.
+4.  **Install and Start Redis Server:**
+
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt update
+    sudo apt install redis-server
+    sudo systemctl start redis-server
+    sudo systemctl enable redis-server
+    ```
+
+    **macOS (using Homebrew):**
+    ```bash
+    brew install redis
+    brew services start redis
+    ```
+
+    **Windows:**
+    ```bash
+    # Install Redis using WSL or download Windows port
+    # Or use Docker: docker run -d -p 6379:6379 redis:latest
+    ```
+
+    **Verify Redis is running:**
+    ```bash
+    redis-cli ping
+    # Should return: PONG
+    ```
+
+5.  **Set up Configuration (API Key & Settings):**
+
+    - Create a `.env` file in the project root directory (copy from `.env.sample`):
+      ```bash
+      cp .env.sample .env
+      ```
+    - Edit the `.env` file and add your Google API Key:
       ```dotenv
       GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
+      
+      # Redis Configuration (defaults should work for local setup)
+      REDIS_HOST=127.0.0.1
+      REDIS_PORT=6379
+      REDIS_DB=0
+      
+      # Dashboard Integration
+      ENABLE_VISUALIZATION=true
       ```
-    - You can also override other default settings from `src/config.py` in this `.env` file. See the Configuration (`config.py` and `.env`) section for more details.
 
-5.  **World Setup (`setup_simulation.py`)**
-    - Run the `setup_simulation.py` script. This interactive script will guide you through:
-      - Defining the basic parameters of your simulation world (e.g., genre, location).
-      - Generating initial "life summaries" (personas, goals, backstories) for your Simulacra agents using an LLM.
+6.  **World Setup (ADK Version - Recommended):**
     ```bash
-    python setup_simulation.py
+    python setup_simulation_adk.py
     ```
-    - This script will create two crucial types of files in the `data/` directory:
-      - `data/states/world_config_[uuid].json`: Contains the initial configuration and static details of your simulation world. (This file might initially be created in `data/` and then used to form part of the full simulation state).
-      - `data/life_summaries/life_summary_[AgentName]_[uuid].json`: Contains the detailed persona for each Simulacrum. These are essential for agents to operate.
+    This will create:
+    - `data/states/world_config_[uuid].json`: Initial world configuration
+    - `data/life_summaries/life_summary_[AgentName]_[uuid].json`: Simulacra personas
+
+    **Note:** The legacy `setup_simulation.py` has been removed. Use the ADK version above.
 
 ## Running the Simulation
 
-### Web Visualizer (Recommended)
+### Tauri Desktop Dashboard (Recommended)
 
-For an interactive, real-time visualization of the simulation, use the web-based visualizer. This provides a force-directed graph that shows agent movements, locations, and status updates in your browser.
+The Tauri-based desktop dashboard provides a modern React interface with real-time visualization and interactive controls. It uses Redis for efficient real-time communication between the Python simulation and the UI.
 
-**1. Start the Simulation Backend:**
+**Installation:**
 
-First, ensure the main simulation is running. This process streams the necessary data to the visualizer.
+1. **Install Rust (if not already installed):**
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   source ~/.cargo/env
+   ```
 
+2. **Install Node.js dependencies:**
+   ```bash
+   cd simulation-dashboard
+   npm install
+   ```
+
+3. **Tauri CLI (included in devDependencies):**
+   The Tauri CLI is automatically installed with `npm install` as a dev dependency.
+
+**Running the Full System:**
+
+1. **Ensure Redis is running:**
+   ```bash
+   redis-cli ping
+   # Should return: PONG
+   ```
+
+2. **Start the Simulation Backend:**
+   The simulation now includes Redis integration for real-time communication:
+   ```bash
+   python main_async.py
+   ```
+   
+   You should see:
+   ```
+   INFO: [RedisClient] Connected to Redis at 127.0.0.1:6379
+   INFO: Redis integration started successfully
+   ```
+
+3. **Launch the Tauri Desktop App:**
+   In a separate terminal:
+   ```bash
+   cd simulation-dashboard
+   npm run tauri:dev
+   ```
+
+**Dashboard Features:**
+
+- **Real-time State Updates**: Redis pub/sub for instant UI updates
+- **Interactive Commands**: Inject narratives, send agent events, update world info
+- **Agent Visualization**: Live monitoring of simulacra status and actions
+- **Event Streaming**: Categorized real-time event logs (Simulacra, World Engine, Narrative)
+- **No UI Flickering**: Optimized React architecture prevents input interference
+- **Stable Text Input**: Fixed backwards text and focus issues
+
+**Dashboard Tabs:**
+- **Dashboard**: Overview with agent status and live event streams
+- **Visualization**: D3.js force-directed graph of agents and locations
+- **Interactive**: Command interface for direct simulation interaction
+
+**Building for Production:**
 ```bash
-python main_async.py
+cd simulation-dashboard
+npm run tauri:build
 ```
 
-**2. Start the Web Visualizer Server:**
+### Troubleshooting
 
-In a **separate terminal**, start the simple Python HTTP server that serves the visualizer's web interface.
+**Common Issues:**
 
-```bash
-python start_visualizer.py
-```
+1. **Redis Connection Failed:**
+   ```
+   ERROR: [RedisClient] Failed to connect to Redis
+   ```
+   - Ensure Redis server is running: `redis-cli ping`
+   - Check Redis configuration in `.env` file
+   - For WSL users: Redis may need to be installed in WSL environment
 
-This will automatically open the visualizer in your default web browser at **http://localhost:8080**.
+2. **UI Flickering or Backwards Text:**
+   - This should be fixed in the current version
+   - If you still experience issues, try refreshing the dashboard
+   - Ensure you're using the latest version with React Context architecture
+
+3. **Tauri Permission Errors:**
+   ```
+   event.listen not allowed
+   ```
+   - The dashboard includes proper Tauri permissions configuration
+   - If issues persist, check `src-tauri/capabilities/default.json`
+
+4. **Dashboard Shows "No Simulation Data":**
+   - Ensure the Python simulation is running first
+   - Check that Redis connection is successful in both simulation and dashboard
+   - Verify the simulation is publishing state updates
+
+5. **Input Focus Issues:**
+   - The new architecture should prevent all focus-related problems
+   - If inputs still behave oddly, try closing and reopening the dashboard
+
+**Performance Tips:**
+- Redis state updates are optimized to only publish when state changes
+- Dashboard uses React Context to prevent unnecessary re-renders
+- Interactive commands are isolated to prevent UI interference
+
+This creates a standalone executable in `src-tauri/target/release/`.
+
 
 ### Command-Line Output
 
-If you prefer a text-based view or are not using a graphical environment, you can observe the simulation directly in your terminal. The `main_async.py` script uses the `rich` library to print a live, updating table with key simulation metrics.
+For text-based monitoring, observe the simulation directly in your terminal:
 
 ```bash
 python main_async.py
 ```
+
+The `main_async.py` script uses the `rich` library to display a live, updating table with key simulation metrics.
 
 ## Important Notes for Running:
 
