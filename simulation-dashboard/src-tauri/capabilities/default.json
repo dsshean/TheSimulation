@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for the simulation dashboard",
+  "windows": ["*"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:default",
+    "core:default",
+    "core:app:default",
+    "core:app:allow-name",
+    "core:app:allow-version"
+  ]
+}

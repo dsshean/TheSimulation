@@ -5,7 +5,7 @@ import json
 import logging
 import random # Added for dynamic_interruption_task
 import re # Added for narrative_image_generation_task
-import time # For time_manager_task and chat responses
+import time # For time_manager_task
 import os # Added for narrative_image_generation_task
 from io import BytesIO # Added for narrative_image_generation_task
 from typing import Any, Dict, Optional, List
@@ -102,8 +102,7 @@ async def time_manager_task(
     event_bus_qsize_func, # Function to get event_bus.qsize()
     narration_qsize_func, # Function to get narration_queue.qsize()
     live_display: Any, # Rich Live object
-    logger_instance: logging.Logger,
-    dashboard_app: Optional[Any] = None # Dashboard app for live updates
+    logger_instance: logging.Logger
 ):
     """Advances time, applies completed action effects, and updates display."""
     logger_instance.info("[TimeManager] Task started.")
@@ -190,18 +189,6 @@ async def time_manager_task(
                 logger_instance.debug(f"[TimeManager] Error processing narration events: {e}")
             
             live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
-            
-            # Update dashboard with live simulation data
-            if dashboard_app and hasattr(dashboard_app, 'update_live_simulation_data'):
-                try:
-                    dashboard_app.update_live_simulation_data(
-                        current_state, 
-                        event_bus_qsize_func(), 
-                        narration_qsize_func()
-                    )
-                except Exception as e:
-                    logger_instance.debug(f"[TimeManager] Error updating dashboard: {e}")
-            
             await asyncio.sleep(UPDATE_INTERVAL)
 
     except asyncio.CancelledError:
@@ -456,22 +443,9 @@ async def narrative_image_generation_task(
 
         current_sim_time_for_filename = current_state.get("world_time", 0.0)
         actor_name_in_narrative = "the observer"
-        actor_location_id = None
-        
-        # Extract actor name and try to find their location
         match = re.match(r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)", original_narrative_prompt_text)
         if match and match.group(1) not in ["As", "The", "A", "An", "It", "He", "She", "They", "Then", "Suddenly", "During", "While"]:
             actor_name_in_narrative = match.group(1)
-            
-            # Try to find the actor's current location
-            simulacra_profiles = current_state.get(SIMULACRA_KEY, {})
-            for sim_id, sim_data in simulacra_profiles.items():
-                if isinstance(sim_data, dict):
-                    sim_name = sim_data.get("persona_details", {}).get("Name", "")
-                    if sim_name == actor_name_in_narrative:
-                        actor_location_id = sim_data.get(CURRENT_LOCATION_KEY)
-                        logger_instance.debug(f"[NarrativeImageGenerator] Found actor {actor_name_in_narrative} at location {actor_location_id}")
-                        break
 
         time_string_for_image_prompt = get_time_string_for_prompt(current_state, sim_elapsed_time_seconds=current_sim_time_for_filename)
         weather_condition_for_image_prompt = get_nested(current_state, 'world_feeds', 'weather', 'condition', default='Weather unknown.')
@@ -539,30 +513,8 @@ Generate this image."""
                     logger_instance.info(f"[NarrativeImageGenerator] Saved image: {image_path}")
                     image_generated_successfully = True
                     saved_image_path_for_social_post = image_path
-                    
-                    # Store image information in state for web interface
-                    image_data = {
-                        "filename": image_filename,
-                        "path": image_path,
-                        "location_id": actor_location_id,
-                        "actor_name": actor_name_in_narrative,
-                        "narrative_snippet": refined_narrative_for_image,
-                        "sim_time": current_sim_time_for_filename,
-                        "timestamp": time.time()
-                    }
-                    
-                    # Add to narrative_images list in state
-                    if "narrative_images" not in current_state:
-                        current_state["narrative_images"] = []
-                    current_state["narrative_images"].append(image_data)
-                    
-                    # Keep only recent images (last 20)
-                    if len(current_state["narrative_images"]) > 20:
-                        current_state["narrative_images"] = current_state["narrative_images"][-20:]
-                    
                     _log_event(current_sim_time_for_filename, "ImageGenerator", "image_generation",
-                               {"image_filename": image_filename, "prompt_snippet": refined_narrative_for_image, 
-                                "location_id": actor_location_id, "actor_name": actor_name_in_narrative},
+                               {"image_filename": image_filename, "prompt_snippet": refined_narrative_for_image},
                                logger_instance, event_logger_instance)
                     break
                 except Exception as e_img_proc:
@@ -756,10 +708,7 @@ async def process_pending_simulation_events(current_state: Dict[str, Any], logge
 
 # --- WebSocket Visualization Server ---
 
-async def visualization_websocket_task(state: Dict[str, Any], logger_instance: logging.Logger, 
-                                      narration_queue: Optional[asyncio.Queue] = None,
-                                      world_mood: str = "normal",
-                                      simulation_time_getter: Optional[callable] = None):
+async def visualization_websocket_task(state: Dict[str, Any], logger_instance: logging.Logger):
     """
     WebSocket server that streams real-time simulation state to web visualizer.
     Replaces the pygame visualization with a modern web-based interface.
@@ -781,62 +730,9 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
             # Keep connection alive and handle any client messages
             async for message in websocket:
                 try:
-                    # Handle client requests (e.g., zoom to agent, get details, commands, images)
+                    # Handle client requests (e.g., zoom to agent, get details)
                     client_request = json.loads(message)
-                    
-                    # Check if this is an image request
-                    if client_request.get('type') == 'get_image':
-                        image_filename = client_request.get('filename')
-                        if image_filename:
-                            try:
-                                import base64
-                                image_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'narrative_images', image_filename)
-                                if os.path.exists(image_path):
-                                    with open(image_path, 'rb') as img_file:
-                                        image_data = base64.b64encode(img_file.read()).decode('utf-8')
-                                    response = {
-                                        'type': 'image_data',
-                                        'filename': image_filename,
-                                        'data': f'data:image/png;base64,{image_data}'
-                                    }
-                                else:
-                                    response = {'type': 'error', 'message': 'Image not found'}
-                            except Exception as e:
-                                logger_instance.error(f"[WebSocketViz] Error serving image: {e}")
-                                response = {'type': 'error', 'message': 'Error loading image'}
-                        else:
-                            response = {'type': 'error', 'message': 'No filename provided'}
-                    
-                    # Check if this is a command (has 'command' field) or a request (has 'type' field)
-                    elif 'command' in client_request:
-                        # This is a command from the integrated client functionality
-                        logger_instance.info(f"[WebSocketViz] Processing command: {client_request.get('command')}")
-                        
-                        try:
-                            from .socket_server import process_message
-                            response = await process_message(
-                                json.dumps(client_request),
-                                state,
-                                narration_queue or asyncio.Queue(),
-                                world_mood,
-                                simulation_time_getter or (lambda: state.get('world_time', 0))
-                            )
-                            # Add response type for web client
-                            response['type'] = 'command_response'
-                            response['timestamp'] = client_request.get('timestamp')
-                            logger_instance.info(f"[WebSocketViz] Command response: {response}")
-                        except Exception as e:
-                            logger_instance.error(f"[WebSocketViz] Error processing command: {e}")
-                            response = {
-                                'type': 'command_response',
-                                'success': False,
-                                'message': f'Error processing command: {str(e)}',
-                                'timestamp': client_request.get('timestamp')
-                            }
-                    else:
-                        # This is a visualization request
-                        response = _handle_client_request(client_request, state)
-                    
+                    response = _handle_client_request(client_request, state)
                     await websocket.send(json.dumps(response))
                 except json.JSONDecodeError:
                     logger_instance.warning(f"[WebSocketViz] Invalid JSON from client: {message}")
@@ -854,20 +750,13 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
     async def broadcast_updates():
         """Continuously broadcast state updates to all connected clients"""
         last_world_time = 0
-        last_narrative_count = 0
         
         while True:
             try:
                 current_world_time = state.get('world_time', 0)
-                current_narrative_count = len(state.get('narrative_log', []))
                 
-                # Check if we should broadcast (time advanced, new narrative, or have clients)
-                should_broadcast = (
-                    (current_world_time != last_world_time or current_narrative_count != last_narrative_count) 
-                    and len(connected_clients) > 0
-                )
-                
-                if should_broadcast:
+                # Only broadcast if simulation time has advanced and we have clients
+                if current_world_time != last_world_time and len(connected_clients) > 0:
                     viz_data = _prepare_visualization_data(state)
                     logger_instance.debug(f"[WebSocketViz] Broadcasting update: time={current_world_time:.1f}, agents={len(viz_data.get('simulacra', {}))}, locations={len(viz_data.get('locations', {}))}")
                     
@@ -893,11 +782,6 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
                             logger_instance.info(f"[WebSocketViz] Active clients: {len(connected_clients)}")
                     
                     last_world_time = current_world_time
-                    last_narrative_count = current_narrative_count
-                
-                # Also check for new chat responses for interactive mode
-                if connected_clients:
-                    await _check_and_send_chat_responses(connected_clients, state, logger_instance)
                 
                 await asyncio.sleep(0.5)  # Update rate: 2Hz for smooth visualization
                 
@@ -928,101 +812,41 @@ async def visualization_websocket_task(state: Dict[str, Any], logger_instance: l
 def _prepare_visualization_data(state: Dict[str, Any]) -> Dict[str, Any]:
     """Prepare simulation state data for web visualization"""
     
-    # Extract simulacra data - try both possible state structures
+    # Extract simulacra data
     simulacra_data = {}
-    simulacra_profiles = state.get(SIMULACRA_KEY, {})  # Uses SIMULACRA_KEY from config
-    if not simulacra_profiles:
-        simulacra_profiles = state.get('simulacra', {})  # Fallback
-    
+    simulacra_profiles = state.get('simulacra_profiles', {})
     for agent_id, agent_data in simulacra_profiles.items():
-        if isinstance(agent_data, dict):
-            simulacra_data[agent_id] = {
-                'id': agent_id,
-                'name': agent_data.get('persona_details', {}).get('Name', agent_id),
-                'current_location': agent_data.get(CURRENT_LOCATION_KEY, agent_data.get('current_location')),
-                'status': agent_data.get('status', 'unknown'),
-                'current_action': agent_data.get('current_action_description', 'No current action'),
-                'last_observation': agent_data.get('last_observation', 'No recent observations'),
-                'goal': agent_data.get('goal', 'No current goal')[:100] + '...' if len(agent_data.get('goal', '')) > 100 else agent_data.get('goal', 'No current goal'),
-                'age': agent_data.get('persona_details', {}).get('Age'),
-                'occupation': agent_data.get('persona_details', {}).get('Occupation')
-            }
+        simulacra_data[agent_id] = {
+            'id': agent_id,
+            'name': agent_data.get('persona_details', {}).get('Name', agent_id),
+            'current_location': agent_data.get('current_location'),
+            'status': agent_data.get('status', 'unknown'),
+            'current_action': agent_data.get('current_action_description', 'No current action'),
+            'last_observation': agent_data.get('last_observation', 'No recent observations'),
+            'goal': agent_data.get('goal', 'No current goal')[:100] + '...' if len(agent_data.get('goal', '')) > 100 else agent_data.get('goal', 'No current goal'),
+            'age': agent_data.get('persona_details', {}).get('Age'),
+            'occupation': agent_data.get('persona_details', {}).get('Occupation')
+        }
     
-    # Generate world engine activity summary with latest agent action
-    world_engine_activity = "No recent activity"
-    if simulacra_data:
-        busy_agents = [agent for agent in simulacra_data.values() if agent.get('status') == 'busy']
-        thinking_agents = [agent for agent in simulacra_data.values() if agent.get('status') == 'thinking']
-        
-        if busy_agents:
-            # Show the latest busy agent's action
-            latest_busy = busy_agents[0]  # Could sort by last_observation timestamp if available
-            action = latest_busy.get('current_action', 'unknown action')
-            if len(action) > 50:
-                action = action[:50] + '...'
-            world_engine_activity = f"{latest_busy['name']}: {action}"
-        elif thinking_agents:
-            # Show thinking agent
-            latest_thinking = thinking_agents[0]
-            world_engine_activity = f"{latest_thinking['name']}: thinking..."
-        else:
-            idle_agents = [agent for agent in simulacra_data.values() if agent.get('status') == 'idle']
-            if idle_agents:
-                world_engine_activity = f"{len(idle_agents)} agent(s) awaiting actions"
-    
-    # Extract location data - try multiple possible state structures
+    # Extract location data
     locations_data = {}
-    
-    # Try different possible location structures
-    location_details = (state.get(WORLD_STATE_KEY, {}).get(LOCATION_DETAILS_KEY, {}) or 
-                       state.get('current_world_state', {}).get('location_details', {}) or
-                       state.get('world_state', {}).get('location_details', {}))
-    
+    location_details = state.get('current_world_state', {}).get('location_details', {})
     for loc_id, loc_data in location_details.items():
-        if isinstance(loc_data, dict):
-            # Count objects and NPCs
-            ephemeral_objects = loc_data.get('ephemeral_objects', [])
-            ephemeral_npcs = loc_data.get('ephemeral_npcs', [])
-            connected_locations = loc_data.get('connected_locations', [])
-            
-            # Extract connection IDs properly
-            connection_ids = []
-            for conn in connected_locations:
-                if isinstance(conn, dict):
-                    conn_id = conn.get('to_location_id_hint')
-                    if conn_id:
-                        connection_ids.append(conn_id)
-                elif isinstance(conn, str):
-                    connection_ids.append(conn)
-            
-            locations_data[loc_id] = {
-                'id': loc_id,
-                'name': loc_data.get('name', loc_id),
-                'description': loc_data.get('description', 'No description'),
-                'object_count': len(ephemeral_objects),
-                'npc_count': len(ephemeral_npcs),
-                'connections': connection_ids,
-                'objects': [{'id': obj.get('id'), 'name': obj.get('name'), 'description': obj.get('description')} 
-                           for obj in ephemeral_objects if isinstance(obj, dict)][:10]  # Limit for performance
-            }
-    
-    # Create placeholder locations for any connection targets that don't exist
-    all_connection_targets = set()
-    for loc_data in locations_data.values():
-        all_connection_targets.update(loc_data.get('connections', []))
-    
-    for target_id in all_connection_targets:
-        if target_id and target_id not in locations_data:
-            # Create a placeholder location for visualization
-            locations_data[target_id] = {
-                'id': target_id,
-                'name': target_id.replace('_', ' ').title(),
-                'description': 'Undiscovered location',
-                'object_count': 0,
-                'npc_count': 0,
-                'connections': [],
-                'objects': []
-            }
+        # Count objects and NPCs
+        ephemeral_objects = loc_data.get('ephemeral_objects', [])
+        ephemeral_npcs = loc_data.get('ephemeral_npcs', [])
+        connected_locations = loc_data.get('connected_locations', [])
+        
+        locations_data[loc_id] = {
+            'id': loc_id,
+            'name': loc_data.get('name', loc_id),
+            'description': loc_data.get('description', 'No description'),
+            'object_count': len(ephemeral_objects),
+            'npc_count': len(ephemeral_npcs),
+            'connections': [conn.get('to_location_id_hint') for conn in connected_locations if isinstance(conn, dict)],
+            'objects': [{'id': obj.get('id'), 'name': obj.get('name'), 'description': obj.get('description')} 
+                       for obj in ephemeral_objects if isinstance(obj, dict)][:10]  # Limit for performance
+        }
     
     # Extract global objects
     objects_data = {}
@@ -1050,9 +874,6 @@ def _prepare_visualization_data(state: Dict[str, Any]) -> Dict[str, Any]:
     narrative_log = state.get('narrative_log', [])
     recent_narrative = narrative_log[-10:] if len(narrative_log) > 10 else narrative_log
     
-    # Extract narrative images for web interface
-    narrative_images = state.get('narrative_images', [])
-    
     return {
         'type': 'simulation_state',
         'timestamp': time.time(),
@@ -1062,8 +883,6 @@ def _prepare_visualization_data(state: Dict[str, Any]) -> Dict[str, Any]:
         'objects': objects_data,
         'recent_narrative': recent_narrative,
         'world_feeds': state.get('world_feeds', {}),
-        'world_engine_activity': world_engine_activity,
-        'narrative_images': narrative_images,
         'active_simulacra_count': len(simulacra_data),
         'total_locations': len(locations_data),
         'total_objects': len(objects_data)
@@ -1105,49 +924,3 @@ def _handle_client_request(request: Dict[str, Any], state: Dict[str, Any]) -> Di
             }
     
     return {'type': 'error', 'message': f'Unknown request type: {request_type}'}
-
-
-async def _check_and_send_chat_responses(connected_clients, state, logger_instance):
-    """Check for new agent responses in interactive mode and send them to clients"""
-    try:
-        # This is a simplified version - in a full implementation, 
-        # we'd track which clients are in interactive mode with which agents
-        # and send targeted responses. For now, we'll let the client filter.
-        
-        narrative_log = state.get('narrative_log', [])
-        if not narrative_log:
-            return
-            
-        # Get the most recent narrative entry
-        latest_entry = narrative_log[-1]
-        
-        # Check if this looks like an agent response that should be sent to chat
-        if '[InteractionMode]' in latest_entry:
-            # Parse agent ID and content from the entry
-            # Format: "[T123.4] [InteractionMode] agent_id experiences: some event"
-            
-            # Send chat response to all connected clients
-            # The client will filter based on their active interactive session
-            chat_response = {
-                'type': 'chat_response',
-                'content': latest_entry,
-                'timestamp': time.time()
-            }
-            
-            disconnected_clients = []
-            for client in connected_clients[:]:
-                try:
-                    await client.send(json.dumps(chat_response))
-                except websockets.exceptions.ConnectionClosed:
-                    disconnected_clients.append(client)
-                except Exception as e:
-                    logger_instance.warning(f"[WebSocketViz] Error sending chat response: {e}")
-                    disconnected_clients.append(client)
-            
-            # Clean up disconnected clients
-            for client in disconnected_clients:
-                if client in connected_clients:
-                    connected_clients.remove(client)
-                    
-    except Exception as e:
-        logger_instance.error(f"[WebSocketViz] Error in chat response check: {e}")

@@ -1,0 +1,25 @@
+[package]
+name = "simulation-dashboard"
+version = "0.0.1"
+description = "TheSimulation Dashboard"
+authors = ["TheSimulation Team"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.10"
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+redis = { version = "0.24", features = ["tokio-comp"] }
+uuid = { version = "1.0", features = ["v4"] }
+base64 = "0.21"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
