@@ -18,6 +18,7 @@ Update as of:
 ![Visualization View](UI2.png)
 
 **Key Features:**
+
 - **Real-time Monitoring**: Live simulation state updates via Redis pub/sub
 - **Interactive Visualization**: D3.js graph showing locations (blue) and agents (green) with object/NPC counts
 - **Narrative Images**: Gallery viewer with navigation arrows for generated images
@@ -27,6 +28,7 @@ Update as of:
 - **Desktop Application**: Cross-platform Tauri app with native performance
 
 **Usage:**
+
 ```bash
 # Start the dashboard
 cd simulation-dashboard
@@ -35,7 +37,6 @@ npm run tauri:dev
 # Start simulation with Redis
 python main_async.py
 ```
-
 
 ## Table of Contents
 
@@ -206,18 +207,21 @@ npm run tauri:dev
 ### Setup
 
 1.  **Clone the repository:**
+
     ```bash
     git clone https://github.com/dsshean/TheSimulation.git
     cd TheSimulation
     ```
 
 2.  **Set up a virtual environment (recommended):**
+
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 
 3.  **Install Python dependencies:**
+
     ```bash
     pip install -r requirements.txt
     # Dependencies include: google-adk, google-generativeai, python-dotenv, rich, redis, etc.
@@ -226,6 +230,7 @@ npm run tauri:dev
 4.  **Install and Start Redis Server:**
 
     **Ubuntu/Debian:**
+
     ```bash
     sudo apt update
     sudo apt install redis-server
@@ -234,18 +239,21 @@ npm run tauri:dev
     ```
 
     **macOS (using Homebrew):**
+
     ```bash
     brew install redis
     brew services start redis
     ```
 
     **Windows:**
+
     ```bash
     # Install Redis using WSL or download Windows port
     # Or use Docker: docker run -d -p 6379:6379 redis:latest
     ```
 
     **Verify Redis is running:**
+
     ```bash
     redis-cli ping
     # Should return: PONG
@@ -258,23 +266,27 @@ npm run tauri:dev
       cp .env.sample .env
       ```
     - Edit the `.env` file and add your Google API Key:
+
       ```dotenv
       GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
-      
+
       # Redis Configuration (defaults should work for local setup)
       REDIS_HOST=127.0.0.1
       REDIS_PORT=6379
       REDIS_DB=0
-      
+
       # Dashboard Integration
       ENABLE_VISUALIZATION=true
       ```
 
 6.  **World Setup (ADK Version - Recommended):**
+
     ```bash
     python setup_simulation_adk.py
     ```
+
     This will create:
+
     - `data/states/world_config_[uuid].json`: Initial world configuration
     - `data/life_summaries/life_summary_[AgentName]_[uuid].json`: Simulacra personas
 
@@ -289,12 +301,14 @@ The Tauri-based desktop dashboard provides a modern React interface with real-ti
 **Installation:**
 
 1. **Install Rust (if not already installed):**
+
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    source ~/.cargo/env
    ```
 
 2. **Install Node.js dependencies:**
+
    ```bash
    cd simulation-dashboard
    npm install
@@ -306,6 +320,7 @@ The Tauri-based desktop dashboard provides a modern React interface with real-ti
 **Running the Full System:**
 
 1. **Ensure Redis is running:**
+
    ```bash
    redis-cli ping
    # Should return: PONG
@@ -313,11 +328,13 @@ The Tauri-based desktop dashboard provides a modern React interface with real-ti
 
 2. **Start the Simulation Backend:**
    The simulation now includes Redis integration for real-time communication:
+
    ```bash
    python main_async.py
    ```
-   
+
    You should see:
+
    ```
    INFO: [RedisClient] Connected to Redis at 127.0.0.1:6379
    INFO: Redis integration started successfully
@@ -340,11 +357,13 @@ The Tauri-based desktop dashboard provides a modern React interface with real-ti
 - **Stable Text Input**: Fixed backwards text and focus issues
 
 **Dashboard Tabs:**
+
 - **Dashboard**: Overview with agent status and live event streams
 - **Visualization**: D3.js force-directed graph of agents and locations
 - **Interactive**: Command interface for direct simulation interaction
 
 **Building for Production:**
+
 ```bash
 cd simulation-dashboard
 npm run tauri:build
@@ -355,26 +374,32 @@ npm run tauri:build
 **Common Issues:**
 
 1. **Redis Connection Failed:**
+
    ```
    ERROR: [RedisClient] Failed to connect to Redis
    ```
+
    - Ensure Redis server is running: `redis-cli ping`
    - Check Redis configuration in `.env` file
    - For WSL users: Redis may need to be installed in WSL environment
 
 2. **UI Flickering or Backwards Text:**
+
    - This should be fixed in the current version
    - If you still experience issues, try refreshing the dashboard
    - Ensure you're using the latest version with React Context architecture
 
 3. **Tauri Permission Errors:**
+
    ```
    event.listen not allowed
    ```
+
    - The dashboard includes proper Tauri permissions configuration
    - If issues persist, check `src-tauri/capabilities/default.json`
 
 4. **Dashboard Shows "No Simulation Data":**
+
    - Ensure the Python simulation is running first
    - Check that Redis connection is successful in both simulation and dashboard
    - Verify the simulation is publishing state updates
@@ -384,12 +409,12 @@ npm run tauri:build
    - If inputs still behave oddly, try closing and reopening the dashboard
 
 **Performance Tips:**
+
 - Redis state updates are optimized to only publish when state changes
 - Dashboard uses React Context to prevent unnecessary re-renders
 - Interactive commands are isolated to prevent UI interference
 
 This creates a standalone executable in `src-tauri/target/release/`.
-
 
 ### Command-Line Output
 
