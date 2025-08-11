@@ -59,6 +59,8 @@ from .simulation_utils import (  # Utility functions; generate_llm_interjection_
     _update_state_value, generate_table, get_time_string_for_prompt, get_target_entity_state, # Re-added get_time_string_for_prompt, added get_target_entity_state
     _log_event, handle_action_interruption) # get_random_style_combination is used by core_tasks
 from .state_loader import parse_location_string  # Used in run_simulation
+from .redis_client import start_redis_integration, stop_redis_integration
+from .redis_commands import create_command_handlers
 
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
 
@@ -1774,6 +1776,33 @@ async def run_simulation(
     tasks = []
     final_state_path = os.path.join(STATE_DIR, f"simulation_state_{world_instance_uuid}.json")
 
+    # --- Redis Integration Setup ---
+    try:
+        logger.info("Starting Redis integration for Tauri UI communication...")
+        command_handlers = create_command_handlers(state, narration_queue, get_current_sim_time)
+        # Set world mood in the handlers
+        handlers_obj = None
+        for handler in command_handlers.values():
+            if hasattr(handler, '__self__'):
+                handlers_obj = handler.__self__
+                break
+        if handlers_obj:
+            handlers_obj.set_world_mood(world_mood_global)
+            
+        redis_tasks = await start_redis_integration(
+            state=state,
+            simulation_time_getter=get_current_sim_time,
+            command_handlers=command_handlers
+        )
+        if redis_tasks:
+            tasks.extend(redis_tasks)
+            logger.info(f"Redis integration started with {len(redis_tasks)} tasks")
+        else:
+            logger.warning("Redis integration failed to start - Tauri UI will not be available")
+    except Exception as e:
+        logger.error(f"Failed to start Redis integration: {e}", exc_info=True)
+        logger.warning("Continuing simulation without Redis/Tauri UI support")
+
     try:
         def get_current_table_for_live():
             eb_qsize = event_bus.qsize() if event_bus else 0
@@ -1865,6 +1894,14 @@ async def run_simulation(
         else:
             logger.warning("No tasks list found or empty during cleanup.")
         logger.info("All tasks cancelled or finished.")
+
+        # --- Redis Integration Cleanup ---
+        try:
+            logger.info("Stopping Redis integration...")
+            await stop_redis_integration()
+            logger.info("Redis integration stopped")
+        except Exception as e:
+            logger.error(f"Error stopping Redis integration: {e}", exc_info=True)
 
         final_uuid_to_save = state.get("world_instance_uuid") 
         if final_uuid_to_save and final_state_path: # final_state_path should be defined if final_uuid_to_save is valid
