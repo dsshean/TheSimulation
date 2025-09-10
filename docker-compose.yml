@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  thesimulation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: thesimulation
+    env_file:
+      - .env
+    ports:
+      - "6379:6379"   # Redis
+      - "8765:8765"   # Socket server  
+      - "8766:8766"   # WebSocket visualization
+    volumes:
+      # Mount data directories for persistence
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Mount the .env file from the root directory
+      - ./.env:/app/.env:ro
+    environment:
+      # Required: Your Google API key
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      
+      # Optional: Simulation configuration
+      - INSTANCE_UUID=${INSTANCE_UUID:-}
+      - OVERRIDE_LOCATION=${OVERRIDE_LOCATION:-}
+      - OVERRIDE_MOOD=${OVERRIDE_MOOD:-}
+      
+      # Model configuration
+      - MODEL_GEMINI_PRO=${MODEL_GEMINI_PRO:-gemini-2.0-flash}
+      - SEARCH_AGENT_MODEL_NAME=${SEARCH_AGENT_MODEL_NAME:-gemini-2.0-flash}
+      
+      # Feature flags
+      - ENABLE_WEB_VISUALIZATION=true
+      - ENABLE_NARRATIVE_IMAGE_GENERATION=${ENABLE_NARRATIVE_IMAGE_GENERATION:-false}
+      - ENABLE_BLUESKY_POSTING=${ENABLE_BLUESKY_POSTING:-false}
+      
+      # Performance settings
+      - SIMULATION_SPEED_FACTOR=${SIMULATION_SPEED_FACTOR:-1.0}
+      - UPDATE_INTERVAL=${UPDATE_INTERVAL:-0.1}
+      - MAX_SIMULATION_TIME=${MAX_SIMULATION_TIME:-9996000.0}
+      
+      # Redis settings
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; r=redis.Redis(host='localhost', port=6379); r.ping()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
+    
+    # Resource limits (adjust based on your system)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'

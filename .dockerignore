@@ -1,0 +1,62 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs (we want to mount these as volumes)
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+simulation-dashboard/dist/
+simulation-dashboard/build/
+target/
+src-tauri/target/
+
+# Test files
+test_*.py
+tests/
+
+# Documentation
+README.md
+*.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Local environment files (will be mounted)
+.env.local
+.env.development
+.env.production
