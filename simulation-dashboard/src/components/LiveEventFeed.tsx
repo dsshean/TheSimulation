@@ -124,7 +124,7 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
                           {event.agent_id}
                         </span>
                         <span className="text-xs text-gray-500 flex-shrink-0">
-                          T{event.sim_time_s?.toFixed(1) || '0.0'}s
+                          T{event.timestamp?.toFixed(1) || '0.0'}s
                         </span>
                       </div>
                       
