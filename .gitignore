@@ -7,3 +7,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# IDE and tooling
+.claude/
+.github/
+.vscode/
