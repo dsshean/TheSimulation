@@ -45,9 +45,20 @@ export const useTauriSimulation = () => {
 
     // Extract events from recent_events log
     if (stateData.recent_events && Array.isArray(stateData.recent_events)) {
+      console.log('🔍 Processing recent_events:', {
+        total_events: stateData.recent_events.length,
+        last_5_events: stateData.recent_events.slice(-5).map(e => `${e.event_type}(${e.agent_type})`)
+      });
+      
+      // Also set window title for debugging
+      if (typeof window !== 'undefined') {
+        window.document.title = `Dashboard - ${stateData.recent_events.length} events`;
+      }
+      
       stateData.recent_events.slice(-20).forEach((event: any) => {
         // World Engine resolution events
         if (event.event_type === 'resolution' && event.agent_type === 'world_engine') {
+          console.log('✅ Found World Engine event:', event.sim_time_s);
           const resolutionData = event.data || {};
           const content = resolutionData.outcome_description || 'World Engine resolution';
           const details = JSON.stringify({
@@ -87,6 +98,7 @@ export const useTauriSimulation = () => {
         
         // Simulacra monologue events from recent_events
         if (event.event_type === 'monologue' && event.agent_type === 'simulacra') {
+          console.log('✅ Found Simulacra monologue event:', event.sim_time_s);
           const agentName = event.agent_id;
           newEvents.push({
             timestamp: currentTime - ((stateData.world_time || 0) - (event.sim_time_s || 0)),
@@ -303,7 +315,6 @@ export const useTauriSimulation = () => {
   // Setup event listeners - SIMPLE VERSION
   useEffect(() => {
     let unlistenStateUpdate: (() => void) | undefined;
-    let refreshInterval: NodeJS.Timeout | undefined;
 
     const setup = async () => {
       try {
@@ -331,11 +342,8 @@ export const useTauriSimulation = () => {
         // Get initial state
         await refreshState();
         
-        // Fallback: Poll for updates every 3 seconds if Redis events fail
-        refreshInterval = setInterval(async () => {
-          console.log('🔄 Polling for state updates...');
-          await refreshState();
-        }, 3000);
+        // Remove polling - rely only on Redis event-driven updates
+        console.log('📡 Relying on Redis event-driven updates only');
         
         setLoading(false);
       } catch (err) {
@@ -350,9 +358,6 @@ export const useTauriSimulation = () => {
     return () => {
       if (unlistenStateUpdate) {
         unlistenStateUpdate();
-      }
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
       }
     };
   }, []); // Empty dependency array
