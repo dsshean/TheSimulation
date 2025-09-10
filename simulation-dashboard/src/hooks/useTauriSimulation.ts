@@ -16,10 +16,9 @@ export const useTauriSimulation = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Extract events from simulation state
+  // Extract events from simulation state  
   const extractEventsFromState = useCallback((stateData: SimulationState) => {
     const newEvents: EventData[] = [];
-    const currentTime = Date.now() / 1000;
 
     console.log('🔍 Extracting events from state:', {
       narrative_log: stateData.narrative_log?.length || 0,
@@ -27,35 +26,16 @@ export const useTauriSimulation = () => {
       world_feeds: Object.keys(stateData.world_feeds || {}).length
     });
 
-    // Extract narrative events from narrative_log
-    if (stateData.narrative_log && Array.isArray(stateData.narrative_log)) {
-      stateData.narrative_log.slice(-10).reverse().forEach((narrative: string, index: number) => {
-        newEvents.push({
-          timestamp: currentTime - index,
-          sim_time_s: stateData.world_time || 0,
-          agent_id: 'Narrator',
-          event_type: 'narrative',
-          data: { 
-            content: narrative,
-            narrative_text: narrative
-          }
-        });
-      });
-    }
-
-    // Extract events from recent_events log
+    // Use recent_events as the primary source since it has proper timestamps
     if (stateData.recent_events && Array.isArray(stateData.recent_events)) {
       console.log('🔍 Processing recent_events:', {
         total_events: stateData.recent_events.length,
         last_5_events: stateData.recent_events.slice(-5).map(e => `${e.event_type}(${e.agent_type})`)
       });
       
-      // Also set window title for debugging
-      if (typeof window !== 'undefined') {
-        window.document.title = `Dashboard - ${stateData.recent_events.length} events`;
-      }
-      
       stateData.recent_events.slice(-20).forEach((event: any) => {
+        // Use simulation time as timestamp to avoid Date.now() creating new timestamps
+        const eventTimestamp = event.sim_time_s || stateData.world_time || 0;
         // World Engine resolution events
         if (event.event_type === 'resolution' && event.agent_type === 'world_engine') {
           console.log('✅ Found World Engine event:', event.sim_time_s);
@@ -69,7 +49,7 @@ export const useTauriSimulation = () => {
           }, null, 2);
           
           newEvents.push({
-            timestamp: currentTime - ((stateData.world_time || 0) - (event.sim_time_s || 0)),
+            timestamp: eventTimestamp,
             sim_time_s: event.sim_time_s || 0,
             agent_id: 'World Engine',
             event_type: 'world_engine',
@@ -85,7 +65,7 @@ export const useTauriSimulation = () => {
         if (event.event_type === 'observation' && event.agent_type === 'simulacra') {
           const agentName = event.agent_id;
           newEvents.push({
-            timestamp: currentTime - ((stateData.world_time || 0) - (event.sim_time_s || 0)),
+            timestamp: eventTimestamp,
             sim_time_s: event.sim_time_s || 0,
             agent_id: agentName,
             event_type: 'observation',
@@ -101,7 +81,7 @@ export const useTauriSimulation = () => {
           console.log('✅ Found Simulacra monologue event:', event.sim_time_s);
           const agentName = event.agent_id;
           newEvents.push({
-            timestamp: currentTime - ((stateData.world_time || 0) - (event.sim_time_s || 0)),
+            timestamp: eventTimestamp,
             sim_time_s: event.sim_time_s || 0,
             agent_id: agentName,
             event_type: 'monologue',
@@ -118,7 +98,7 @@ export const useTauriSimulation = () => {
     if (stateData.current_world_state && newEvents.filter(e => e.event_type === 'world_engine').length === 0) {
       const worldEngineActivity = `World time: ${(stateData.world_time || 0).toFixed(1)}s`;
       newEvents.push({
-        timestamp: currentTime,
+        timestamp: stateData.world_time || 0,
         sim_time_s: stateData.world_time || 0,
         agent_id: 'World Engine',
         event_type: 'world_engine',
@@ -133,7 +113,7 @@ export const useTauriSimulation = () => {
     if (stateData.world_feeds) {
       if (stateData.world_feeds.weather) {
         newEvents.push({
-          timestamp: currentTime - 1,
+          timestamp: (stateData.world_time || 0) - 0.1,
           sim_time_s: stateData.world_time || 0,
           agent_id: 'World Engine',
           event_type: 'world_engine',
@@ -154,7 +134,7 @@ export const useTauriSimulation = () => {
         if (agentData.monologue_history && Array.isArray(agentData.monologue_history)) {
           agentData.monologue_history.slice(-10).reverse().forEach((monologue: string, index: number) => {
             newEvents.push({
-              timestamp: currentTime - index - 2,
+              timestamp: (stateData.world_time || 0) - (index * 0.1) - 0.2,
               sim_time_s: stateData.world_time || 0,
               agent_id: agentName,
               event_type: 'monologue',
@@ -169,7 +149,7 @@ export const useTauriSimulation = () => {
         // Extract current action status
         if (agentData.current_action_description) {
           newEvents.push({
-            timestamp: currentTime - 0.5,
+            timestamp: (stateData.world_time || 0) - 0.05,
             sim_time_s: stateData.world_time || 0,
             agent_id: agentName,
             event_type: 'intent',
@@ -185,7 +165,7 @@ export const useTauriSimulation = () => {
         // Extract recent observations (full content)
         if (agentData.last_observation) {
           newEvents.push({
-            timestamp: currentTime - 1.5,
+            timestamp: (stateData.world_time || 0) - 0.15,
             sim_time_s: stateData.world_time || 0,
             agent_id: agentName,
             event_type: 'observation',
