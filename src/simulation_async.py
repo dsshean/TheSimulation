@@ -21,15 +21,9 @@ from google.adk.sessions import InMemorySessionService, Session
 from google.genai import types as genai_types
 # from PIL import Image # No longer used directly here
 from pydantic import ValidationError # BaseModel, Field, etc. are no longer needed here
-from rich.console import Console
-from rich.live import Live
-from rich.panel import Panel
-from rich.table import Table
-
 from .socket_server import socket_server_task
 
-# Console disabled for Textual mode - all output goes to dashboard
-console = None  # Disabled to prevent interfering with Textual UI
+# No console/Rich dependencies - using standard print
 from .core_tasks import dynamic_interruption_task, narrative_image_generation_task, visualization_websocket_task
 
 from .agents import create_narration_llm_agent  # Agent creation functions
@@ -99,7 +93,7 @@ search_agent_session_id_val: Optional[str] = None # Renamed
 # world_generator_session_id: Optional[str] = None
 
 world_mood_global: str = "The familiar, everyday real world; starting the morning routine at home."
-live_display_object: Optional[Live] = None
+# live_display_object removed - no longer needed
 
 # Add these helper functions after the imports
 async def safe_queue_get(queue, timeout=5.0, task_name="Unknown"):
@@ -368,6 +362,12 @@ def _list_to_dicts_if_needed(list_of_items: List[Any]) -> List[Dict[str, Any]]:
         # It will return {} for unsupported types within the list.
     ]
 
+def _update_goal_from_monologue(state, agent_id, monologue_text, logger):
+    """Helper function to extract and update agent goal from monologue if it contains goal-related keywords."""
+    if monologue_text and any(keyword in monologue_text.lower() for keyword in ["goal", "want to", "need to", "plan to", "going to", "should"]):
+        goal_text = monologue_text[:100] + "..." if len(monologue_text) > 100 else monologue_text
+        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.goal", goal_text, logger)
+
 # --- Helper Function for ADK Agent Calls ---
 async def _call_adk_agent_and_parse(
     runner: Runner,
@@ -547,15 +547,19 @@ async def narration_task():
                 try:
                     actual_narrative_paragraph = getattr(validated_narrator_output, 'narrative', "Narration error or missing narrative field.")
                     logger.debug(f"[NarrationTask] Narrator output received: {actual_narrative_paragraph[:100]}")
+                    
+                    # PRINT Narrator response to console
+                    print(f"\n📖 [Narrator] Response:")
+                    print(f"  {actual_narrative_paragraph}")
 
                     cleaned_narrative_text = actual_narrative_paragraph
                     internal_agent_name_placeholder = f"[SimulacraLLM_{actor_id}]"
                     cleaned_narrative_text = cleaned_narrative_text.replace(internal_agent_name_placeholder, actor_name)
 
-                    if cleaned_narrative_text and live_display_object:
-                        if console: live_display_object.console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
-                    elif cleaned_narrative_text:
-                        if console: console.print(Panel(cleaned_narrative_text, title=f"Narrator @ {completion_time:.1f}s", border_style="green", expand=False))
+                    # Live display removed - using logger
+                    if cleaned_narrative_text:
+                        logger.info(f"Narrator @ {completion_time:.1f}s: {cleaned_narrative_text}")
+                    # Console print removed
 
                     final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
                     state.setdefault("narrative_log", []).append(final_narrative_entry)
@@ -601,16 +605,16 @@ async def narration_task():
                 except Exception as e_processing:
                     logger.error(f"[NarrationTask] Error processing narrator output: {e_processing}")
                     fallback_narrative = f"{actor_name} completed an action, but the narrative could not be generated."
-                    if live_display_object:
-                        if console: live_display_object.console.print(Panel(fallback_narrative, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="yellow", expand=False))
+                    # Live display removed - using logger
+                    logger.warning(f"Narrator (Fallback) @ {completion_time:.1f}s: {fallback_narrative}")
                     if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                         _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", fallback_narrative, logger)
             else:
                 # Handle case where LLM call failed
                 logger.error(f"[NarrationTask] Failed to get narrator output for {actor_name}")
                 fallback_narrative = f"{actor_name} completed an action: {outcome_desc}"
-                if live_display_object:
-                    if console: live_display_object.console.print(Panel(fallback_narrative, title=f"Narrator (Fallback) @ {completion_time:.1f}s", border_style="red", expand=False))
+                # Live display removed - using logger
+                logger.error(f"Narrator (Fallback) @ {completion_time:.1f}s: {fallback_narrative}")
                 if actor_id in get_nested(state, SIMULACRA_KEY, default={}):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{actor_id}.last_observation", fallback_narrative, logger)
 
@@ -776,19 +780,26 @@ async def world_engine_task_llm():
             if validated_data:
                 outcome_description = getattr(validated_data, 'outcome_description', "Outcome not described.")
                 parsed_resolution = _to_dict(validated_data)
-                if live_display_object and parsed_resolution:
-                    if console: live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
+                # Live display removed - using logger
+                if parsed_resolution:
+                    logger.info(f"World Engine Resolution @ {current_sim_time:.1f}s")
                     try: 
-                        if console: live_display_object.console.print(json.dumps(parsed_resolution, indent=2))
+                        logger.debug(f"Resolution details: {json.dumps(parsed_resolution, indent=2)}")
                     except TypeError: 
-                        if console: live_display_object.console.print(str(parsed_resolution))
+                        logger.debug(f"Resolution details: {str(parsed_resolution)}")
+                # PRINT WorldEngine response to console
+                print(f"\n🌍 [WorldEngine @ {current_sim_time:.1f}s] Response:")
+                try:
+                    print(json.dumps(parsed_resolution, indent=2))
+                except TypeError:
+                    print(str(parsed_resolution))
                 _log_event(sim_time=current_sim_time, agent_id="WorldEngine", event_type="resolution", data=parsed_resolution, logger_instance=logger, event_logger_global=event_logger_global)
 
             # Handle case where validated_data is None
             if not validated_data:
                 outcome_description = "Action failed: No response from World Engine LLM."
             elif getattr(validated_data, 'valid_action', False):
-                completion_time = current_sim_time + getattr(validated_data, 'duration', 0.0)
+                completion_time = round(current_sim_time + getattr(validated_data, 'duration', 0.0), 2)
                 
                 # ADD YOUR UNIVERSAL INTERRUPTION CODE HERE - before any action-specific handling
                 # Check if target is another Simulacra and handle interruption if needed
@@ -1032,8 +1043,13 @@ async def world_engine_task_llm():
                         state["pending_simulation_events"].sort(key=lambda x: x.get("trigger_sim_time", float('inf')))
                         logger.info(f"[WorldEngineLLM] Scheduled narration for talk action to trigger at {completion_time:.1f}s")
                     else:
-                        # Use temporal ordering system instead of direct queue
+                        # Use temporal ordering system and wait for narration to complete
                         await add_narration_event_with_ordering(narration_event, task_name=f"WorldEngineLLM_{actor_id}")
+                        
+                        # Wait for the narration to process and update agent's observation
+                        # This ensures the agent gets the updated observation before making their next move
+                        await asyncio.sleep(0.1)  # Brief wait to allow narration task to complete
+                        
                         logger.info(f"[WorldEngineLLM] Action VALID for {actor_id}. Updated state immediately, set end time {completion_time:.1f}s")
                 else:
                     logger.error(f"[WorldEngineLLM] Actor {actor_id} not found in state after valid action resolution.")
@@ -1059,12 +1075,12 @@ async def world_engine_task_llm():
                 actor_name_for_log = get_nested(state, SIMULACRA_KEY, actor_id, "persona_details", "Name", default=actor_id)
                 resolution_details = {"valid_action": False, "duration": 0.0, "results": {}, "outcome_description": final_outcome_desc}
                 
-                if live_display_object: 
-                    if console: live_display_object.console.print(f"\n[bold blue][World Engine Resolution @ {current_sim_time:.1f}s][/bold blue]")
-                    try: 
-                        if console: live_display_object.console.print(json.dumps(resolution_details, indent=2))
-                    except TypeError: 
-                        if console: live_display_object.console.print(str(resolution_details))
+                # Live display removed - using logger
+                logger.info(f"World Engine Resolution @ {current_sim_time:.1f}s")
+                try: 
+                    logger.debug(f"Resolution details: {json.dumps(resolution_details, indent=2)}")
+                except TypeError: 
+                    logger.debug(f"Resolution details: {str(resolution_details)}")
                 
                 state.setdefault("narrative_log", []).append(f"[T{current_sim_time:.1f}] {actor_name_for_log}'s action failed: {final_outcome_desc}")
 
@@ -1287,6 +1303,18 @@ async def simulacra_agent_task_llm(agent_id: str):
             if validated_intent:
                 # Store the monologue and update goal if needed
                 monologue_text = getattr(validated_intent, 'internal_monologue', "")
+                action_type = getattr(validated_intent, 'action_type', "")
+                target_id = getattr(validated_intent, 'target_id', "")
+                details = getattr(validated_intent, 'details', "")
+                
+                # PRINT Simulacra response to console
+                print(f"\n🧠 [Simulacra {agent_name}] Response:")
+                print(f"  Monologue: {monologue_text}")
+                print(f"  Action: {action_type}")
+                if target_id:
+                    print(f"  Target: {target_id}")
+                print(f"  Details: {details}")
+                
                 if monologue_text:
                     _log_event(
                         sim_time=current_world_time_init,
@@ -1305,8 +1333,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                     _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", current_monologue_history, logger)
                 
                 # Extract and update goal from monologue if it contains goal-setting language
-                if monologue_text and any(keyword in monologue_text.lower() for keyword in ["goal", "want to", "need to", "plan to", "going to", "should"]):
-                    _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.goal", monologue_text[:100] + "..." if len(monologue_text) > 100 else monologue_text, logger)
+                _update_goal_from_monologue(state, agent_id, monologue_text, logger)
                 
                 intent_data = _to_dict(validated_intent, exclude={'internal_monologue'})
                 success = await safe_queue_put(
@@ -1411,7 +1438,7 @@ async def simulacra_agent_task_llm(agent_id: str):
             current_status_busy_loop = agent_state_busy_loop.get("status")
 
             if current_status_busy_loop == "idle":
-                logger.debug(f"[{agent_name}] Status is idle. Proceeding to plan next action.")
+                logger.debug(f"[{agent_name}] Status is {current_status_busy_loop}. Proceeding to plan next action.")
                 
                 prompt_text = _build_simulacra_prompt(
                     agent_id, agent_name, agent_state_busy_loop, current_sim_time_busy_loop,
@@ -1428,6 +1455,18 @@ async def simulacra_agent_task_llm(agent_id: str):
 
                 if validated_intent:
                     monologue_text = getattr(validated_intent, 'internal_monologue', "")
+                    action_type = getattr(validated_intent, 'action_type', "")
+                    target_id = getattr(validated_intent, 'target_id', "")
+                    details = getattr(validated_intent, 'details', "")
+                    
+                    # PRINT Simulacra response to console
+                    print(f"\n🧠 [Simulacra {agent_name}] Response:")
+                    print(f"  Monologue: {monologue_text}")
+                    print(f"  Action: {action_type}")
+                    if target_id:
+                        print(f"  Target: {target_id}")
+                    print(f"  Details: {details}")
+                    
                     if monologue_text:
                         _log_event(
                             sim_time=current_sim_time_busy_loop,
@@ -1444,8 +1483,7 @@ async def simulacra_agent_task_llm(agent_id: str):
                             current_monologue_history_loop = current_monologue_history_loop[-MEMORY_LOG_CONTEXT_LENGTH:]
                         _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.monologue_history", current_monologue_history_loop, logger)
                     
-                    if monologue_text and any(keyword in monologue_text.lower() for keyword in ["goal", "want to", "need to", "plan to", "going to", "should"]):
-                        _update_state_value(state, f"{SIMULACRA_KEY}.{agent_id}.goal", monologue_text[:100] + "..." if len(monologue_text) > 100 else monologue_text, logger)
+                    _update_goal_from_monologue(state, agent_id, monologue_text, logger)
                     
                     intent_data = _to_dict(validated_intent, exclude={'internal_monologue'})
                     success = await safe_queue_put(
@@ -1506,6 +1544,16 @@ async def simulacra_agent_task_llm(agent_id: str):
                         if validated_reflection_intent:
                             action_type_reflect = getattr(validated_reflection_intent, 'action_type', 'unknown')
                             monologue_reflect = getattr(validated_reflection_intent, 'internal_monologue', '')
+                            target_id_reflect = getattr(validated_reflection_intent, 'target_id', "")
+                            details_reflect = getattr(validated_reflection_intent, 'details', "")
+                            
+                            # PRINT Reflection response to console
+                            print(f"\n🤔 [Simulacra {agent_name} - Reflection] Response:")
+                            print(f"  Monologue: {monologue_reflect}")
+                            print(f"  Action: {action_type_reflect}")
+                            if target_id_reflect:
+                                print(f"  Target: {target_id_reflect}")
+                            print(f"  Details: {details_reflect}")
                             
                             # Store reflection monologue
                             if monologue_reflect:
@@ -1601,11 +1649,11 @@ async def run_simulation(
     global world_engine_agent, world_engine_runner, world_engine_session_id
     global narration_agent_instance, narration_runner, narration_session_id
     global simulacra_agents_map, simulacra_runners_map, simulacra_session_ids_map # Keep this line
-    global state, live_display_object
+    global state
     global world_mood_global, search_llm_agent_instance, search_agent_runner_instance, search_agent_session_id_val, perception_manager_global
     global event_logger_global # Ensure we can assign to the global
 
-    if console: console.rule("[bold green]Starting Async Simulation[/]")
+    logger.info("Starting Async Simulation")
 
     event_logger_global = event_logger_instance # Assign the passed logger to our global variable
 
@@ -1618,7 +1666,7 @@ async def run_simulation(
     logger.info("ADK InMemoryMemoryService initialized.")
 
     if not API_KEY:
-        if console: console.print("[bold red]ERROR: GOOGLE_API_KEY environment variable not set.[/bold red]")
+        logger.critical("ERROR: GOOGLE_API_KEY environment variable not set.")
         sys.exit(1)
     try:
         genai.configure(api_key=API_KEY)
@@ -1626,16 +1674,16 @@ async def run_simulation(
         logger.info("Google Generative AI configured.")
     except Exception as e:
         logger.critical(f"Failed to configure Google API: {e}", exc_info=True)
-        if console: console.print(f"[bold red]ERROR: Failed to configure Google API: {e}[/bold red]")
+        logger.critical(f"ERROR: Failed to configure Google API: {e}")
         sys.exit(1)
 
-    if console: console.print(Panel(f"[[bold yellow]{APP_NAME}[/]] - Initializing Simulation State...", title="Startup", border_style="blue"))
+    logger.info(f"{APP_NAME} - Initializing Simulation State...")
     logger.info("Starting simulation initialization.")
     
     loaded_state_data, state_file_path = load_or_initialize_simulation(instance_uuid_arg)
     if loaded_state_data is None:
         logger.critical("Failed to load or create simulation state. Cannot proceed.")
-        if console: console.print("[bold red]Error:[/bold red] Could not obtain simulation state.")
+        logger.critical("Error: Could not obtain simulation state.")
         sys.exit(1)
     state = loaded_state_data 
     world_instance_uuid = state.get("world_instance_uuid")
@@ -1649,14 +1697,14 @@ async def run_simulation(
             state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]['state'] = parsed_override_loc.get('state')
             state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]['country'] = parsed_override_loc.get('country')
             logger.info(f"World location overridden: {state[WORLD_TEMPLATE_DETAILS_KEY][LOCATION_KEY]}")
-            if console: console.print(f"Location overridden to: [yellow]{location_override_arg}[/yellow]")
+            logger.info(f"Location overridden to: {location_override_arg}")
         except Exception as e:
             logger.error(f"Failed to apply location override: {e}", exc_info=True)
 
     if mood_override_arg:
         world_mood_global = mood_override_arg.strip()
         logger.info(f"Global world mood overridden to '{world_mood_global}'.")
-        if console: console.print(f"Global world mood set to: [yellow]{world_mood_global}[/yellow]")
+        logger.info(f"Global world mood set to: {world_mood_global}")
         state.setdefault(WORLD_TEMPLATE_DETAILS_KEY, {})['mood'] = world_mood_global
     else: 
         world_mood_global = get_nested(state, WORLD_TEMPLATE_DETAILS_KEY, 'mood', default="The familiar, everyday real world; starting the morning routine at home.")
@@ -1673,10 +1721,10 @@ async def run_simulation(
     final_active_sim_ids = state.get(ACTIVE_SIMULACRA_IDS_KEY, [])
     if not final_active_sim_ids:
          logger.critical("No active simulacra available after state load. Cannot proceed.")
-         if console: console.print("[bold red]Error:[/bold red] No verified Simulacra available.")
+         logger.critical("Error: No verified Simulacra available.")
          sys.exit(1)
     logger.info(f"Initialization complete. Instance {world_instance_uuid} ready with {len(final_active_sim_ids)} simulacra.")
-    if console: console.print(f"Running simulation with: {', '.join(final_active_sim_ids)}")
+    logger.info(f"Running simulation with: {', '.join(final_active_sim_ids)}")
 
 
     # Create shared agents once
@@ -1804,23 +1852,18 @@ async def run_simulation(
         logger.warning("Continuing simulation without Redis/Tauri UI support")
 
     try:
-        def get_current_table_for_live():
-            eb_qsize = event_bus.qsize() if event_bus else 0
-            nq_qsize = narration_queue.qsize() if narration_queue else 0
-            return generate_table(state, eb_qsize, nq_qsize)
-
-        with Live(get_current_table_for_live(), console=console, refresh_per_second=1.0/UPDATE_INTERVAL, vertical_overflow="visible") as live:
-            live_display_object = live
-            tasks.append(asyncio.create_task(
-                socket_server_task(
-                    state=state,
-                    narration_queue=narration_queue,
-                    world_mood=world_mood_global,
-                    simulation_time_getter=get_current_sim_time,
-                    live_display_object_ref=live # Pass the live object
-                ), 
-                name="SocketServer"
-            ))
+        # Socket server task - no Live display needed
+        tasks.append(asyncio.create_task(
+            socket_server_task(
+                state=state,
+                narration_queue=narration_queue,
+                world_mood=world_mood_global,
+                simulation_time_getter=get_current_sim_time,
+                live_display_object_ref=None  # No live display
+            ), 
+            name="SocketServer"
+        ))
+        # Web visualization task (conditional)
         if ENABLE_WEB_VISUALIZATION:
             tasks.append(asyncio.create_task(
                 visualization_websocket_task(
@@ -1832,54 +1875,54 @@ async def run_simulation(
                 ),
                 name="VisualizationWebSocket"
             ))
-            tasks.append(asyncio.create_task(time_manager_task(
-                current_state=state, 
-                event_bus_qsize_func=lambda: event_bus.qsize(), 
-                narration_qsize_func=lambda: narration_queue.qsize(), 
-                live_display=live, 
-                logger_instance=logger,
-                dashboard_app=dashboard_app
-            ), name="TimeManager"))
-            # tasks.append(asyncio.create_task(interaction_dispatcher_task(state, event_bus, logger), name="InteractionDispatcher")) # REMOVED
-            tasks.append(asyncio.create_task(world_info_gatherer_task(state, world_mood_global, search_agent_runner_instance, search_agent_session_id_val, logger), name="WorldInfoGatherer"))
-            tasks.append(asyncio.create_task(dynamic_interruption_task(
-                current_state=state,
-                world_mood=world_mood_global,
-                logger_instance=logger,
-                event_logger_instance=event_logger_global
-            ), name="DynamicInterruptionTask"))
-            
-            tasks.append(asyncio.create_task(narration_task(), name="NarrationTask"))
-            tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
-            tasks.append(asyncio.create_task(narrative_image_generation_task(
-                current_state=state,
-                world_mood=world_mood_global,
-                logger_instance=logger,
-                event_logger_instance=event_logger_global
-            ), name="NarrativeImageGenerationTask"))
-            for sim_id_val_task in final_active_sim_ids: 
-                tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id_val_task), name=f"Simulacra_{sim_id_val_task}"))
+        
+        # Essential tasks (always run)
+        tasks.append(asyncio.create_task(time_manager_task(
+            current_state=state, 
+            event_bus_qsize_func=lambda: event_bus.qsize(), 
+            narration_qsize_func=lambda: narration_queue.qsize(), 
+            live_display=None,  # No live display needed
+            logger_instance=logger,
+            dashboard_app=dashboard_app
+        ), name="TimeManager"))
+        # tasks.append(asyncio.create_task(interaction_dispatcher_task(state, event_bus, logger), name="InteractionDispatcher")) # REMOVED
+        tasks.append(asyncio.create_task(world_info_gatherer_task(state, world_mood_global, search_agent_runner_instance, search_agent_session_id_val, logger), name="WorldInfoGatherer"))
+        tasks.append(asyncio.create_task(dynamic_interruption_task(
+            current_state=state,
+            world_mood=world_mood_global,
+            logger_instance=logger,
+            event_logger_instance=event_logger_global
+        ), name="DynamicInterruptionTask"))
+        
+        tasks.append(asyncio.create_task(narration_task(), name="NarrationTask"))
+        tasks.append(asyncio.create_task(world_engine_task_llm(), name="WorldEngine"))
+        tasks.append(asyncio.create_task(narrative_image_generation_task(
+            current_state=state,
+            world_mood=world_mood_global,
+            logger_instance=logger,
+            event_logger_instance=event_logger_global
+        ), name="NarrativeImageGenerationTask"))
+        for sim_id_val_task in final_active_sim_ids: 
+            tasks.append(asyncio.create_task(simulacra_agent_task_llm(agent_id=sim_id_val_task), name=f"Simulacra_{sim_id_val_task}"))
 
-            tasks.append(asyncio.create_task(queue_health_monitor(), name="QueueHealthMonitor"))
+        tasks.append(asyncio.create_task(queue_health_monitor(), name="QueueHealthMonitor"))
 
-            if not tasks:
-                 logger.error("No tasks were created. Simulation cannot run.")
-                 if console: console.print("[bold red]Error: No simulation tasks started.[/bold red]")
-            else:
-                logger.info(f"Started {len(tasks)} tasks.")
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for task in done:
-                    try: 
-                        task.result()
-                    except asyncio.CancelledError: 
-                        logger.info(f"Task {task.get_name()} was cancelled.")
-                    except Exception as task_exc: 
-                        logger.error(f"Task {task.get_name()} raised: {task_exc}", exc_info=task_exc)
-                logger.info("One main task completed/failed. Initiating shutdown.")
+        if not tasks:
+             logger.error("No tasks were created. Simulation cannot run.")
+        else:
+            logger.info(f"Started {len(tasks)} tasks.")
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                try: 
+                    task.result()
+                except asyncio.CancelledError: 
+                    logger.info(f"Task {task.get_name()} was cancelled.")
+                except Exception as task_exc: 
+                    logger.error(f"Task {task.get_name()} raised: {task_exc}", exc_info=task_exc)
+            logger.info("One main task completed/failed. Initiating shutdown.")
 
     except Exception as e:
         logger.exception(f"Error during simulation setup or execution: {e}")
-        if console: console.print(f"[bold red]Unexpected error during simulation run: {e}[/bold red]")
     finally:
         logger.info("Cancelling remaining tasks...")
         if 'tasks' in locals() and tasks: 
@@ -1912,19 +1955,19 @@ async def run_simulation(
                      state["world_time"] = 0.0
                 save_json_file(final_state_path, state) # Use final_state_path
                 logger.info(f"Final simulation state saved to {final_state_path}")
-                if console: console.print(f"Final state saved to {final_state_path}")
+                logger.info(f"Final state saved to {final_state_path}")
             except Exception as save_e:
                  logger.error(f"Failed to save final state to {final_state_path}: {save_e}", exc_info=True)
-                 if console: console.print(f"[red]Error saving final state: {save_e}[/red]")
+                 logger.error(f"Error saving final state: {save_e}")
         elif not final_uuid_to_save: # Only log error if UUID was the issue
              logger.error("Cannot save final state: world_instance_uuid is not defined in module state.")
-             if console: console.print("[bold red]Error: Cannot save final state (UUID unknown).[/bold red]")
+             logger.error("Error: Cannot save final state (UUID unknown).")
 
-        if console: console.print("\nFinal State Table:")
+        logger.info("Final State Table:")
         if state:
             eb_qsize_final = event_bus.qsize() if event_bus else 0
             nq_qsize_final = narration_queue.qsize() if narration_queue else 0
-            if console: console.print(generate_table(state, eb_qsize_final, nq_qsize_final))
+            logger.info(f"Final state summary: {len(state)} entries, event_bus_queue: {eb_qsize_final}, narration_queue: {nq_qsize_final}")
         else:
-            if console: console.print("[yellow]State dictionary is empty.[/yellow]")
-        if console: console.rule("[bold green]Simulation Shutdown Complete[/]")
+            logger.warning("State dictionary is empty.")
+        logger.info("Simulation Shutdown Complete")
