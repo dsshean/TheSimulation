@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EventData } from '../types/simulation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -20,6 +20,16 @@ export const EventLogBox: React.FC<EventLogBoxProps> = React.memo(({
   // Get the most recent event
   const latestEvent = events.length > 0 ? events[0] : null;
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
+  const [animate, setAnimate] = useState<boolean>(false);
+
+  // Animate when new events arrive
+  useEffect(() => {
+    if (latestEvent) {
+      setAnimate(true);
+      const timer = setTimeout(() => setAnimate(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [latestEvent?.timestamp]);
 
   const formatEventContent = (event: EventData) => {
     if (event.event_type === 'monologue') {
@@ -56,7 +66,7 @@ export const EventLogBox: React.FC<EventLogBoxProps> = React.memo(({
   };
 
   return (
-    <div className={`${bgColor} rounded-lg shadow-lg border border-gray-200 h-96`}>
+    <div className={`${bgColor} rounded-lg shadow-lg border border-gray-200 h-96 transition-all duration-300 ${animate ? 'animate-pulse shadow-xl scale-105' : ''}`}>
       <div className={`p-4 border-b border-gray-200 ${textColor}`}>
         <h3 className="text-lg font-bold flex items-center gap-2">
           {icon}
@@ -131,9 +141,13 @@ export const EventLogBox: React.FC<EventLogBoxProps> = React.memo(({
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if events have changed
+  // Re-render if events have changed or latest event timestamp changed
+  const prevLatest = prevProps.events[0];
+  const nextLatest = nextProps.events[0];
+  
   return (
     prevProps.events.length === nextProps.events.length &&
-    JSON.stringify(prevProps.events.slice(0, 5)) === JSON.stringify(nextProps.events.slice(0, 5))
+    prevLatest?.timestamp === nextLatest?.timestamp &&
+    prevProps.title === nextProps.title
   );
 });
