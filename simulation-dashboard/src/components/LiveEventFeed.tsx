@@ -20,15 +20,22 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
 }) => {
   const [filter, setFilter] = useState<string>('all');
   const [animate, setAnimate] = useState<string | null>(null);
+  const [lastEventTimestamp, setLastEventTimestamp] = useState<number | null>(null);
 
-  // Animate new events
+  // Animate new events only when timestamp changes
   useEffect(() => {
     if (events.length > 0) {
       const latestEvent = events[0];
-      setAnimate(`${latestEvent.agent_id}-${latestEvent.timestamp}`);
-      setTimeout(() => setAnimate(null), 1000);
+      const currentTimestamp = latestEvent.timestamp;
+      
+      // Only animate if this is a truly new event
+      if (lastEventTimestamp !== currentTimestamp) {
+        setAnimate(`${latestEvent.agent_id}-${currentTimestamp}`);
+        setLastEventTimestamp(currentTimestamp);
+        setTimeout(() => setAnimate(null), 1000);
+      }
     }
-  }, [events]);
+  }, [events, lastEventTimestamp]);
 
   const getEventIcon = (eventType: string) => {
     switch (eventType) {

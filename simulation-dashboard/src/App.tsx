@@ -72,21 +72,13 @@ function App() {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-gray-400 text-6xl mb-4">📊</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">No Simulation Data</h1>
-          <p className="text-gray-600 mb-4">No simulation state found. Make sure a simulation is running.</p>
-          <div className="text-sm text-gray-500 mb-4 space-y-1">
-            <p>Running: {running ? 'Yes' : 'No'}</p>
-            <p>Loading: {loading ? 'Yes' : 'No'}</p>
-            <p>Error: {error || 'None'}</p>
-          </div>
-          <button
-            onClick={refreshState}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 inline mr-2" />
-            Refresh
-          </button>
+          <LoadingSpinner size="lg" message="Connecting to simulation..." />
+          <p className="mt-4 text-gray-600">
+            Running: {running ? 'Yes' : 'No'} | Error: {error || 'None'}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            The dashboard will automatically load when simulation data is available
+          </p>
         </div>
       </div>
     );
@@ -267,7 +259,7 @@ function App() {
                             <div>
                               <EventLogBox
                                 title="Narrative"
-                                events={events.filter(e => e.event_type === 'narrative')}
+                                events={filteredEvents.filter(e => e.event_type === 'narrative')}
                                 icon={<BookOpen className="w-5 h-5" />}
                                 bgColor="bg-orange-50"
                                 textColor="text-orange-900"
@@ -283,7 +275,7 @@ function App() {
                         content: (
                           <div className="bg-green-50 rounded-lg p-4 max-h-96 overflow-y-auto">
                             <EventLog 
-                              events={events.filter(e => e.event_type === 'world_engine')} 
+                              events={filteredEvents.filter(e => e.event_type === 'world_engine')} 
                               title="World Engine Events"
                             />
                           </div>
