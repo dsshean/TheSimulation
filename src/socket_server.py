@@ -154,7 +154,7 @@ async def process_message(
                 
                 # 2. Add to the narrative log directly
                 state.setdefault("narrative_log", []).append(final_narrative_entry)
-                max_narrative_log = 50
+                max_narrative_log = 20
                 if len(state["narrative_log"]) > max_narrative_log:
                     state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
                 

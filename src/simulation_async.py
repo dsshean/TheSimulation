@@ -59,7 +59,7 @@ from .simulation_utils import (  # Utility functions; generate_llm_interjection_
     _update_state_value, generate_table, get_time_string_for_prompt, get_target_entity_state, # Re-added get_time_string_for_prompt, added get_target_entity_state
     _log_event, handle_action_interruption) # get_random_style_combination is used by core_tasks
 from .state_loader import parse_location_string  # Used in run_simulation
-from .redis_client import start_redis_integration, stop_redis_integration
+from .redis_client_improved import start_redis_integration, stop_redis_integration
 from .redis_commands import create_command_handlers
 
 logger = logging.getLogger(__name__) # Use logger from main entry point setup
@@ -559,7 +559,7 @@ async def narration_task():
 
                     final_narrative_entry = f"[T{completion_time:.1f}] {cleaned_narrative_text}"
                     state.setdefault("narrative_log", []).append(final_narrative_entry)
-                    max_narrative_log = 50
+                    max_narrative_log = 20
                     if len(state["narrative_log"]) > max_narrative_log:
                         state["narrative_log"] = state["narrative_log"][-max_narrative_log:]
                     
