@@ -46,20 +46,17 @@ else
     echo "No existing life summaries found. Will generate new personas."
 fi
 
-# Start Redis first and wait for it
-echo "Starting Redis..."
-redis-server /etc/redis/redis.conf &
-REDIS_PID=$!
-
-# Wait for Redis to be ready
-echo "Waiting for Redis to be ready..."
-for i in {1..30}; do
+# Redis will be started by supervisor, just wait for it to be ready
+echo "Waiting for Redis to be ready (managed by supervisor)..."
+for i in {1..60}; do
     if redis-cli ping > /dev/null 2>&1; then
         echo "Redis is ready!"
         break
     fi
-    if [ $i -eq 30 ]; then
-        echo "ERROR: Redis failed to start after 30 seconds"
+    if [ $i -eq 60 ]; then
+        echo "ERROR: Redis failed to start after 60 seconds"
+        echo "Checking Redis logs..."
+        cat /var/log/supervisor/redis_error.log 2>/dev/null || echo "No Redis error log found"
         exit 1
     fi
     sleep 1

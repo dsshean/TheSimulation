@@ -10,13 +10,14 @@ interface EventLogBoxProps {
   textColor?: string;
 }
 
-export const EventLogBox: React.FC<EventLogBoxProps> = React.memo(({ 
+export const EventLogBox: React.FC<EventLogBoxProps> = ({ 
   title, 
   events, 
   icon, 
   bgColor = 'bg-white',
   textColor = 'text-gray-800'
 }) => {
+  
   // Get the most recent event
   const latestEvent = events.length > 0 ? events[0] : null;
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
@@ -140,14 +141,4 @@ export const EventLogBox: React.FC<EventLogBoxProps> = React.memo(({
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Re-render if events have changed or latest event timestamp changed
-  const prevLatest = prevProps.events[0];
-  const nextLatest = nextProps.events[0];
-  
-  return (
-    prevProps.events.length === nextProps.events.length &&
-    prevLatest?.timestamp === nextLatest?.timestamp &&
-    prevProps.title === nextProps.title
-  );
-});
+};

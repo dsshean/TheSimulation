@@ -17,13 +17,14 @@ export const useTauriSimulation = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Extract events from simulation state  
-  const extractEventsFromState = useCallback((stateData: SimulationState) => {
+  const extractEventsFromState = (stateData: SimulationState) => {
     const newEvents: EventData[] = [];
 
     console.log('🔍 Extracting events from state:', {
       narrative_log: stateData.narrative_log?.length || 0,
       simulacra_count: Object.keys(stateData.simulacra_profiles || {}).length,
-      world_feeds: Object.keys(stateData.world_feeds || {}).length
+      world_feeds: Object.keys(stateData.world_feeds || {}).length,
+      recent_events: stateData.recent_events?.length || 0
     });
 
     // Use recent_events as the primary source since it has proper timestamps
@@ -33,30 +34,22 @@ export const useTauriSimulation = () => {
         last_5_events: stateData.recent_events.slice(-5).map(e => `${e.event_type}(${e.agent_type})`)
       });
       
-      stateData.recent_events.slice(-20).forEach((event: any) => {
+      stateData.recent_events.slice(-50).forEach((event: any) => {
         // Use simulation time as timestamp to avoid Date.now() creating new timestamps
         const eventTimestamp = event.sim_time_s || stateData.world_time || 0;
-        // World Engine resolution events
-        if (event.event_type === 'resolution' && event.agent_type === 'world_engine') {
-          console.log('✅ Found World Engine event:', event.sim_time_s);
-          const resolutionData = event.data || {};
-          const content = resolutionData.outcome_description || 'World Engine resolution';
-          const details = JSON.stringify({
-            valid_action: resolutionData.valid_action,
-            duration: resolutionData.duration,
-            results: resolutionData.results,
-            scheduled_future_event: resolutionData.scheduled_future_event
-          }, null, 2);
-          
+        
+        // Simulacra monologue events from recent_events
+        if (event.event_type === 'monologue' && event.agent_type === 'simulacra') {
+          console.log('✅ Found Simulacra monologue event:', event.sim_time_s);
+          const agentName = event.agent_id;
           newEvents.push({
             timestamp: eventTimestamp,
             sim_time_s: event.sim_time_s || 0,
-            agent_id: 'World Engine',
-            event_type: 'world_engine',
+            agent_id: agentName,
+            event_type: 'monologue',
             data: { 
-              content: content,
-              details: details,
-              resolution: resolutionData
+              content: event.data.monologue || event.data.content || 'Agent thinking...',
+              monologue: event.data.monologue || event.data.content || 'Agent thinking...'
             }
           });
         }
@@ -76,22 +69,6 @@ export const useTauriSimulation = () => {
           });
         }
         
-        // Simulacra monologue events from recent_events
-        if (event.event_type === 'monologue' && event.agent_type === 'simulacra') {
-          console.log('✅ Found Simulacra monologue event:', event.sim_time_s);
-          const agentName = event.agent_id;
-          newEvents.push({
-            timestamp: eventTimestamp,
-            sim_time_s: event.sim_time_s || 0,
-            agent_id: agentName,
-            event_type: 'monologue',
-            data: { 
-              content: event.data.monologue || event.data.content || 'Agent thinking...',
-              monologue: event.data.monologue || event.data.content || 'Agent thinking...'
-            }
-          });
-        }
-        
         // Narrative events from recent_events
         if (event.event_type === 'narrative' && (event.agent_type === 'narrator' || event.agent_id === 'Narrator')) {
           console.log('✅ Found Narrative event:', event.sim_time_s);
@@ -103,6 +80,31 @@ export const useTauriSimulation = () => {
             data: { 
               content: event.data.narrative_text || event.data.content || 'Narrative update...',
               narrative_text: event.data.narrative_text || event.data.content || 'Narrative update...'
+            }
+          });
+        }
+
+        // World Engine resolution events
+        if ((event.event_type === 'resolution' || event.event_type === 'world_engine') && event.agent_type === 'world_engine') {
+          console.log('✅ Found World Engine event:', event.sim_time_s);
+          const resolutionData = event.data || {};
+          const content = resolutionData.outcome_description || 'World Engine resolution';
+          const details = JSON.stringify({
+            valid_action: resolutionData.valid_action,
+            duration: resolutionData.duration,
+            results: resolutionData.results,
+            scheduled_future_event: resolutionData.scheduled_future_event
+          }, null, 2);
+          
+          newEvents.push({
+            timestamp: eventTimestamp,
+            sim_time_s: event.sim_time_s || 0,
+            agent_id: 'World Engine',
+            event_type: 'world_engine',
+            data: { 
+              content: content,
+              details: details,
+              resolution: resolutionData
             }
           });
         }
@@ -163,52 +165,58 @@ export const useTauriSimulation = () => {
       }
     }
 
-    // Extract agent events with better handling
+    // Extract agent events from simulacra profiles
     if (stateData.simulacra_profiles) {
       Object.entries(stateData.simulacra_profiles as any).forEach(([agentId, agentData]: [string, any]) => {
         const agentName = agentData.persona_details?.Name || agentId;
 
-        // Extract recent monologues (last 10) - full content for simulacra tab
+        // Extract monologue events from monologue_history
         if (agentData.monologue_history && Array.isArray(agentData.monologue_history)) {
+          console.log(`✅ Found ${agentData.monologue_history.length} monologue entries for ${agentName}`);
+          
           agentData.monologue_history.slice(-10).reverse().forEach((monologue: string, index: number) => {
+            // Extract timestamp from monologue if it has one like "[T114.5]"
+            const timestampMatch = monologue.match(/\[T([0-9.]+)\]/);
+            const timestamp = timestampMatch ? parseFloat(timestampMatch[1]) : (stateData.world_time || 0) - (index * 0.1);
+            
             newEvents.push({
-              timestamp: (stateData.world_time || 0) - (index * 0.1) - 0.2,
-              sim_time_s: stateData.world_time || 0,
+              timestamp: timestamp,
+              sim_time_s: timestamp,
               agent_id: agentName,
               event_type: 'monologue',
               data: { 
-                content: monologue, // Full monologue content
+                content: monologue,
                 monologue: monologue
               }
             });
           });
         }
 
-        // Extract current action status
+        // Extract current action as intent event
         if (agentData.current_action_description) {
           newEvents.push({
-            timestamp: (stateData.world_time || 0) - 0.05,
+            timestamp: stateData.world_time || 0,
             sim_time_s: stateData.world_time || 0,
             agent_id: agentName,
             event_type: 'intent',
             data: { 
               action_type: agentData.current_action_description.split(' - ')[0]?.replace('Action: ', '') || 'unknown',
               details: agentData.current_action_description.split(' - ')[1] || agentData.current_action_description,
-              content: `${agentData.status}: ${agentData.current_action_description}`,
+              content: `Status: ${agentData.status} | Action: ${agentData.current_action_description}`,
               status: agentData.status
             }
           });
         }
 
-        // Extract recent observations (full content)
+        // Extract last observation as observation event
         if (agentData.last_observation) {
           newEvents.push({
-            timestamp: (stateData.world_time || 0) - 0.15,
+            timestamp: (stateData.world_time || 0) - 0.1,
             sim_time_s: stateData.world_time || 0,
             agent_id: agentName,
             event_type: 'observation',
             data: { 
-              content: agentData.last_observation, // Full observation content
+              content: agentData.last_observation,
               observation: agentData.last_observation
             }
           });
@@ -216,12 +224,10 @@ export const useTauriSimulation = () => {
       });
     }
 
-    // Limit to last 10 events and update
-    if (newEvents.length > 0) {
-      const sortedEvents = newEvents.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
-      setEvents(sortedEvents);
-    }
-  }, []);
+    // Always update events, even if empty, and increase limit
+    const sortedEvents = newEvents.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+    setEvents(sortedEvents);
+  };
 
   // Get current simulation state
   const refreshState = useCallback(async () => {
@@ -236,7 +242,7 @@ export const useTauriSimulation = () => {
       console.error('Failed to get simulation state:', err);
       setError(err as string);
     }
-  }, [extractEventsFromState]);
+  }, []);
 
   // Start simulation
   const startSimulation = useCallback(async () => {

@@ -13,18 +13,18 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js for the dashboard
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
-
 # Copy requirements first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy only necessary files (not the entire context)
+COPY src/ ./src/
+COPY main_async.py .
+COPY docker/ ./docker/
+COPY .env .
+COPY world_configurations/ ./world_configurations/
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/data/states \
@@ -34,9 +34,6 @@ RUN mkdir -p /app/data/states \
     /var/log/supervisor \
     && chmod -R 755 /app/data \
     && chmod -R 755 /app/logs
-
-# Back to app root  
-WORKDIR /app
 
 # Copy supervisor configuration
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -49,7 +46,7 @@ COPY docker/startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
 # Expose ports
-EXPOSE 6379 8765 8766 1420
+EXPOSE 6379 8765 8766
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -65,5 +62,5 @@ ENV REDIS_PORT=6379
 # Volume for persistent data
 VOLUME ["/app/data", "/app/logs"]
 
-# Start supervisor to manage all services
-CMD ["/usr/local/bin/startup.sh"]
+# Start supervisor to manage all services  
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

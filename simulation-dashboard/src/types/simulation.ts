@@ -11,6 +11,8 @@ export interface SimulationState {
     description: string;
     name: string;
   };
+  narrative_log: string[];
+  recent_events: any[];
 }
 
 export interface SimulacraProfile {
@@ -74,7 +76,7 @@ export interface EventData {
   timestamp: number;
   sim_time_s: number;
   agent_id: string;
-  event_type: 'monologue' | 'intent' | 'resolution' | 'narrative';
+  event_type: 'monologue' | 'intent' | 'resolution' | 'narrative' | 'world_engine' | 'observation';
   data: any;
 }
 

@@ -4,6 +4,7 @@ import json
 import logging
 import random
 import re
+import sys
 from datetime import datetime, timezone  # Added for get_time_string_for_prompt
 from typing import Any, Dict, List, Optional
 
@@ -454,7 +455,7 @@ def get_time_string_for_prompt(
 
 # --- Helper for Event Logging ---
 def _log_event(sim_time: float, agent_id: str, event_type: str, data: Dict[str, Any], logger_instance: logging.Logger, event_logger_global: logging.Logger):
-    """Logs a structured event to the dedicated event logger."""
+    """Logs a structured event to the dedicated event logger and Redis."""
     if event_logger_global:
         agent_type = "system"
         if agent_id.startswith("sim_"):
@@ -475,6 +476,21 @@ def _log_event(sim_time: float, agent_id: str, event_type: str, data: Dict[str, 
             event_logger_global.info(json.dumps(log_entry), extra={'data': log_entry})
         except Exception as e:
             logger_instance.error(f"Failed to log event (type: {event_type}, agent: {agent_id}) to event log: {e}", exc_info=True)
+        
+        # Also add to Redis client's recent_events buffer for dashboard
+        try:
+            if 'src.redis_client_improved' in sys.modules:
+                redis_module = sys.modules['src.redis_client_improved']
+                if hasattr(redis_module, 'improved_redis_client'):
+                    redis_client = redis_module.improved_redis_client
+                    if redis_client and getattr(redis_client, 'running', False):
+                        redis_client.add_recent_event(log_entry)
+                        # Temporary debug log
+                        if event_type in ['narrative', 'monologue', 'resolution', 'observation']:
+                            logger_instance.debug(f"[DEBUG] Added {event_type}({log_entry.get('agent_type', 'unknown')}) event to Redis buffer")
+        except Exception as e:
+            # Don't log this error as it would be noisy, just continue
+            pass
 
 def get_random_style_combination(
     logger_instance: logging.Logger, # Added logger_instance parameter

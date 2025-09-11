@@ -9,7 +9,7 @@ interface EventLogProps {
   title?: string;
 }
 
-export const EventLog: React.FC<EventLogProps> = React.memo(({ events, title = "Event Log" }) => {
+export const EventLog: React.FC<EventLogProps> = ({ events, title = "Event Log" }) => {
   const renderEventContent = (event: EventData) => {
     const { event_type, data } = event;
     
@@ -85,6 +85,21 @@ export const EventLog: React.FC<EventLogProps> = React.memo(({ events, title = "
           </div>
         );
         
+      case 'world_engine':
+        return (
+          <div className="space-y-2">
+            <div className="font-medium text-green-900">🌍 World Engine</div>
+            <div className="text-sm text-green-800 bg-green-50 p-3 rounded space-y-2">
+              <div>{data.content || data.outcome_description || 'World Engine processing...'}</div>
+              {data.details && (
+                <div className="text-xs text-green-700 mt-2 p-2 bg-green-100 rounded">
+                  <pre className="whitespace-pre-wrap">{data.details}</pre>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+        
       default:
         return (
           <div className="space-y-2">
@@ -144,11 +159,4 @@ export const EventLog: React.FC<EventLogProps> = React.memo(({ events, title = "
       </ScrollArea>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if events have actually changed
-  return (
-    prevProps.title === nextProps.title &&
-    prevProps.events.length === nextProps.events.length &&
-    JSON.stringify(prevProps.events.slice(0, 10)) === JSON.stringify(nextProps.events.slice(0, 10))
-  );
-});
+};

@@ -1,62 +1,29 @@
-# Git
-.git/
-.gitignore
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-.pytest_cache/
-.coverage
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs (we want to mount these as volumes)
-logs/
+# Large data files that should not be in Docker build context
+data/narrative_images/*
+data/states/*
+logs/*
 *.log
-
-# Temporary files
-*.tmp
-*.temp
+*.jsonl
 
 # Build artifacts
+simulation-dashboard/node_modules/
+simulation-dashboard/src-tauri/target/
+simulation-dashboard/target/
 simulation-dashboard/dist/
-simulation-dashboard/build/
-target/
-src-tauri/target/
 
-# Test files
-test_*.py
-tests/
+# Cache and temporary files
+__pycache__/
+*.pyc
+.pytest_cache/
 
-# Documentation
-README.md
-*.md
-docs/
+# Version control
+.git
+.gitignore
 
-# CI/CD
-.github/
-.gitlab-ci.yml
+# IDE files
+.vscode/
+.claude/
 
-# Local environment files (will be mounted)
-.env.local
-.env.development
-.env.production
+# OS files
+.DS_Store
+Thumbs.db

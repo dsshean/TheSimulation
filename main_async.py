@@ -13,8 +13,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from rich.console import Console
-console = Console()
 
 from src.simulation_async import APP_NAME, run_simulation
 
@@ -78,12 +76,12 @@ if __name__ == "__main__":
     # Initialize event logger
     initialize_event_logger(args.instance_uuid)
 
-    console.print(f"[bold green]Starting {APP_NAME} Simulation[/bold green]")
-    console.print(f"Instance UUID: {args.instance_uuid or 'Latest'}")
+    print(f"[bold green]Starting {APP_NAME} Simulation[/bold green]")
+    print(f"Instance UUID: {args.instance_uuid or 'Latest'}")
     if args.override_location:
-        console.print(f"Location Override: {args.override_location}")
+        print(f"Location Override: {args.override_location}")
     if args.override_mood:
-        console.print(f"Mood Override: {args.override_mood}")
+        print(f"Mood Override: {args.override_mood}")
     
     try:
         if sys.platform == "win32":
@@ -98,11 +96,11 @@ if __name__ == "__main__":
         
     except KeyboardInterrupt:
         logger.warning("Simulation interrupted by user.")
-        console.print("\n[orange_red1]Simulation interrupted.[/]")
+        print("\n[orange_red1]Simulation interrupted.[/]")
     except Exception as e:
         logger.critical(f"An unexpected error occurred: {e}", exc_info=True)
-        console.print(f"[bold red]An unexpected error occurred:[/bold red] {e}")
-        console.print_exception(show_locals=False)
+        print(f"[bold red]An unexpected error occurred:[/bold red] {e}")
+        # print_exception(show_locals=False)
     finally:
         logging.shutdown()
-        console.print("Application finished.")
+        print("Application finished.")

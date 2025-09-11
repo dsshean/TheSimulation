@@ -15,6 +15,7 @@ struct SimulationState {
     world_feeds: serde_json::Value,
     world_template_details: serde_json::Value,
     narrative_log: Vec<String>,
+    recent_events: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

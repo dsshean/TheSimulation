@@ -189,7 +189,8 @@ async def time_manager_task(
             except Exception as e:
                 logger_instance.debug(f"[TimeManager] Error processing narration events: {e}")
             
-            live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
+            if live_display:
+                live_display.update(generate_table(current_state, event_bus_qsize_func(), narration_qsize_func()))
             
             # Update dashboard with live simulation data
             if dashboard_app and hasattr(dashboard_app, 'update_live_simulation_data'):

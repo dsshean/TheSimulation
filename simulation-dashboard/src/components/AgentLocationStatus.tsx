@@ -9,6 +9,7 @@ interface AgentLocationStatusProps {
 }
 
 export const AgentLocationStatus: React.FC<AgentLocationStatusProps> = React.memo(({ state }) => {
+  
   const simulacra = state.simulacra_profiles || {};
   const activeIds = state.active_simulacra_ids || [];
   const currentTime = state.world_time;

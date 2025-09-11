@@ -30,12 +30,19 @@ Update as of:
 **Usage:**
 
 ```bash
-# Start the dashboard
+# Option 1: Docker (Recommended for Production)
+docker-compose up -d
+
+# Option 2: Local Development
+# Start Redis
+docker run -d -p 6379:6379 redis:latest
+
+# Start simulation
+python main_async.py
+
+# Start dashboard (separate terminal)
 cd simulation-dashboard
 npm run tauri:dev
-
-# Start simulation with Redis
-python main_async.py
 ```
 
 ## Table of Contents
@@ -165,6 +172,34 @@ TheSimulation operates through a series of asynchronous components, orchestrated
 
 For users who want to get up and running immediately:
 
+## Docker Quick Start (Recommended)
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/dsshean/TheSimulation.git
+cd TheSimulation
+
+# 2. Configure environment
+cp .env.sample .env
+# Edit .env and add your GOOGLE_API_KEY
+
+# 3. Generate world and agents
+docker run --rm -v $(pwd):/app -w /app python:3.11-slim bash -c "
+  pip install -r requirements.txt && 
+  python setup_simulation_adk.py
+"
+
+# 4. Start everything with Docker
+docker-compose up -d
+
+# 5. Launch dashboard (separate terminal)
+cd simulation-dashboard
+npm install
+npm run tauri:dev
+```
+
+## Local Development Quick Start
+
 ```bash
 # 1. Clone and setup
 git clone https://github.com/dsshean/TheSimulation.git
@@ -173,10 +208,8 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# 2. Install and start Redis
-sudo apt install redis-server  # Ubuntu/Debian
-# OR: brew install redis && brew services start redis  # macOS
-# OR: docker run -d -p 6379:6379 redis:latest  # Docker
+# 2. Start Redis
+docker run -d -p 6379:6379 redis:latest
 
 # 3. Configure
 cp .env.sample .env
@@ -198,223 +231,283 @@ npm run tauri:dev
 
 ### Prerequisites
 
+**For Docker deployment:**
+- Docker and Docker Compose
+- Node.js (v18+) and npm - for dashboard
+- Rust toolchain - for Tauri desktop app
+
+**For local development:**
 - Python 3.11+
 - Git
-- Redis Server (for real-time communication)
-- Node.js (v16 or higher) - for dashboard
-- Rust - for Tauri desktop app
+- Redis Server (or Docker for Redis)
+- Node.js (v18+) and npm - for dashboard  
+- Rust toolchain - for Tauri desktop app
 
-### Setup
+### Setup Options
 
-1.  **Clone the repository:**
+## Option 1: Docker Setup (Recommended for Production)
 
-    ```bash
-    git clone https://github.com/dsshean/TheSimulation.git
-    cd TheSimulation
-    ```
+Docker provides a complete, self-contained environment with Redis and all dependencies.
 
-2.  **Set up a virtual environment (recommended):**
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/dsshean/TheSimulation.git
+   cd TheSimulation
+   ```
 
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
+2. **Configure environment:**
+   ```bash
+   cp .env.sample .env
+   # Edit .env and add your GOOGLE_API_KEY
+   ```
 
-3.  **Install Python dependencies:**
+3. **Build and start:**
+   ```bash
+   docker-compose up --build -d
+   ```
 
-    ```bash
-    pip install -r requirements.txt
-    # Dependencies include: google-adk, google-generativeai, python-dotenv, rich, redis, etc.
-    ```
+4. **Verify container is running:**
+   ```bash
+   docker-compose ps
+   docker-compose logs --tail=20
+   ```
 
-4.  **Install and Start Redis Server:**
+**Docker Features:**
+- ✅ **Fast builds** - Optimized Docker context (excludes large build artifacts)
+- ✅ **Self-contained** - Redis, Python simulation, and all dependencies included
+- ✅ **Production ready** - Supervisor manages all services automatically
+- ✅ **Persistent data** - Volumes mounted for `data/` and `logs/` directories
 
-    **Ubuntu/Debian:**
+## Option 2: Local Development Setup
 
-    ```bash
-    sudo apt update
-    sudo apt install redis-server
-    sudo systemctl start redis-server
-    sudo systemctl enable redis-server
-    ```
+For development and debugging, run components separately.
 
-    **macOS (using Homebrew):**
+1. **Clone and setup Python environment:**
+   ```bash
+   git clone https://github.com/dsshean/TheSimulation.git
+   cd TheSimulation
+   python -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-    ```bash
-    brew install redis
-    brew services start redis
-    ```
+2. **Start Redis (easiest with Docker):**
+   ```bash
+   docker run -d -p 6379:6379 --name redis-simulation redis:latest
+   # Verify: redis-cli ping (should return PONG)
+   ```
 
-    **Windows:**
+3. **Configure environment:**
+   ```bash
+   cp .env.sample .env
+   # Edit .env and add your GOOGLE_API_KEY
+   ```
 
-    ```bash
-    # Install Redis using WSL or download Windows port
-    # Or use Docker: docker run -d -p 6379:6379 redis:latest
-    ```
+4. **Generate world and agents:**
+   ```bash
+   python setup_simulation_adk.py
+   ```
 
-    **Verify Redis is running:**
-
-    ```bash
-    redis-cli ping
-    # Should return: PONG
-    ```
-
-5.  **Set up Configuration (API Key & Settings):**
-
-    - Create a `.env` file in the project root directory (copy from `.env.sample`):
-      ```bash
-      cp .env.sample .env
-      ```
-    - Edit the `.env` file and add your Google API Key:
-
-      ```dotenv
-      GOOGLE_API_KEY="YOUR_ACTUAL_GOOGLE_API_KEY"
-
-      # Redis Configuration (defaults should work for local setup)
-      REDIS_HOST=127.0.0.1
-      REDIS_PORT=6379
-      REDIS_DB=0
-
-      # Dashboard Integration
-      ENABLE_VISUALIZATION=true
-      ```
-
-6.  **World Setup (ADK Version - Recommended):**
-
-    ```bash
-    python setup_simulation_adk.py
-    ```
-
-    This will create:
-
-    - `data/states/world_config_[uuid].json`: Initial world configuration
-    - `data/life_summaries/life_summary_[AgentName]_[uuid].json`: Simulacra personas
-
-    **Note:** The legacy `setup_simulation.py` has been removed. Use the ADK version above.
+   This creates:
+   - `data/states/world_config_[uuid].json`: Initial world configuration  
+   - `data/life_summaries/life_summary_[AgentName]_[uuid].json`: Simulacra personas
 
 ## Running the Simulation
 
-### Tauri Desktop Dashboard (Recommended)
+### Tauri Desktop Dashboard
 
-The Tauri-based desktop dashboard provides a modern React interface with real-time visualization and interactive controls. It uses Redis for efficient real-time communication between the Python simulation and the UI.
+The Tauri-based desktop dashboard provides a modern React interface with real-time visualization and interactive controls. It connects to the simulation via Redis for efficient real-time communication.
 
-**Installation:**
+## Installing Rust and Node.js
 
-1. **Install Rust (if not already installed):**
+**Rust Installation:**
+```bash
+# Unix/macOS/Linux
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
 
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   source ~/.cargo/env
-   ```
+# Windows - Download installer from: https://rustup.rs/
+# Or use package manager: winget install Rustlang.Rustup
+```
 
-2. **Install Node.js dependencies:**
+**Node.js Installation:**
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install nodejs npm
 
-   ```bash
-   cd simulation-dashboard
-   npm install
-   ```
+# macOS
+brew install node
 
-3. **Tauri CLI (included in devDependencies):**
-   The Tauri CLI is automatically installed with `npm install` as a dev dependency.
+# Windows
+winget install OpenJS.NodeJS
+# Or download from: https://nodejs.org/
+```
 
-**Running the Full System:**
+## Running the Dashboard
 
-1. **Ensure Redis is running:**
+**Prerequisites:**
+- Simulation must be running (either Docker or local)
+- Redis must be accessible on port 6379
 
-   ```bash
-   redis-cli ping
-   # Should return: PONG
-   ```
-
-2. **Start the Simulation Backend:**
-   The simulation now includes Redis integration for real-time communication:
-
-   ```bash
-   python main_async.py
-   ```
-
-   You should see:
-
-   ```
-   INFO: [RedisClient] Connected to Redis at 127.0.0.1:6379
-   INFO: Redis integration started successfully
-   ```
-
-3. **Launch the Tauri Desktop App:**
-   In a separate terminal:
-   ```bash
-   cd simulation-dashboard
-   npm run tauri:dev
-   ```
-
-**Dashboard Features:**
-
-- **Real-time State Updates**: Redis pub/sub for instant UI updates
-- **Interactive Commands**: Inject narratives, send agent events, update world info
-- **Agent Visualization**: Live monitoring of simulacra status and actions
-- **Event Streaming**: Categorized real-time event logs (Simulacra, World Engine, Narrative)
-- **No UI Flickering**: Optimized React architecture prevents input interference
-- **Stable Text Input**: Fixed backwards text and focus issues
-
-**Dashboard Tabs:**
-
-- **Dashboard**: Overview with agent status and live event streams
-- **Visualization**: D3.js force-directed graph of agents and locations
-- **Interactive**: Command interface for direct simulation interaction
-
-**Building for Production:**
-
+**Setup and Launch:**
 ```bash
 cd simulation-dashboard
+
+# Install dependencies (first time only)
+npm install
+
+# Development mode (with hot reload)
+npm run tauri:dev
+
+# Build for production
 npm run tauri:build
 ```
 
-### Troubleshooting
+## Complete Workflow Examples
 
-**Common Issues:**
+### With Docker Backend:
+```bash
+# Terminal 1: Start simulation
+docker-compose up -d
 
-1. **Redis Connection Failed:**
+# Terminal 2: Start dashboard  
+cd simulation-dashboard
+npm run tauri:dev
+```
 
-   ```
-   ERROR: [RedisClient] Failed to connect to Redis
-   ```
+### With Local Backend:
+```bash
+# Terminal 1: Start Redis
+docker run -d -p 6379:6379 redis:latest
 
-   - Ensure Redis server is running: `redis-cli ping`
-   - Check Redis configuration in `.env` file
-   - For WSL users: Redis may need to be installed in WSL environment
+# Terminal 2: Start simulation
+python main_async.py
 
-2. **UI Flickering or Backwards Text:**
+# Terminal 3: Start dashboard
+cd simulation-dashboard
+npm run tauri:dev
+```
 
-   - This should be fixed in the current version
-   - If you still experience issues, try refreshing the dashboard
-   - Ensure you're using the latest version with React Context architecture
+## Dashboard Features
 
-3. **Tauri Permission Errors:**
+- **🔄 Real-time Updates**: All tabs update automatically via Redis pub/sub
+- **📊 Interactive Visualization**: D3.js force-directed graph of agents and locations  
+- **🎮 Interactive Commands**: Inject narratives, send agent events, update world info
+- **👥 Agent Monitoring**: Live simulacra status, thoughts, observations, and actions
+- **📝 Event Streaming**: Categorized real-time event logs (Simulacra, World Engine, Narrative)
+- **🖥️ Desktop Application**: Cross-platform native app with Tauri
+- **🚫 No UI Issues**: Fixed flickering, backwards text, and focus problems
 
-   ```
-   event.listen not allowed
-   ```
+## Dashboard Tabs
 
-   - The dashboard includes proper Tauri permissions configuration
-   - If issues persist, check `src-tauri/capabilities/default.json`
+- **Dashboard**: Overview with agent status and live event streams
+- **Visualization**: D3.js force-directed graph of agents and locations  
+- **Interactive**: Command interface for direct simulation interaction
 
-4. **Dashboard Shows "No Simulation Data":**
+## Build Options
 
-   - Ensure the Python simulation is running first
-   - Check that Redis connection is successful in both simulation and dashboard
-   - Verify the simulation is publishing state updates
+**Development (with hot reload):**
+```bash
+npm run tauri:dev
+```
 
-5. **Input Focus Issues:**
-   - The new architecture should prevent all focus-related problems
-   - If inputs still behave oddly, try closing and reopening the dashboard
+**Production build:**
+```bash
+npm run tauri:build
+# Creates executable in src-tauri/target/release/
+```
 
-**Performance Tips:**
+## Troubleshooting
 
-- Redis state updates are optimized to only publish when state changes
-- Dashboard uses React Context to prevent unnecessary re-renders
-- Interactive commands are isolated to prevent UI interference
+### Docker Issues
 
-This creates a standalone executable in `src-tauri/target/release/`.
+**Container fails to start:**
+```bash
+# Check container status
+docker-compose ps
+docker-compose logs --tail=50
+
+# Common fixes
+docker-compose down
+docker system prune -f  # Clean up unused containers
+docker-compose up --build -d
+```
+
+**Port conflicts:**
+```bash
+# If port 6379 is in use
+docker stop $(docker ps -q --filter "publish=6379")
+docker-compose up -d
+```
+
+### Dashboard Issues
+
+**Rust/Tauri build errors:**
+```bash
+# Update Rust toolchain
+rustup update
+
+# Clear Tauri cache
+cd simulation-dashboard
+rm -rf src-tauri/target/
+npm run tauri:dev
+```
+
+**Node.js dependency issues:**
+```bash
+# Clear npm cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**Dashboard shows "No Simulation Data":**
+- ✅ Verify simulation is running: `docker-compose ps` or check Python output
+- ✅ Check Redis connection: `redis-cli ping` (should return PONG)
+- ✅ Ensure ports aren't blocked by firewall
+
+**Real-time updates not working:**
+- ✅ Fixed in latest version - all tabs now update automatically
+- ✅ If issues persist, restart both simulation and dashboard
+
+### Simulation Issues
+
+**Redis connection failed:**
+```bash
+# Verify Redis is accessible
+redis-cli ping
+
+# For Docker Redis
+docker run -d -p 6379:6379 redis:latest
+
+# Check .env configuration
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+**Missing API key:**
+```bash
+# Ensure .env file exists with valid key
+cp .env.sample .env
+# Edit .env and add: GOOGLE_API_KEY="your_actual_key"
+```
+
+### Performance Optimization
+
+**For better performance:**
+- Use Docker for production deployments
+- Ensure adequate RAM (2GB+ recommended) 
+- Close unnecessary browser tabs when running dashboard
+- Monitor CPU usage with complex simulations
+
+**Docker resource limits:**
+Edit `docker-compose.yml` to adjust:
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 4G
+      cpus: '4.0'
+```
 
 ### Command-Line Output
 
