@@ -14,7 +14,7 @@ interface TabsProps {
   className?: string;
 }
 
-export const Tabs: React.FC<TabsProps> = React.memo(({ 
+export const Tabs: React.FC<TabsProps> = ({ 
   tabs, 
   defaultTab, 
   className = '' 
@@ -64,14 +64,4 @@ export const Tabs: React.FC<TabsProps> = React.memo(({
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if tab structure has changed
-  // Don't re-render for content updates - let the individual tab content handle that
-  return (
-    prevProps.tabs.length === nextProps.tabs.length &&
-    prevProps.defaultTab === nextProps.defaultTab &&
-    prevProps.className === nextProps.className &&
-    JSON.stringify(prevProps.tabs.map(t => ({ id: t.id, label: t.label }))) === 
-    JSON.stringify(nextProps.tabs.map(t => ({ id: t.id, label: t.label })))
-  );
-});
+};

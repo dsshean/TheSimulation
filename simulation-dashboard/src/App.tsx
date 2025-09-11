@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTauriSimulation } from './hooks/useTauriSimulation';
 import { WorldState } from './components/WorldState';
 import { AgentLocationStatus } from './components/AgentLocationStatus';
@@ -240,15 +240,15 @@ function App() {
                             {/* Simulacra Thoughts and Observations */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                               <EventLogBox
-                                title={selectedAgent === 'all' ? 'Simulacra Thoughts' : `${availableAgents.find(a => a.id === selectedAgent)?.name || selectedAgent} Thoughts`}
-                                events={filteredEvents.filter(e => e.event_type === 'monologue')}
+                                title="Simulacra Thoughts"
+                                events={events.filter(e => e.event_type === 'monologue')}
                                 icon={<Brain className="w-5 h-5" />}
                                 bgColor="bg-blue-50"
                                 textColor="text-blue-900"
                               />
                               <EventLogBox
-                                title={selectedAgent === 'all' ? 'Simulacra Observations' : `${availableAgents.find(a => a.id === selectedAgent)?.name || selectedAgent} Observations`}
-                                events={filteredEvents.filter(e => e.event_type === 'observation')}
+                                title="Simulacra Observations"
+                                events={events.filter(e => e.event_type === 'observation')}
                                 icon={<Eye className="w-5 h-5" />}
                                 bgColor="bg-cyan-50"
                                 textColor="text-cyan-900"
@@ -259,7 +259,7 @@ function App() {
                             <div>
                               <EventLogBox
                                 title="Narrative"
-                                events={filteredEvents.filter(e => e.event_type === 'narrative')}
+                                events={events.filter(e => e.event_type === 'narrative')}
                                 icon={<BookOpen className="w-5 h-5" />}
                                 bgColor="bg-orange-50"
                                 textColor="text-orange-900"
@@ -275,7 +275,7 @@ function App() {
                         content: (
                           <div className="bg-green-50 rounded-lg p-4 max-h-96 overflow-y-auto">
                             <EventLog 
-                              events={filteredEvents.filter(e => e.event_type === 'world_engine')} 
+                              events={events.filter(e => e.event_type === 'world_engine')} 
                               title="World Engine Events"
                             />
                           </div>

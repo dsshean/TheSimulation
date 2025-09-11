@@ -91,6 +91,44 @@ export const useTauriSimulation = () => {
             }
           });
         }
+        
+        // Narrative events from recent_events
+        if (event.event_type === 'narrative' && (event.agent_type === 'narrator' || event.agent_id === 'Narrator')) {
+          console.log('✅ Found Narrative event:', event.sim_time_s);
+          newEvents.push({
+            timestamp: eventTimestamp,
+            sim_time_s: event.sim_time_s || 0,
+            agent_id: 'Narrator',
+            event_type: 'narrative',
+            data: { 
+              content: event.data.narrative_text || event.data.content || 'Narrative update...',
+              narrative_text: event.data.narrative_text || event.data.content || 'Narrative update...'
+            }
+          });
+        }
+      });
+    }
+    
+    // Extract narrative from narrative_log as fallback
+    if (stateData.narrative_log && Array.isArray(stateData.narrative_log) && stateData.narrative_log.length > 0) {
+      console.log('📖 Extracting narrative from narrative_log:', stateData.narrative_log.length);
+      
+      // Get the last 10 narrative entries
+      stateData.narrative_log.slice(-10).forEach((narrative: string, index: number) => {
+        // Extract the timestamp from narrative text like "[T56.7]"
+        const timestampMatch = narrative.match(/\[T([\d.]+)\]/);
+        const narrativeTimestamp = timestampMatch ? parseFloat(timestampMatch[1]) : (stateData.world_time || 0) - (index * 0.1);
+        
+        newEvents.push({
+          timestamp: narrativeTimestamp,
+          sim_time_s: narrativeTimestamp,
+          agent_id: 'Narrator',
+          event_type: 'narrative',
+          data: { 
+            content: narrative,
+            narrative_text: narrative
+          }
+        });
       });
     }
     
